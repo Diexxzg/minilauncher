@@ -541,4 +541,11 @@ fun HomeRoot(tick: Int, homeTick: Int) {
                     favs = move(favs, p, 1)
                     prefs.saveFavs(favs)
                 },
-                o
+                                onHide = { p ->
+                    hidden = if (p in hidden) hidden - p else hidden + p
+                    prefs.saveHidden(hidden)
+                }
+            )
+        }
+    }
+}
