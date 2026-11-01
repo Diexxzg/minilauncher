@@ -79,7 +79,7 @@ fun WallpaperLayer(file: File?) {
         )
     } else {
         val bmp by produceState<ImageBitmap?>(null, file) {
-            value = withContext(Dispatchers.IO) { loadBitmap(file, 1920) }
+                        value = withContext(Dispatchers.IO) { loadBitmap(file, 1920) }
         }
         val b = bmp
         if (b != null) {
