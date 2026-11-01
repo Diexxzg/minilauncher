@@ -8,7 +8,6 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -16,8 +15,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -51,7 +49,6 @@ fun HomeRoot(tick: Int, homeTick: Int) {
     var hidden by remember { mutableStateOf(prefs.hidden()) }
     var walls by remember { mutableStateOf<List<File>>(emptyList()) }
     var wallName by remember { mutableStateOf(prefs.wallpaper) }
-    var wallBmp by remember { mutableStateOf<ImageBitmap?>(null) }
     var media by remember { mutableStateOf<MediaInfo?>(null) }
     var screen by remember { mutableStateOf("home") }
 
@@ -68,17 +65,16 @@ fun HomeRoot(tick: Int, homeTick: Int) {
         }
     }
 
-    LaunchedEffect(wallName, walls) {
-        val f = walls.firstOrNull { it.name == wallName } ?: walls.firstOrNull()
-        wallBmp = if (f == null) null else withContext(Dispatchers.IO) { loadBitmap(f, 3840) }
-    }
-
     LaunchedEffect(Unit) {
         while (true) {
             media = withContext(Dispatchers.IO) { readMedia(ctx) }
             delay(1000)
         }
     }
+
+    val m = media
+    val art = remember(m?.bitmap) { m?.bitmap?.asImageBitmap() }
+    val selected = walls.firstOrNull { it.name == wallName } ?: walls.firstOrNull()
 
     BackHandler {
         screen = if (screen == "walls" || screen == "edit") "settings" else "home"
@@ -115,7 +111,7 @@ fun HomeRoot(tick: Int, homeTick: Int) {
     }
 
     Box(Modifier.fillMaxSize().background(Color(0xFF0B1020))) {
-        wallBmp?.let { Image(it, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop) }
+        WallpaperLayer(selected)
         Box(
             Modifier.fillMaxSize().background(
                 Brush.verticalGradient(listOf(Color(0x22000000), Color.Transparent, Color(0x99000000)))
@@ -123,7 +119,7 @@ fun HomeRoot(tick: Int, homeTick: Int) {
         )
         when (screen) {
             "home" -> HomeScreen(
-                dock, media, null,
+                dock, m, art,
                 { launch(it) },
                 { screen = "all" },
                 { screen = "settings" },
@@ -143,7 +139,7 @@ fun HomeRoot(tick: Int, homeTick: Int) {
                     wallName = n
                     prefs.wallpaper = n
                 },
-                onAdd = { picker.launch(arrayOf("image/*")) }
+                onAdd = { picker.launch(arrayOf("image/*", "video/*")) }
             )
             "edit" -> EditApps(
                 apps = apps,
