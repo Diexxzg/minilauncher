@@ -3,6 +3,7 @@ package com.mini.launcher
 import android.content.Context
 import android.content.Intent
 import android.graphics.BitmapFactory
+import android.media.MediaMetadataRetriever
 import android.net.Uri
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
@@ -63,10 +64,25 @@ fun wallDir(ctx: Context): File {
 
 fun listWalls(ctx: Context): List<File> =
     (wallDir(ctx).listFiles() ?: emptyArray())
-        .filter { it.extension.lowercase() in setOf("png", "jpg", "jpeg", "webp") }
+        .filter {
+            it.extension.lowercase() in setOf(
+                "png", "jpg", "jpeg", "webp", "gif", "mp4", "webm", "mkv", "3gp"
+            )
+        }
         .sortedBy { it.name }
 
 fun loadBitmap(f: File, target: Int): ImageBitmap? {
+    if (f.extension.lowercase() in setOf("mp4", "webm", "mkv", "3gp")) {
+        return try {
+            val r = MediaMetadataRetriever()
+            r.setDataSource(f.path)
+            val b = r.getFrameAtTime(1_000_000L)
+            r.release()
+            b?.asImageBitmap()
+        } catch (e: Exception) {
+            null
+        }
+    }
     val o = BitmapFactory.Options().apply { inJustDecodeBounds = true }
     BitmapFactory.decodeFile(f.path, o)
     var s = 1
@@ -76,7 +92,16 @@ fun loadBitmap(f: File, target: Int): ImageBitmap? {
 }
 
 fun importWall(ctx: Context, uri: Uri): String? {
-    val name = "fondo_" + System.currentTimeMillis() + ".jpg"
+    val mime = ctx.contentResolver.getType(uri) ?: ""
+    val ext = when {
+        mime == "image/gif" -> "gif"
+        mime == "image/webp" -> "webp"
+        mime == "image/png" -> "png"
+        mime == "video/webm" -> "webm"
+        mime.startsWith("video/") -> "mp4"
+        else -> "jpg"
+    }
+    val name = "fondo_" + System.currentTimeMillis() + "." + ext
     return try {
         ctx.contentResolver.openInputStream(uri)?.use { input ->
             File(wallDir(ctx), name).outputStream().use { out -> input.copyTo(out) }
