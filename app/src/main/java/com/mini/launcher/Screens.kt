@@ -13,8 +13,13 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -22,7 +27,13 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import android.content.Context
+import android.content.Intent
+import android.media.tv.TvContract
+import android.media.tv.TvInputManager
 import androidx.core.app.NotificationManagerCompat
+import kotlin.math.cos
+import kotlin.math.sin
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -35,7 +46,9 @@ fun HomeScreen(
     art: ImageBitmap?,
     onLaunch: (AppInfo) -> Unit,
     onAll: () -> Unit,
-    onSettings: () -> Unit
+    onSettings: () -> Unit,
+    onWifi: () -> Unit,
+    onInputs: () -> Unit
 ) {
     val st = LocalDock.current
     val f = st.scalePct / 100f
@@ -56,7 +69,7 @@ fun HomeScreen(
         Row(
             Modifier.align(Alignment.TopEnd).padding(32.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(18.dp)
+            horizontalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             if (media != null) {
                 MusicPill(media, art)
@@ -67,8 +80,14 @@ fun HomeScreen(
                 )
             }
             Clock()
+            GlassBox(onClick = onInputs, modifier = Modifier.size(44.dp), shape = CircleShape) {
+                InputIcon(Color.White)
+            }
+            GlassBox(onClick = onWifi, modifier = Modifier.size(44.dp), shape = CircleShape) {
+                WifiIcon(Color.White)
+            }
             GlassBox(onClick = onSettings, modifier = Modifier.size(44.dp), shape = CircleShape) {
-                Text("⚙", color = Color.White, fontSize = 20.sp)
+                GearIcon(Color.White)
             }
         }
         LazyRow(
@@ -319,6 +338,127 @@ fun EditApps(
                     SmallBtn("+") { onSize(app.pkg, (pct + 10).coerceIn(50, 200)) }
                     SmallBtn(if (app.pkg in hidden) "Mostrar" else "Ocultar") { onHide(app.pkg) }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+fun WifiIcon(color: Color, s: Int = 22) {
+    Canvas(Modifier.size(s.dp)) {
+        val w = size.width
+        val cx = w / 2f
+        val cy = w * 0.82f
+        val sw = w * 0.1f
+        for (k in 1..3) {
+            val r = w * 0.2f * k
+            drawArc(
+                color = color,
+                startAngle = 225f,
+                sweepAngle = 90f,
+                useCenter = false,
+                topLeft = Offset(cx - r, cy - r),
+                size = Size(2f * r, 2f * r),
+                style = Stroke(sw, cap = StrokeCap.Round)
+            )
+        }
+        drawCircle(color, sw * 0.8f, Offset(cx, cy))
+    }
+}
+
+@Composable
+fun InputIcon(color: Color, s: Int = 22) {
+    Canvas(Modifier.size(s.dp)) {
+        val w = size.width
+        val sw = w * 0.09f
+        drawRoundRect(
+            color = color,
+            topLeft = Offset(w * 0.34f, w * 0.16f),
+            size = Size(w * 0.52f, w * 0.68f),
+            cornerRadius = CornerRadius(w * 0.08f, w * 0.08f),
+            style = Stroke(sw)
+        )
+        drawLine(color, Offset(w * 0.08f, w * 0.5f), Offset(w * 0.6f, w * 0.5f), strokeWidth = sw, cap = StrokeCap.Round)
+        drawLine(color, Offset(w * 0.42f, w * 0.34f), Offset(w * 0.6f, w * 0.5f), strokeWidth = sw, cap = StrokeCap.Round)
+        drawLine(color, Offset(w * 0.42f, w * 0.66f), Offset(w * 0.6f, w * 0.5f), strokeWidth = sw, cap = StrokeCap.Round)
+    }
+}
+
+@Composable
+fun GearIcon(color: Color, s: Int = 22) {
+    Canvas(Modifier.size(s.dp)) {
+        val w = size.width
+        val c = Offset(w / 2f, w / 2f)
+        drawCircle(color, radius = w * 0.2f, center = c, style = Stroke(w * 0.1f))
+        for (i in 0 until 8) {
+            val a = Math.toRadians(i * 45.0)
+            val dx = cos(a).toFloat()
+            val dy = sin(a).toFloat()
+            drawLine(
+                color,
+                Offset(c.x + dx * w * 0.32f, c.y + dy * w * 0.32f),
+                Offset(c.x + dx * w * 0.46f, c.y + dy * w * 0.46f),
+                strokeWidth = w * 0.12f,
+                cap = StrokeCap.Round
+            )
+        }
+    }
+}
+
+class InputItem(val id: String, val label: String)
+
+fun listInputs(ctx: Context): List<InputItem> {
+    return try {
+        val tm = ctx.getSystemService(Context.TV_INPUT_SERVICE) as TvInputManager
+        tm.tvInputList
+            .filter { it.isPassthroughInput }
+            .map {
+                InputItem(
+                    it.id,
+                    (it.loadCustomLabel(ctx) ?: it.loadLabel(ctx)).toString()
+                )
+            }
+    } catch (e: Exception) {
+        emptyList()
+    }
+}
+
+fun openInput(ctx: Context, id: String) {
+    try {
+        val i = Intent(Intent.ACTION_VIEW, TvContract.buildChannelUriForPassthroughInput(id))
+        i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        ctx.startActivity(i)
+    } catch (e: Exception) {
+    }
+}
+
+@Composable
+fun InputsPanel(items: List<InputItem>, onPick: (String) -> Unit, onClose: () -> Unit) {
+    val shape = RoundedCornerShape(28.dp)
+    Box(Modifier.fillMaxSize().background(Color(0x55000000)), contentAlignment = Alignment.CenterEnd) {
+        Column(
+            Modifier
+                .padding(32.dp)
+                .width(380.dp)
+                .clip(shape)
+                .background(Color(0x55FFFFFF))
+                .border(1.dp, Color(0x55FFFFFF), shape)
+                .verticalScroll(rememberScrollState())
+                .padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text("Entradas", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Medium)
+            if (items.isEmpty()) {
+                Text(
+                    "No se encontraron entradas de TV (HDMI).",
+                    color = Color(0xCCFFFFFF), fontSize = 14.sp
+                )
+                PanelItem("Cerrar", Modifier.autoFocus()) { onClose() }
+            } else {
+                items.forEachIndexed { i, it ->
+                    PanelItem(it.label, if (i == 0) Modifier.autoFocus() else Modifier) { onPick(it.id) }
+                }
+                PanelItem("Cerrar") { onClose() }
             }
         }
     }
