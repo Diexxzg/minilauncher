@@ -18,10 +18,14 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.ClipOp
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.LayoutCoordinates
@@ -59,17 +63,23 @@ fun Modifier.softGlow(color: Color, level: Int, amount: () -> Float, corner: Dp)
     return this.drawBehind {
         val a = amount()
         if (a > 0.01f) {
-            val layers = 10
-            val step = (1.5f + level * 0.6f).dp.toPx()
+            val layers = 18
+            val reach = (4f + level * 3f).dp.toPx()
             val base = corner.toPx()
-            for (i in layers downTo 1) {
-                val e = step * i
-                drawRoundRect(
-                    color = color.copy(alpha = (0.05f + 0.02f * level) * a),
-                    topLeft = Offset(-e, -e),
-                    size = Size(size.width + 2f * e, size.height + 2f * e),
-                    cornerRadius = CornerRadius(base + e, base + e)
-                )
+            val hole = Path()
+            hole.addRoundRect(RoundRect(0f, 0f, size.width, size.height, CornerRadius(base, base)))
+            // El brillo solo se dibuja por fuera de la tarjeta y se desvanece poco a poco.
+            clipPath(hole, ClipOp.Difference) {
+                val p = (0.018f + 0.006f * level) * a
+                for (i in layers downTo 1) {
+                    val e = reach * i / layers
+                    drawRoundRect(
+                        color = color.copy(alpha = p),
+                        topLeft = Offset(-e, -e),
+                        size = Size(size.width + 2f * e, size.height + 2f * e),
+                        cornerRadius = CornerRadius(base + e, base + e)
+                    )
+                }
             }
         }
     }
@@ -186,6 +196,25 @@ fun Clock() {
         f.format(now), color = Color(0xEBFFFFFF), fontSize = 22.sp,
         fontWeight = FontWeight.Medium,
         style = TextStyle(shadow = Shadow(Color(0xAA000000), Offset(0f, 2f), 8f))
+    )
+}
+
+@Composable
+fun DateText(modifier: Modifier = Modifier) {
+    var now by remember { mutableStateOf(Date()) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            now = Date()
+            delay(60_000)
+        }
+    }
+    val f = remember { SimpleDateFormat("EEEE, d 'de' MMMM", Locale.forLanguageTag("es-VE")) }
+    Text(
+        f.format(now).replaceFirstChar { it.uppercase() },
+        color = Color(0xCCFFFFFF), fontSize = 16.sp,
+        fontWeight = FontWeight.Medium,
+        style = TextStyle(shadow = Shadow(Color(0xAA000000), Offset(0f, 2f), 8f)),
+        modifier = modifier
     )
 }
 
