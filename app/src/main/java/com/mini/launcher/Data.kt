@@ -9,6 +9,8 @@ import android.net.Uri
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.core.graphics.drawable.toBitmap
+import org.json.JSONArray
+import org.json.JSONObject
 import java.io.File
 
 class AppInfo(
@@ -20,6 +22,11 @@ class AppInfo(
     val glow: Int
 )
 
+object AppCache {
+    @Volatile
+    var apps: List<AppInfo> = emptyList()
+}
+
 class Prefs(ctx: Context) {
     private val sp = ctx.getSharedPreferences("home", Context.MODE_PRIVATE)
     fun favs(): List<String> =
@@ -30,6 +37,67 @@ class Prefs(ctx: Context) {
     fun hidden(): Set<String> = (sp.getStringSet("hidden", emptySet()) ?: emptySet()).toSet()
     fun saveHidden(s: Set<String>) {
         sp.edit().putStringSet("hidden", s).apply()
+    }
+    fun recents(): List<String> =
+        (sp.getString("recents", "") ?: "").split(",").filter { it.isNotEmpty() }
+    fun pushRecent(p: String): List<String> {
+        val l = (listOf(p) + recents().filter { it != p }).take(10)
+        sp.edit().putString("recents", l.joinToString(",")).apply()
+        return l
+    }
+    fun usage(): Map<String, Int> {
+        val out = HashMap<String, Int>()
+        for (part in (sp.getString("usage", "") ?: "").split(",")) {
+            val p = part.split(":")
+            if (p.size == 2) {
+                val v = p[1].toIntOrNull()
+                if (v != null) out[p[0]] = v
+            }
+        }
+        return out
+    }
+    fun bumpUsage(p: String): Map<String, Int> {
+        val m = HashMap(usage())
+        m[p] = (m[p] ?: 0) + 1
+        sp.edit().putString("usage", m.entries.joinToString(",") { it.key + ":" + it.value }).apply()
+        return m
+    }
+    fun exportJson(): String {
+        val o = JSONObject()
+        for ((k, v) in sp.all) {
+            when (v) {
+                is Int, is Long, is Boolean, is String -> o.put(k, v)
+                is Set<*> -> o.put(k, JSONArray(v.map { it.toString() }))
+                else -> {}
+            }
+        }
+        return o.toString(2)
+    }
+    fun importJson(text: String): Boolean {
+        return try {
+            val o = JSONObject(text)
+            val e = sp.edit()
+            e.clear()
+            val keys = o.keys()
+            while (keys.hasNext()) {
+                val k = keys.next()
+                when (val v = o.get(k)) {
+                    is Int -> e.putInt(k, v)
+                    is Long -> e.putLong(k, v)
+                    is Boolean -> e.putBoolean(k, v)
+                    is String -> e.putString(k, v)
+                    is JSONArray -> e.putStringSet(k, (0 until v.length()).map { i -> v.getString(i) }.toSet())
+                    else -> {}
+                }
+            }
+            e.commit()
+        } catch (ex: Exception) {
+            false
+        }
+    }
+    fun getStr(k: String, d: String): String = sp.getString(k, d) ?: d
+    fun putStr(k: String, v: String) {
+        sp.edit().putString(k, v).apply()
     }
     fun getInt(k: String, d: Int): Int = sp.getInt(k, d)
     fun putInt(k: String, v: Int) {
@@ -214,4 +282,27 @@ fun openSystem(ctx: Context, key: String) {
         if (tryStart(ctx, t)) return
     }
     tryStart(ctx, "android.settings.SETTINGS")
+}
+
+fun backupFile(ctx: Context): File {
+    val base = ctx.getExternalFilesDir(null) ?: ctx.filesDir
+    return File(base, "ajustes_launcher.json")
+}
+
+fun writeBackup(ctx: Context, prefs: Prefs): Boolean =
+    try {
+        backupFile(ctx).writeText(prefs.exportJson())
+        true
+    } catch (e: Exception) {
+        false
+    }
+
+fun readBackup(ctx: Context, prefs: Prefs): Boolean {
+    val f = backupFile(ctx)
+    if (!f.exists()) return false
+    return try {
+        prefs.importJson(f.readText())
+    } catch (e: Exception) {
+        false
+    }
 }
