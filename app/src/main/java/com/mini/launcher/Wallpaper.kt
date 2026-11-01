@@ -5,6 +5,8 @@ import android.graphics.ImageDecoder
 import android.graphics.drawable.AnimatedImageDrawable
 import android.graphics.drawable.Drawable
 import android.view.View
+import android.widget.Toast
+import androidx.compose.ui.platform.LocalContext
 import android.widget.ImageView
 import android.widget.VideoView
 import androidx.compose.foundation.Image
@@ -30,6 +32,7 @@ class FillVideoView(ctx: Context) : VideoView(ctx) {
 @Composable
 fun WallpaperLayer(file: File?) {
     if (file == null) return
+    val ctx = LocalContext.current
     val ext = file.extension.lowercase()
     if (ext in setOf("mp4", "webm", "mkv", "3gp")) {
         AndroidView(
@@ -40,7 +43,10 @@ fun WallpaperLayer(file: File?) {
                         mp.isLooping = true
                         mp.setVolume(0f, 0f)
                     }
-                    setOnErrorListener { _, _, _ -> true }
+                    setOnErrorListener { _, _, _ ->
+                        Toast.makeText(c, "No se pudo reproducir el fondo", Toast.LENGTH_SHORT).show()
+                        true
+                    }
                 }
             },
             update = { v ->
@@ -62,6 +68,9 @@ fun WallpaperLayer(file: File?) {
                     null
                 }
             }
+            if (value == null) {
+                Toast.makeText(ctx, "No se pudo cargar el fondo", Toast.LENGTH_SHORT).show()
+            }
         }
         AndroidView(
             modifier = Modifier.fillMaxSize(),
@@ -79,7 +88,10 @@ fun WallpaperLayer(file: File?) {
         )
     } else {
         val bmp by produceState<ImageBitmap?>(null, file) {
-                        value = withContext(Dispatchers.IO) { loadBitmap(file, 1920) }
+        value = withContext(Dispatchers.IO) { loadBitmap(file, 1920) }
+        if (value == null) {
+            Toast.makeText(ctx, "No se pudo cargar el fondo", Toast.LENGTH_SHORT).show()
+        }
         }
         val b = bmp
         if (b != null) {
