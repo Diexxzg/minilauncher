@@ -206,6 +206,18 @@ fun Equalizer(playing: Boolean, color: Color) {
     }
 }
 
+/** Escala toda la pildora (tamaños en dp y sp) sin romper el diseño. */
+@Composable
+fun ScaledPill(m: MediaInfo, art: ImageBitmap?, pct: Int) {
+    val d = androidx.compose.ui.platform.LocalDensity.current
+    androidx.compose.runtime.CompositionLocalProvider(
+        androidx.compose.ui.platform.LocalDensity provides
+            androidx.compose.ui.unit.Density(d.density * pct / 100f, d.fontScale)
+    ) {
+        MusicPill(m, art)
+    }
+}
+
 @Composable
 fun MusicPill(m: MediaInfo, art: ImageBitmap?) {
     var pos by remember { mutableLongStateOf(0L) }
@@ -250,7 +262,7 @@ fun MusicPill(m: MediaInfo, art: ImageBitmap?) {
             }
             Column(Modifier.widthIn(max = 170.dp)) {
                 Text(
-                    "REPRODUCIENDO", color = Color(0xB3FFFFFF), fontSize = 9.sp,
+                    "REPRODUCIENDO", color = Color(0xB3FFFFFF), fontSize = 12.sp,
                     letterSpacing = 1.5.sp, fontWeight = FontWeight.Medium
                 )
                 Text(
@@ -258,7 +270,7 @@ fun MusicPill(m: MediaInfo, art: ImageBitmap?) {
                     maxLines = 1, overflow = TextOverflow.Ellipsis
                 )
                 Text(
-                    m.artist, color = Color(0xB3FFFFFF), fontSize = 11.sp,
+                    m.artist, color = Color(0xB3FFFFFF), fontSize = 13.sp,
                     maxLines = 1, overflow = TextOverflow.Ellipsis
                 )
             }
