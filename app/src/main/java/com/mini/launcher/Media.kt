@@ -10,7 +10,9 @@ import android.media.session.PlaybackState
 import android.os.SystemClock
 import android.service.notification.NotificationListenerService
 import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
@@ -21,24 +23,22 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.input.key.KeyEventType
-import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.onKeyEvent
-import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 
 class MediaListener : NotificationListenerService()
 
@@ -47,8 +47,6 @@ class MediaInfo(
     val artist: String,
     val bitmap: Bitmap?,
     val playing: Boolean,
-    val position: Long,
-    val duration: Long,
     val controller: MediaController
 )
 
@@ -67,31 +65,42 @@ fun readMedia(ctx: Context): MediaInfo? {
         val bmp = md.getBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART)
             ?: md.getBitmap(MediaMetadata.METADATA_KEY_ART)
             ?: md.getBitmap(MediaMetadata.METADATA_KEY_DISPLAY_ICON)
-        val st = c.playbackState
-        val playing = st?.state == PlaybackState.STATE_PLAYING
-        var pos = st?.position ?: 0L
-        if (st != null && playing) {
-            pos += ((SystemClock.elapsedRealtime() - st.lastPositionUpdateTime) * st.playbackSpeed).toLong()
-        }
-        val dur = md.getLong(MediaMetadata.METADATA_KEY_DURATION)
-        if (pos < 0L) pos = 0L
-        if (dur > 0L && pos > dur) pos = dur
-        return MediaInfo(title, artist, bmp, playing, pos, dur, c)
+        val playing = c.playbackState?.state == PlaybackState.STATE_PLAYING
+        return MediaInfo(title, artist, bmp, playing, c)
     } catch (e: Exception) {
         return null
     }
 }
 
-fun timeText(ms: Long): String {
-    val s = if (ms < 0L) 0L else ms / 1000L
-    return "%d:%02d".format(s / 60L, s % 60L)
+fun sameMedia(a: MediaInfo?, b: MediaInfo?): Boolean {
+    if (a == null || b == null) return a == null && b == null
+    return a.title == b.title && a.artist == b.artist && a.playing == b.playing &&
+        (a.bitmap == null) == (b.bitmap == null) &&
+        a.controller.sessionToken == b.controller.sessionToken
 }
 
-fun seekBy(m: MediaInfo, d: Long) {
-    var t = m.position + d
+fun livePosition(c: MediaController): Pair<Long, Long> {
+    return try {
+        val st = c.playbackState
+        val dur = c.metadata?.getLong(MediaMetadata.METADATA_KEY_DURATION) ?: 0L
+        var pos = st?.position ?: 0L
+        if (st != null && st.state == PlaybackState.STATE_PLAYING) {
+            pos += ((SystemClock.elapsedRealtime() - st.lastPositionUpdateTime) * st.playbackSpeed).toLong()
+        }
+        if (pos < 0L) pos = 0L
+        if (dur > 0L && pos > dur) pos = dur
+        Pair(pos, dur)
+    } catch (e: Exception) {
+        Pair(0L, 0L)
+    }
+}
+
+fun seekBy(c: MediaController, d: Long) {
+    val r = livePosition(c)
+    var t = r.first + d
     if (t < 0L) t = 0L
-    if (m.duration > 0L && t > m.duration) t = m.duration
-    m.controller.transportControls.seekTo(t)
+    if (r.second > 0L && t > r.second) t = r.second
+    c.transportControls.seekTo(t)
 }
 
 fun DrawScope.drawPlay(c: Color) {
@@ -138,8 +147,8 @@ fun DrawScope.drawPrev(c: Color) {
 }
 
 @Composable
-fun Icon24(kind: String, color: Color) {
-    Canvas(Modifier.size(22.dp)) {
+fun Icon24(kind: String, color: Color, size: Int = 22) {
+    Canvas(Modifier.size(size.dp)) {
         when (kind) {
             "play" -> drawPlay(color)
             "pause" -> drawPause(color)
@@ -150,11 +159,7 @@ fun Icon24(kind: String, color: Color) {
 }
 
 @Composable
-fun CircleBtn(
-    size: Int,
-    onClick: () -> Unit,
-    content: @Composable BoxScope.() -> Unit
-) {
+fun CircleBtn(size: Int, onClick: () -> Unit, content: @Composable BoxScope.() -> Unit) {
     GlassBox(
         onClick = onClick,
         modifier = Modifier.size(size.dp),
@@ -163,111 +168,118 @@ fun CircleBtn(
     )
 }
 
+fun DrawScope.eqBars(hs: List<Float>, color: Color) {
+    val bw = size.width / 7f
+    for (i in 0 until 4) {
+        val bh = size.height * hs[i]
+        drawRoundRect(
+            color,
+            Offset(i * 2f * bw, size.height - bh),
+            Size(bw, bh),
+            CornerRadius(bw / 2f, bw / 2f)
+        )
+    }
+}
+
 @Composable
-fun ControlsRow(m: MediaInfo) {
-    val tc = m.controller.transportControls
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(14.dp)
-    ) {
-        CircleBtn(44, { tc.skipToPrevious() }) { Icon24("prev", Color.White) }
-        CircleBtn(44, { seekBy(m, -15000L) }) {
-            Text("-15", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+fun EqAnimated(color: Color) {
+    val t = rememberInfiniteTransition(label = "eq")
+    val a = t.animateFloat(0.25f, 1f, infiniteRepeatable(tween(420, easing = LinearEasing), RepeatMode.Reverse), label = "a")
+    val b = t.animateFloat(0.25f, 1f, infiniteRepeatable(tween(560, easing = LinearEasing), RepeatMode.Reverse), label = "b")
+    val c = t.animateFloat(0.25f, 1f, infiniteRepeatable(tween(340, easing = LinearEasing), RepeatMode.Reverse), label = "c")
+    val d = t.animateFloat(0.25f, 1f, infiniteRepeatable(tween(500, easing = LinearEasing), RepeatMode.Reverse), label = "d")
+    Canvas(Modifier.size(22.dp, 18.dp)) {
+        eqBars(listOf(a.value, b.value, c.value, d.value), color)
+    }
+}
+
+@Composable
+fun Equalizer(playing: Boolean, color: Color) {
+    if (playing) {
+        EqAnimated(color)
+    } else {
+        Canvas(Modifier.size(22.dp, 18.dp)) {
+            eqBars(listOf(0.3f, 0.3f, 0.3f, 0.3f), color)
         }
-        CircleBtn(64, { if (m.playing) tc.pause() else tc.play() }) {
+    }
+}
+
+@Composable
+fun MusicPill(m: MediaInfo, art: ImageBitmap?) {
+    var pos by remember { mutableLongStateOf(0L) }
+    var dur by remember { mutableLongStateOf(0L) }
+    LaunchedEffect(m.controller, m.title, m.playing) {
+        while (true) {
+            val r = withContext(Dispatchers.IO) { livePosition(m.controller) }
+            pos = r.first
+            dur = r.second
+            delay(500)
+        }
+    }
+    val tc = m.controller.transportControls
+    val shape = RoundedCornerShape(50)
+    Box(
+        Modifier
+            .clip(shape)
+            .background(Brush.horizontalGradient(listOf(Color(0x44FFFFFF), Color(0x1AFFFFFF))))
+            .border(1.dp, Color(0x33FFFFFF), shape)
+    ) {
+        Row(
+            Modifier.padding(start = 10.dp, end = 12.dp, top = 8.dp, bottom = 11.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
             Box(
-                Modifier.size(52.dp).clip(CircleShape).background(Color.White),
+                Modifier.size(44.dp).clip(CircleShape).background(Color(0x33FFFFFF)),
                 contentAlignment = Alignment.Center
             ) {
-                Icon24(if (m.playing) "pause" else "play", Color(0xFF101418))
-            }
-        }
-        CircleBtn(44, { seekBy(m, 15000L) }) {
-            Text("+15", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-        }
-        CircleBtn(44, { tc.skipToNext() }) { Icon24("next", Color.White) }
-    }
-}
-
-@Composable
-fun GlassCurrent(m: MediaInfo, modifier: Modifier = Modifier) {
-    var focused by remember { mutableStateOf(false) }
-    val target = if (m.duration > 0L) (m.position.toFloat() / m.duration.toFloat()).coerceIn(0f, 1f) else 0f
-    val frac by animateFloatAsState(target, tween(900, easing = LinearEasing), label = "progress")
-    Column(modifier) {
-        Column(Modifier.widthIn(max = 440.dp)) {
-            Box(
-                Modifier
-                    .fillMaxWidth()
-                    .onFocusChanged { focused = it.isFocused }
-                    .onKeyEvent { e ->
-                        if (e.type == KeyEventType.KeyDown &&
-                            (e.key == Key.DirectionLeft || e.key == Key.DirectionRight)
-                        ) {
-                            seekBy(m, if (e.key == Key.DirectionRight) 15000L else -15000L)
-                            true
-                        } else {
-                            false
-                        }
-                    }
-                    .focusable()
-            ) {
-                Canvas(Modifier.fillMaxWidth().height(22.dp)) {
-                    val w = size.width
-                    val h = size.height
-                    val th = (if (focused) 8f else 6f).dp.toPx()
-                    val y = (h - th) / 2f
-                    val rad = CornerRadius(th / 2f, th / 2f)
-                    drawRoundRect(Color(0x44FFFFFF), Offset(0f, y), Size(w, th), rad)
-                    val pw = w * frac
-                    if (pw > 0f) {
-                        drawRoundRect(Color.White, Offset(0f, y), Size(pw, th), rad)
-                    }
-                    if (focused) {
-                        drawCircle(Color.White, 9.dp.toPx(), Offset(pw, h / 2f))
-                    }
+                if (art != null) {
+                    Image(art, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                } else {
+                    Text("♪", color = Color.White, fontSize = 20.sp)
                 }
             }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(timeText(m.position), color = Color(0xCCFFFFFF), fontSize = 12.sp)
-                Text("-" + timeText(m.duration - m.position), color = Color(0xCCFFFFFF), fontSize = 12.sp)
+            Column(Modifier.widthIn(max = 200.dp)) {
+                Text(
+                    "REPRODUCIENDO", color = Color(0xB3FFFFFF), fontSize = 9.sp,
+                    letterSpacing = 1.5.sp, fontWeight = FontWeight.Medium
+                )
+                Text(
+                    m.title, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    m.artist, color = Color(0xB3FFFFFF), fontSize = 11.sp,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis
+                )
             }
-            Spacer(Modifier.height(10.dp))
-            Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                ControlsRow(m)
+            Equalizer(m.playing, Color.White)
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                CircleBtn(32, { tc.skipToPrevious() }) { Icon24("prev", Color.White, 16) }
+                CircleBtn(32, { seekBy(m.controller, -15000L) }) {
+                    Text("-15", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                }
+                CircleBtn(40, { if (m.playing) tc.pause() else tc.play() }) {
+                    Box(
+                        Modifier.size(32.dp).clip(CircleShape).background(Color.White),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon24(if (m.playing) "pause" else "play", Color(0xFF101418), 16)
+                    }
+                }
+                CircleBtn(32, { seekBy(m.controller, 15000L) }) {
+                    Text("+15", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                }
+                CircleBtn(32, { tc.skipToNext() }) { Icon24("next", Color.White, 16) }
             }
         }
-    }
-}
-
-@Composable
-fun MusicBar(m: MediaInfo, art: ImageBitmap?, onListen: () -> Unit) {
-    val shape = RoundedCornerShape(20.dp)
-    Column(Modifier.padding(horizontal = 8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Box(
-            Modifier
-                .size(96.dp)
-                .clip(shape)
-                .background(Color(0x33FFFFFF))
-                .border(1.dp, Color(0x44FFFFFF), shape),
-            contentAlignment = Alignment.Center
-        ) {
-            if (art != null) {
-                Image(art, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-            } else {
-                Text("♪", color = Color.White, fontSize = 36.sp)
-            }
+        val frac = if (dur > 0L) (pos.toFloat() / dur.toFloat()).coerceIn(0f, 1f) else 0f
+        Canvas(Modifier.align(Alignment.BottomStart).fillMaxWidth().height(3.dp)) {
+            drawRect(Color(0x33FFFFFF))
+            drawRect(Color.White, size = Size(size.width * frac, size.height))
         }
-        Spacer(Modifier.height(6.dp))
-        Text(
-            m.title, color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold,
-            maxLines = 1, overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.widthIn(max = 440.dp)
-        )
-        Text(
-            m.artist, color = Color(0xB3FFFFFF), fontSize = 14.sp,
-            maxLines = 1, overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.widthIn(max = 440.dp)
-        )
     }
 }
