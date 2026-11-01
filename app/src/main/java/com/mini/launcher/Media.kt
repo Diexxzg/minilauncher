@@ -24,6 +24,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -226,7 +227,14 @@ fun MusicPill(m: MediaInfo, art: ImageBitmap?) {
             .border(1.dp, Color(0x33FFFFFF), shape)
     ) {
         Row(
-            Modifier.padding(start = 10.dp, end = 12.dp, top = 8.dp, bottom = 11.dp),
+            Modifier
+                .drawBehind {
+                    val frac = if (dur > 0L) (pos.toFloat() / dur.toFloat()).coerceIn(0f, 1f) else 0f
+                    val h = 3.dp.toPx()
+                    drawRect(Color(0x33FFFFFF), Offset(0f, size.height - h), Size(size.width, h))
+                    drawRect(Color.White, Offset(0f, size.height - h), Size(size.width * frac, h))
+                }
+                .padding(start = 10.dp, end = 12.dp, top = 8.dp, bottom = 11.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
@@ -240,7 +248,7 @@ fun MusicPill(m: MediaInfo, art: ImageBitmap?) {
                     Text("♪", color = Color.White, fontSize = 20.sp)
                 }
             }
-            Column(Modifier.widthIn(max = 200.dp)) {
+            Column(Modifier.widthIn(max = 170.dp)) {
                 Text(
                     "REPRODUCIENDO", color = Color(0xB3FFFFFF), fontSize = 9.sp,
                     letterSpacing = 1.5.sp, fontWeight = FontWeight.Medium
@@ -270,11 +278,6 @@ fun MusicPill(m: MediaInfo, art: ImageBitmap?) {
                 }
                 CircleBtn(34, { tc.skipToNext() }) { Icon24("next", Color.White, 16) }
             }
-        }
-        val frac = if (dur > 0L) (pos.toFloat() / dur.toFloat()).coerceIn(0f, 1f) else 0f
-        Canvas(Modifier.align(Alignment.BottomStart).fillMaxWidth().height(3.dp)) {
-            drawRect(Color(0x33FFFFFF))
-            drawRect(Color.White, size = Size(size.width * frac, size.height))
         }
     }
 }
