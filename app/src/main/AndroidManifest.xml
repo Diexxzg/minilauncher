@@ -19,8 +19,8 @@
 
     <application
         android:label="One Piece"
-        android:icon="@android:drawable/sym_def_app_icon"
-        android:banner="@android:drawable/sym_def_app_icon"
+        android:icon="@drawable/app_icon"
+        android:banner="@drawable/app_banner"
         android:usesCleartextTraffic="false"
         android:theme="@android:style/Theme.DeviceDefault.NoActionBar">
         <activity
