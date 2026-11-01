@@ -25,6 +25,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
@@ -63,23 +64,22 @@ fun Modifier.softGlow(color: Color, level: Int, amount: () -> Float, corner: Dp)
     return this.drawBehind {
         val a = amount()
         if (a > 0.01f) {
-            val layers = 18
+            // 5 anillos finos hacia afuera, sin recorte: mucho mas barato que 18 capas con clipPath.
+            val layers = 5
             val reach = (4f + level * 3f).dp.toPx()
             val base = corner.toPx()
-            val hole = Path()
-            hole.addRoundRect(RoundRect(0f, 0f, size.width, size.height, CornerRadius(base, base)))
-            // El brillo solo se dibuja por fuera de la tarjeta y se desvanece poco a poco.
-            clipPath(hole, ClipOp.Difference) {
-                val p = (0.018f + 0.006f * level) * a
-                for (i in layers downTo 1) {
-                    val e = reach * i / layers
-                    drawRoundRect(
-                        color = color.copy(alpha = p),
-                        topLeft = Offset(-e, -e),
-                        size = Size(size.width + 2f * e, size.height + 2f * e),
-                        cornerRadius = CornerRadius(base + e, base + e)
-                    )
-                }
+            val step = reach / layers
+            val peak = (0.22f + 0.06f * level) * a
+            for (i in 0 until layers) {
+                val e = step * (i + 0.5f)
+                val k = 1f - i.toFloat() / layers
+                drawRoundRect(
+                    color = color.copy(alpha = peak * k * k),
+                    topLeft = Offset(-e, -e),
+                    size = Size(size.width + 2f * e, size.height + 2f * e),
+                    cornerRadius = CornerRadius(base + e, base + e),
+                    style = Stroke(width = step + 0.5f)
+                )
             }
         }
     }
@@ -95,10 +95,12 @@ fun Modifier.autoFocus(): Modifier {
     return this.focusRequester(fr)
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun GlassBox(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    onLongClick: (() -> Unit)? = null,
     shape: Shape = RoundedCornerShape(18.dp),
     glow: Color? = null,
     glowLevel: Int = 2,
@@ -137,7 +139,11 @@ fun GlassBox(
                 }
             )
             .onFocusChanged { focused = it.isFocused }
-            .clickable(onClick = onClick),
+            .then(
+                if (onLongClick != null) Modifier.combinedClickable(
+                    onClick = onClick, onLongClick = onLongClick
+                ) else Modifier.clickable(onClick = onClick)
+            ),
         contentAlignment = Alignment.Center,
         content = content
     )
@@ -148,10 +154,13 @@ fun AppTile(
     app: AppInfo,
     modifier: Modifier = Modifier,
     useSize: Boolean = true,
+    fixedScale: Float? = null,
+    onLongClick: (() -> Unit)? = null,
     onClick: () -> Unit
 ) {
     val st = LocalDock.current
-    val f = if (useSize) (st.scalePct / 100f) * ((st.sizes[app.pkg] ?: 100) / 100f) else 1f
+    val f = fixedScale
+        ?: if (useSize) (st.scalePct / 100f) * ((st.sizes[app.pkg] ?: 100) / 100f) else 1f
     val holder = remember { arrayOfNulls<LayoutCoordinates>(1) }
     GlassBox(
         onClick = {
@@ -159,6 +168,7 @@ fun AppTile(
             TileBounds.last = if (c != null && c.isAttached) c.boundsInRoot() else null
             onClick()
         },
+        onLongClick = onLongClick,
         modifier = modifier
             .size((144 * f).dp, (84 * f).dp)
             .onGloballyPositioned { holder[0] = it },
@@ -173,7 +183,7 @@ fun AppTile(
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Image(app.art, null, Modifier.size((40 * f).dp))
                 Text(
-                    app.label, color = Color.White, fontSize = 11.sp, maxLines = 1,
+                    app.label, color = Color.White, fontSize = 13.sp, maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                 )
@@ -183,7 +193,7 @@ fun AppTile(
 }
 
 @Composable
-fun Clock() {
+fun Clock(h24: Boolean = false) {
     var now by remember { mutableStateOf(Date()) }
     LaunchedEffect(Unit) {
         while (true) {
@@ -191,7 +201,7 @@ fun Clock() {
             delay(10_000)
         }
     }
-    val f = remember { SimpleDateFormat("h:mm a", Locale.getDefault()) }
+    val f = remember(h24) { SimpleDateFormat(if (h24) "HH:mm" else "h:mm a", Locale.getDefault()) }
     Text(
         f.format(now), color = Color(0xEBFFFFFF), fontSize = 22.sp,
         fontWeight = FontWeight.Medium,
