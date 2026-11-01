@@ -64,6 +64,7 @@ fun HomeRoot(tick: Int, homeTick: Int) {
     var wallName by remember { mutableStateOf(prefs.wallpaper) }
     var media by remember { mutableStateOf<MediaInfo?>(null) }
     var screen by remember { mutableStateOf("home") }
+    var inputs by remember { mutableStateOf<List<InputItem>>(emptyList()) }
     var scalePct by remember { mutableStateOf(prefs.getInt("scale", 100)) }
     var spacing by remember { mutableStateOf(prefs.getInt("spacing", 16)) }
     var corner by remember { mutableStateOf(prefs.getInt("corner", 18)) }
@@ -197,7 +198,20 @@ fun HomeRoot(tick: Int, homeTick: Int) {
                     dock, m, art,
                     { openApp(it) },
                     { screen = "all" },
-                    { screen = "settings" }
+                    { screen = "settings" },
+                    { openSystem(ctx, "wifi") },
+                    {
+                        inputs = listInputs(ctx)
+                        screen = "inputs"
+                    }
+                )
+                "inputs" -> InputsPanel(
+                    items = inputs,
+                    onPick = {
+                        openInput(ctx, it)
+                        screen = "home"
+                    },
+                    onClose = { screen = "home" }
                 )
                 "all" -> AllApps(visible) { openApp(it) }
                 "settings" -> SettingsPanel(
