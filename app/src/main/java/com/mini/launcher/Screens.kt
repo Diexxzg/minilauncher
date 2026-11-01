@@ -16,12 +16,15 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.app.NotificationManagerCompat
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import java.io.File
 
@@ -36,8 +39,20 @@ fun HomeScreen(
 ) {
     val st = LocalDock.current
     val f = st.scalePct / 100f
+    val ctx = LocalContext.current
+    var listenerOn by remember { mutableStateOf(true) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            listenerOn = NotificationManagerCompat.getEnabledListenerPackages(ctx)
+                .contains(ctx.packageName)
+            delay(3000)
+        }
+    }
     Box(Modifier.fillMaxSize()) {
-        WeatherText(Modifier.align(Alignment.TopStart).padding(32.dp))
+        Column(Modifier.align(Alignment.TopStart).padding(32.dp)) {
+            WeatherText()
+            DateText(Modifier.padding(top = 2.dp))
+        }
         Row(
             Modifier.align(Alignment.TopEnd).padding(32.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -45,6 +60,11 @@ fun HomeScreen(
         ) {
             if (media != null) {
                 MusicPill(media, art)
+            } else if (!listenerOn) {
+                Text(
+                    "Música: falta permitir el acceso a notificaciones",
+                    color = Color(0xB3FFFFFF), fontSize = 12.sp
+                )
             }
             Clock()
             GlassBox(onClick = onSettings, modifier = Modifier.size(44.dp), shape = CircleShape) {
