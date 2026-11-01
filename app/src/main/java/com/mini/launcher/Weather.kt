@@ -5,6 +5,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -15,6 +16,11 @@ import java.net.URL
 import java.net.URLEncoder
 
 const val CITY = "Caracas"
+
+object WeatherCache {
+    var key: String = ""
+    var text: String? = null
+}
 
 fun httpGet(url: String): String? {
     return try {
@@ -41,7 +47,7 @@ fun codeToEmoji(c: Int): String {
     }
 }
 
-fun fetchWeather(city: String): String? {
+fun fetchWeather(city: String, fahrenheit: Boolean = false): String? {
     try {
         val g = httpGet(
             "https://geocoding-api.open-meteo.com/v1/search?count=1&language=es&name=" +
@@ -54,7 +60,8 @@ fun fetchWeather(city: String): String? {
         val lon = o.getDouble("longitude")
         val w = httpGet(
             "https://api.open-meteo.com/v1/forecast?latitude=$lat&longitude=$lon" +
-                "&current=temperature_2m,weather_code"
+                "&current=temperature_2m,weather_code" +
+                (if (fahrenheit) "&temperature_unit=fahrenheit" else "")
         ) ?: return null
         val cur = JSONObject(w).getJSONObject("current")
         val t = Math.round(cur.getDouble("temperature_2m"))
@@ -65,19 +72,31 @@ fun fetchWeather(city: String): String? {
 }
 
 @Composable
-fun WeatherText(modifier: Modifier = Modifier) {
-    var text by remember { mutableStateOf<String?>(null) }
-    LaunchedEffect(Unit) {
+fun WeatherText(
+    city: String,
+    fahrenheit: Boolean,
+    modifier: Modifier = Modifier,
+    size: TextUnit = 20.sp
+) {
+    val key = city + "|" + fahrenheit
+    var text by remember(key) {
+        mutableStateOf<String?>(if (WeatherCache.key == key) WeatherCache.text else null)
+    }
+    LaunchedEffect(key) {
         while (true) {
-            val r = withContext(Dispatchers.IO) { fetchWeather(CITY) }
-            if (r != null) text = r
+            val r = withContext(Dispatchers.IO) { fetchWeather(city, fahrenheit) }
+            if (r != null) {
+                text = r
+                WeatherCache.key = key
+                WeatherCache.text = r
+            }
             delay(if (text == null) 60_000L else 1_800_000L)
         }
     }
     val t = text
     if (t != null) {
         Text(
-            t, color = Color(0xEBFFFFFF), fontSize = 20.sp,
+            t, color = Color(0xEBFFFFFF), fontSize = size,
             fontWeight = FontWeight.Medium, modifier = modifier
         )
     }
