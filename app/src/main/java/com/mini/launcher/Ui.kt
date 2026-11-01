@@ -1,6 +1,7 @@
 package com.mini.launcher
 
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
@@ -10,21 +11,69 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+
+class DockStyle(
+    val scalePct: Int,
+    val spacing: Int,
+    val corner: Int,
+    val bottom: Int,
+    val glow: Int,
+    val sizes: Map<String, Int>
+)
+
+val LocalDock = compositionLocalOf { DockStyle(100, 16, 18, 0, 2, emptyMap()) }
+
+object TileBounds {
+    var last: Rect? = null
+}
+
+fun Modifier.softGlow(color: Color, level: Int, amount: () -> Float, corner: Dp): Modifier {
+    if (level <= 0) return this
+    return this.drawBehind {
+        val a = amount()
+        if (a > 0.01f) {
+            val layers = 10
+            val step = (1.5f + level * 0.6f).dp.toPx()
+            val base = corner.toPx()
+            for (i in layers downTo 1) {
+                val e = step * i
+                drawRoundRect(
+                    color = color.copy(alpha = (0.05f + 0.02f * level) * a),
+                    topLeft = Offset(-e, -e),
+                    size = Size(size.width + 2f * e, size.height + 2f * e),
+                    cornerRadius = CornerRadius(base + e, base + e)
+                )
+            }
+        }
+    }
+}
 
 @Composable
 fun Modifier.autoFocus(): Modifier {
@@ -41,19 +90,41 @@ fun GlassBox(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     shape: Shape = RoundedCornerShape(18.dp),
+    glow: Color? = null,
+    glowLevel: Int = 2,
+    cornerDp: Dp = 18.dp,
     content: @Composable BoxScope.() -> Unit
 ) {
     var focused by remember { mutableStateOf(false) }
-    val s by animateFloatAsState(if (focused) 1.05f else 1f, tween(200), label = "scale")
+    val sc = animateFloatAsState(
+        if (focused) 1.06f else 1f,
+        spring(dampingRatio = 0.75f, stiffness = 380f),
+        label = "scale"
+    )
+    val gl = animateFloatAsState(if (focused) 1f else 0f, tween(220), label = "glow")
     Box(
         modifier = modifier
-            .scale(s)
+            .zIndex(if (focused) 1f else 0f)
+            .graphicsLayer {
+                scaleX = sc.value
+                scaleY = sc.value
+            }
+            .then(
+                if (glow != null) Modifier.softGlow(glow, glowLevel, { gl.value }, cornerDp)
+                else Modifier
+            )
             .clip(shape)
-            .background(if (focused) Color(0x55FFFFFF) else Color(0x22FFFFFF))
-            .border(
-                if (focused) 2.dp else 1.dp,
-                if (focused) Color(0xDDFFFFFF) else Color(0x33FFFFFF),
-                shape
+            .background(if (focused) Color(0x44FFFFFF) else Color(0x22FFFFFF))
+            .then(
+                if (glow == null) {
+                    Modifier.border(
+                        if (focused) 2.dp else 1.dp,
+                        if (focused) Color(0xDDFFFFFF) else Color(0x33FFFFFF),
+                        shape
+                    )
+                } else {
+                    Modifier
+                }
             )
             .onFocusChanged { focused = it.isFocused }
             .clickable(onClick = onClick),
@@ -63,13 +134,34 @@ fun GlassBox(
 }
 
 @Composable
-fun AppTile(app: AppInfo, modifier: Modifier = Modifier, onClick: () -> Unit) {
-    GlassBox(onClick, modifier.size(144.dp, 84.dp)) {
+fun AppTile(
+    app: AppInfo,
+    modifier: Modifier = Modifier,
+    useSize: Boolean = true,
+    onClick: () -> Unit
+) {
+    val st = LocalDock.current
+    val f = if (useSize) (st.scalePct / 100f) * ((st.sizes[app.pkg] ?: 100) / 100f) else 1f
+    val holder = remember { arrayOfNulls<LayoutCoordinates>(1) }
+    GlassBox(
+        onClick = {
+            val c = holder[0]
+            TileBounds.last = if (c != null && c.isAttached) c.boundsInRoot() else null
+            onClick()
+        },
+        modifier = modifier
+            .size((144 * f).dp, (84 * f).dp)
+            .onGloballyPositioned { holder[0] = it },
+        shape = RoundedCornerShape(st.corner.dp),
+        glow = Color(app.glow),
+        glowLevel = st.glow,
+        cornerDp = st.corner.dp
+    ) {
         if (app.banner) {
             Image(app.art, app.label, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
         } else {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Image(app.art, null, Modifier.size(40.dp))
+                Image(app.art, null, Modifier.size((40 * f).dp))
                 Text(
                     app.label, color = Color.White, fontSize = 11.sp, maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -92,7 +184,8 @@ fun Clock() {
     val f = remember { SimpleDateFormat("h:mm a", Locale.getDefault()) }
     Text(
         f.format(now), color = Color(0xEBFFFFFF), fontSize = 22.sp,
-        fontWeight = FontWeight.Medium
+        fontWeight = FontWeight.Medium,
+        style = TextStyle(shadow = Shadow(Color(0xAA000000), Offset(0f, 2f), 8f))
     )
 }
 
