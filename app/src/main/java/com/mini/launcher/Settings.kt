@@ -1,18 +1,23 @@
 package com.mini.launcher
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -31,17 +36,25 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -65,6 +78,17 @@ private val CITIES = listOf(
 
 private val GLOW_NAMES = listOf("Apagado", "Suave", "Medio", "Fuerte", "Máximo")
 
+// ---------- Estilo (sakura + neon) ----------
+// Para cambiar el tamaño del panel: PANEL_W = ancho (fraccion de pantalla), PANEL_H = alto.
+private const val PANEL_W = 0.40f
+private const val PANEL_H = 0.72f
+
+private val PINK = Color(0xFFFF8FB8)
+private val VIOLET = Color(0xFFB69CFF)
+private val CYAN = Color(0xFF7AE3FF)
+private val ACCENT: Brush = Brush.horizontalGradient(listOf(PINK, VIOLET))
+private val IDLE_BORDER: Brush = SolidColor(Color(0x1FFFFFFF))
+
 // ---------- Controles ----------
 
 @Composable
@@ -76,15 +100,26 @@ fun FocusRow(
 ) {
     var focused by remember { mutableStateOf(false) }
     val shape = RoundedCornerShape(14.dp)
+    val bg: Brush = if (focused) {
+        Brush.horizontalGradient(listOf(Color(0x55FF8FB8), Color(0x33B69CFF)))
+    } else {
+        SolidColor(Color(0x14FFFFFF))
+    }
     val base = modifier
         .fillMaxWidth()
         .clip(shape)
-        .background(if (focused) Color(0x44FFFFFF) else Color(0x14FFFFFF))
-        .border(
-            if (focused) 2.dp else 1.dp,
-            if (focused) Color(0xDDFFFFFF) else Color(0x22FFFFFF),
-            shape
-        )
+        .background(bg)
+        .border(if (focused) 1.5.dp else 1.dp, if (focused) ACCENT else IDLE_BORDER, shape)
+        .drawBehind {
+            if (focused) {
+                drawRoundRect(
+                    color = PINK,
+                    topLeft = Offset(6.dp.toPx(), size.height * 0.25f),
+                    size = Size(3.dp.toPx(), size.height * 0.5f),
+                    cornerRadius = CornerRadius(2.dp.toPx())
+                )
+            }
+        }
         .onKeyEvent { e ->
             if (e.type == KeyEventType.KeyDown) {
                 when (e.key) {
@@ -99,7 +134,7 @@ fun FocusRow(
         .onFocusChanged { focused = it.isFocused }
     val clickable = if (onClick != null) base.clickable(onClick = onClick) else base.focusable()
     Row(
-        clickable.padding(horizontal = 16.dp, vertical = 12.dp),
+        clickable.padding(start = 20.dp, end = 14.dp, top = 11.dp, bottom = 11.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         content(this, focused)
@@ -125,12 +160,12 @@ fun SliderRow(
             true
         }
     ) { focused ->
-        Text(label, color = Color.White, fontSize = 18.sp, modifier = Modifier.weight(1f))
+        Text(label, color = Color.White, fontSize = 16.sp, modifier = Modifier.weight(1f))
         Box(
             Modifier
-                .width(220.dp)
-                .height(8.dp)
-                .clip(RoundedCornerShape(4.dp))
+                .width(110.dp)
+                .height(6.dp)
+                .clip(RoundedCornerShape(3.dp))
                 .background(Color(0x33FFFFFF))
         ) {
             val frac = ((value - min).toFloat() / (max - min).toFloat()).coerceIn(0f, 1f)
@@ -138,12 +173,13 @@ fun SliderRow(
                 Modifier
                     .fillMaxHeight()
                     .fillMaxWidth(frac)
-                    .background(if (focused) Color.White else Color(0xAAFFFFFF))
+                    .alpha(if (focused) 1f else 0.75f)
+                    .background(ACCENT)
             )
         }
         Text(
-            value.toString() + unit, color = Color.White, fontSize = 18.sp,
-            textAlign = TextAlign.End, modifier = Modifier.width(84.dp)
+            value.toString() + unit, color = Color.White, fontSize = 15.sp,
+            textAlign = TextAlign.End, modifier = Modifier.width(66.dp)
         )
     }
 }
@@ -163,17 +199,17 @@ fun SwitchRow(
         },
         onClick = { onChange(!checked) }
     ) {
-        Text(label, color = Color.White, fontSize = 18.sp, modifier = Modifier.weight(1f))
+        Text(label, color = Color.White, fontSize = 16.sp, modifier = Modifier.weight(1f))
         Box(
             Modifier
-                .width(52.dp)
-                .height(28.dp)
-                .clip(RoundedCornerShape(14.dp))
-                .background(if (checked) Color(0xFF3DDC84) else Color(0x66FFFFFF))
+                .width(46.dp)
+                .height(26.dp)
+                .clip(RoundedCornerShape(13.dp))
+                .background(if (checked) ACCENT else SolidColor(Color(0x55FFFFFF)))
                 .padding(3.dp),
             contentAlignment = if (checked) Alignment.CenterEnd else Alignment.CenterStart
         ) {
-            Box(Modifier.size(22.dp).clip(CircleShape).background(Color.White))
+            Box(Modifier.size(20.dp).clip(CircleShape).background(Color.White))
         }
     }
 }
@@ -196,65 +232,89 @@ fun ChoiceRow(
         },
         onClick = { onSelect((sel + 1) % options.size) }
     ) { focused ->
-        Text(label, color = Color.White, fontSize = 18.sp, modifier = Modifier.weight(1f))
+        Text(label, color = Color.White, fontSize = 16.sp, modifier = Modifier.weight(1f))
         Text(
             (if (focused) "‹  " else "") + options[sel] + (if (focused) "  ›" else ""),
-            color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Medium
+            color = if (focused) Color(0xFFFFD9E8) else Color(0xDDFFFFFF),
+            fontSize = 15.sp, fontWeight = FontWeight.Medium
         )
     }
 }
 
 @Composable
 fun ActionRow(text: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
-    FocusRow(modifier = modifier, onClick = onClick) {
-        Text(text, color = Color.White, fontSize = 18.sp, modifier = Modifier.weight(1f))
-        Text("›", color = Color(0xAAFFFFFF), fontSize = 20.sp)
+    FocusRow(modifier = modifier, onClick = onClick) { focused ->
+        Text(text, color = Color.White, fontSize = 16.sp, modifier = Modifier.weight(1f))
+        Text("›", color = if (focused) PINK else Color(0xAAFFFFFF), fontSize = 20.sp)
     }
 }
 
 @Composable
 fun InfoRow(label: String, value: String) {
     Row(
-        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+        Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 7.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(label, color = Color(0xCCFFFFFF), fontSize = 17.sp, modifier = Modifier.weight(1f))
-        Text(value, color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Medium)
+        Text(label, color = Color(0xB3FFFFFF), fontSize = 15.sp, modifier = Modifier.weight(1f))
+        Text(value, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Medium)
     }
 }
 
+/**
+ * Barra de categorias: un solo elemento enfocable. Izquierda/derecha cambia de
+ * categoria, abajo entra a las opciones.
+ */
 @Composable
-fun CategoryItem(
-    icon: String,
-    label: String,
-    selected: Boolean,
-    modifier: Modifier = Modifier,
-    onFocus: () -> Unit
-) {
+fun CategoryBar(selected: Int, modifier: Modifier = Modifier, onSelect: (Int) -> Unit) {
     var focused by remember { mutableStateOf(false) }
-    val fm = LocalFocusManager.current
-    val shape = RoundedCornerShape(14.dp)
+    val shape = RoundedCornerShape(16.dp)
     Row(
         modifier
             .fillMaxWidth()
             .clip(shape)
-            .background(
-                if (focused) Color(0x55FFFFFF)
-                else if (selected) Color(0x26FFFFFF)
-                else Color.Transparent
-            )
-            .then(if (focused) Modifier.border(2.dp, Color(0xDDFFFFFF), shape) else Modifier)
-            .onFocusChanged {
-                focused = it.isFocused
-                if (it.isFocused) onFocus()
+            .background(Color(0x14FFFFFF))
+            .border(if (focused) 1.5.dp else 1.dp, if (focused) ACCENT else IDLE_BORDER, shape)
+            .onKeyEvent { e ->
+                if (e.type == KeyEventType.KeyDown) {
+                    when (e.key) {
+                        Key.DirectionLeft -> {
+                            if (selected > 0) onSelect(selected - 1)
+                            true
+                        }
+                        Key.DirectionRight -> {
+                            if (selected < CATS.lastIndex) onSelect(selected + 1)
+                            true
+                        }
+                        else -> false
+                    }
+                } else {
+                    false
+                }
             }
-            .clickable { fm.moveFocus(FocusDirection.Right) }
-            .padding(horizontal = 14.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
+            .onFocusChanged { focused = it.isFocused }
+            .focusable()
+            .padding(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
     ) {
-        Text(icon, fontSize = 20.sp)
-        Text(label, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Medium)
+        CATS.forEachIndexed { i, c ->
+            val sel = i == selected
+            val chipBg: Brush = if (sel) {
+                Brush.horizontalGradient(listOf(Color(0x77FF8FB8), Color(0x66B69CFF)))
+            } else {
+                SolidColor(Color.Transparent)
+            }
+            Box(
+                Modifier
+                    .weight(1f)
+                    .height(38.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(chipBg)
+                    .pointerInput(i) { detectTapGestures { onSelect(i) } },
+                contentAlignment = Alignment.Center
+            ) {
+                Text(c.first, fontSize = 18.sp, modifier = Modifier.alpha(if (sel) 1f else 0.5f))
+            }
+        }
     }
 }
 
@@ -275,50 +335,94 @@ fun SettingsScreen(
     onRestore: () -> Unit
 ) {
     val ctx = LocalContext.current
+    val conf = LocalConfiguration.current
     var cat by remember { mutableIntStateOf(0) }
-    val shape = RoundedCornerShape(26.dp)
+    var shown by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { shown = true }
+    val p by animateFloatAsState(if (shown) 1f else 0f, tween(380), label = "settingsIn")
 
-    // El inicio se ve detras casi sin oscurecer para ver los cambios en vivo.
-    Box(Modifier.fillMaxSize().background(Color(0x22000000))) {
-        Row(
+    val shape = RoundedCornerShape(28.dp)
+    val pw = (conf.screenWidthDp * PANEL_W).coerceIn(400f, 580f).dp
+    val ph = (conf.screenHeightDp * PANEL_H).dp
+    val panelBg = Brush.linearGradient(listOf(Color(0xF2171229), Color(0xF20E1527)))
+    val panelBorder = Brush.linearGradient(
+        listOf(PINK.copy(alpha = 0.75f), Color(0x22FFFFFF), CYAN.copy(alpha = 0.6f))
+    )
+    val rule = Brush.horizontalGradient(
+        listOf(Color.Transparent, PINK.copy(alpha = 0.6f), VIOLET.copy(alpha = 0.6f), Color.Transparent)
+    )
+
+    // El inicio se ve a la izquierda casi sin oscurecer para ver los cambios en vivo.
+    Box(
+        Modifier
+            .fillMaxSize()
+            .background(Brush.horizontalGradient(listOf(Color.Transparent, Color(0x55000000))))
+    ) {
+        Box(
             Modifier
-                .align(Alignment.TopCenter)
-                .padding(start = 48.dp, end = 48.dp, top = 88.dp)
-                .fillMaxWidth()
-                .fillMaxHeight(0.58f)
-                .clip(shape)
-                .background(Color(0xCC101624))
-                .border(1.dp, Color(0x33FFFFFF), shape)
-        ) {
-            Column(
-                Modifier.width(250.dp).fillMaxHeight().padding(14.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                Text(
-                    "Configuración", color = Color.White, fontSize = 22.sp,
-                    fontWeight = FontWeight.Medium,
-                    modifier = Modifier.padding(start = 6.dp, bottom = 8.dp)
-                )
-                CATS.forEachIndexed { i, c ->
-                    CategoryItem(
-                        c.first, c.second, cat == i,
-                        if (i == 0) Modifier.autoFocus() else Modifier
-                    ) { cat = i }
+                .align(Alignment.TopEnd)
+                .padding(top = 64.dp, end = 32.dp)
+                .width(pw)
+                .height(ph)
+                .graphicsLayer {
+                    translationX = (1f - p) * 140.dp.toPx()
+                    alpha = p
                 }
-            }
-            Column(
-                Modifier
-                    .weight(1f)
-                    .fillMaxHeight()
-                    .verticalScroll(rememberScrollState())
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                Text(
-                    CATS[cat].second, color = Color.White, fontSize = 22.sp,
-                    fontWeight = FontWeight.Medium,
-                    modifier = Modifier.padding(bottom = 4.dp)
-                )
+                .clip(shape)
+                .background(panelBg)
+                .drawBehind {
+                    drawRect(
+                        Brush.radialGradient(
+                            listOf(Color(0x33FF8FB8), Color.Transparent),
+                            center = Offset(size.width, 0f),
+                            radius = size.width * 0.9f
+                        )
+                    )
+                    drawRect(
+                        Brush.radialGradient(
+                            listOf(Color(0x2A7AE3FF), Color.Transparent),
+                            center = Offset(0f, size.height),
+                            radius = size.width * 0.8f
+                        )
+                    )
+                }
+                .border(1.5.dp, panelBorder, shape)
+        ) {
+            // Marca de agua de flor de sakura.
+            Text(
+                "✿",
+                color = Color.White.copy(alpha = 0.05f),
+                fontSize = 150.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.align(Alignment.BottomEnd).offset(x = 18.dp, y = 28.dp)
+            )
+            Column(Modifier.fillMaxSize().padding(start = 18.dp, end = 18.dp, top = 16.dp, bottom = 14.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            "✿  CONFIGURACIÓN",
+                            color = PINK, fontSize = 11.sp, letterSpacing = 2.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Text(
+                            CATS[cat].second, color = Color.White, fontSize = 24.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                    Text("✦", color = VIOLET.copy(alpha = 0.9f), fontSize = 18.sp)
+                }
+                Spacer(Modifier.height(10.dp))
+                CategoryBar(cat, Modifier.autoFocus()) { cat = it }
+                Spacer(Modifier.height(10.dp))
+                Box(Modifier.fillMaxWidth().height(1.dp).background(rule))
+                Spacer(Modifier.height(10.dp))
+                Column(
+                    Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
                 when (cat) {
                     0 -> {
                         ActionRow("Cambiar fondo de pantalla") { onWalls() }
@@ -394,27 +498,4 @@ fun SettingsScreen(
                             while (true) {
                                 var frames = 0
                                 val start = withFrameNanos { it }
-                                var t = start
-                                while (t - start < 1_000_000_000L) {
-                                    t = withFrameNanos { it }
-                                    frames++
-                                }
-                                fps = frames
-                            }
-                        }
-                        val wallCount = remember { listWalls(ctx).size }
-                        InfoRow("Versión", version)
-                        InfoRow("Permiso de música", if (listenerOn) "Activo" else "Falta permitir")
-                        InfoRow("Fotogramas por segundo", fps.toString())
-                        InfoRow("Apps instaladas", AppCache.apps.size.toString())
-                        InfoRow("Fondos guardados", wallCount.toString())
-                        InfoRow("Android", android.os.Build.VERSION.RELEASE + " (API " + android.os.Build.VERSION.SDK_INT + ")")
-                        InfoRow("Dispositivo", android.os.Build.MODEL)
-                        ActionRow("Guardar copia de seguridad") { onBackup() }
-                        ActionRow("Restaurar copia de seguridad") { onRestore() }
-                    }
-                }
-            }
-        }
-    }
-}
+                            
