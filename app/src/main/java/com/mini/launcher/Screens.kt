@@ -129,9 +129,6 @@ fun SettingsPanel(
             PanelItem("Cambiar fondo de pantalla") { onWalls() }
             PanelItem("Editar apps (favoritas, orden, tamaño)") { onEdit() }
             PanelItem("Wi-Fi") { onOpen("wifi") }
-            PanelItem("Bluetooth") { onOpen("bt") }
-            PanelItem("Sonido") { onOpen("sound") }
-            PanelItem("Pantalla") { onOpen("display") }
             PanelItem("Todos los ajustes de Android") { onOpen("all") }
             PanelItem("Cerrar") { onClose() }
         }
