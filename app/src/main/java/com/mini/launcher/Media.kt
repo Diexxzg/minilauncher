@@ -259,11 +259,8 @@ fun MusicPill(m: MediaInfo, art: ImageBitmap?) {
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                CircleBtn(32, { tc.skipToPrevious() }) { Icon24("prev", Color.White, 16) }
-                CircleBtn(32, { seekBy(m.controller, -15000L) }) {
-                    Text("-15", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                }
-                CircleBtn(40, { if (m.playing) tc.pause() else tc.play() }) {
+                CircleBtn(34, { tc.skipToPrevious() }) { Icon24("prev", Color.White, 16) }
+                CircleBtn(42, { if (m.playing) tc.pause() else tc.play() }) {
                     Box(
                         Modifier.size(32.dp).clip(CircleShape).background(Color.White),
                         contentAlignment = Alignment.Center
@@ -271,10 +268,7 @@ fun MusicPill(m: MediaInfo, art: ImageBitmap?) {
                         Icon24(if (m.playing) "pause" else "play", Color(0xFF101418), 16)
                     }
                 }
-                CircleBtn(32, { seekBy(m.controller, 15000L) }) {
-                    Text("+15", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                }
-                CircleBtn(32, { tc.skipToNext() }) { Icon24("next", Color.White, 16) }
+                CircleBtn(34, { tc.skipToNext() }) { Icon24("next", Color.White, 16) }
             }
         }
         val frac = if (dur > 0L) (pos.toFloat() / dur.toFloat()).coerceIn(0f, 1f) else 0f
