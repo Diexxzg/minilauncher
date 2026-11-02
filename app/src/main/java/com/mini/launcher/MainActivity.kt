@@ -75,6 +75,8 @@ class MainActivity : ComponentActivity() {
     private var homeTick by mutableIntStateOf(0)
     // resumeTick: al volver de una app; solo relee la carpeta de fondos (barato).
     private var resumeTick by mutableIntStateOf(0)
+    // appPaused: el launcher no esta en primer plano (hay otra app abierta): pausa el fondo animado.
+    private var appPaused by mutableStateOf(false)
 
     private val pkgReceiver = object : BroadcastReceiver() {
         override fun onReceive(c: Context?, i: Intent?) {
@@ -92,12 +94,18 @@ class MainActivity : ComponentActivity() {
         }
         ContextCompat.registerReceiver(this, pkgReceiver, f, ContextCompat.RECEIVER_EXPORTED)
         addOnNewIntentListener { homeTick++ }
-        setContent { HomeRoot(tick, homeTick, resumeTick) }
+        setContent { HomeRoot(tick, homeTick, resumeTick, appPaused) }
     }
 
     override fun onResume() {
         super.onResume()
+        appPaused = false
         resumeTick++
+    }
+
+    override fun onPause() {
+        super.onPause()
+        appPaused = true
     }
 
     override fun onDestroy() {
@@ -110,7 +118,7 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun HomeRoot(tick: Int, homeTick: Int, resumeTick: Int) {
+fun HomeRoot(tick: Int, homeTick: Int, resumeTick: Int, appPaused: Boolean = false) {
     val ctx = LocalContext.current
     val baseDensity = LocalDensity.current
     val scope = rememberCoroutineScope()
@@ -148,6 +156,11 @@ fun HomeRoot(tick: Int, homeTick: Int, resumeTick: Int) {
     var focusTick by remember { mutableIntStateOf(0) }
     var showMore by remember { mutableStateOf(false) }
     var moreBack by remember { mutableIntStateOf(0) }
+    // Accesos rapidos (pulsacion larga en ajustes), carga inicial y categoria abierta en Configuracion.
+    var showQuick by remember { mutableStateOf(false) }
+    var quickBack by remember { mutableIntStateOf(0) }
+    var appsLoaded by remember { mutableStateOf(AppCache.apps.isNotEmpty()) }
+    var settingsCat by remember { mutableIntStateOf(0) }
     var focusedApp by remember { mutableStateOf<AppInfo?>(null) }
     var backdropApp by remember { mutableStateOf<AppInfo?>(null) }
     var prevScreen by remember { mutableStateOf("home") }
@@ -170,6 +183,7 @@ fun HomeRoot(tick: Int, homeTick: Int, resumeTick: Int) {
         pinAsk = null
         showPower = false
         showMore = false
+        showQuick = false
         if (homeTick > 0) {
             dockState.animateScrollToItem(0)
             focusTick++
@@ -206,6 +220,7 @@ fun HomeRoot(tick: Int, homeTick: Int, resumeTick: Int) {
         val loaded = withContext(Dispatchers.IO) { loadApps(ctx) }
         AppCache.apps = loaded
         apps = loaded
+        appsLoaded = true
         if (!prefs.initDone && loaded.isNotEmpty()) {
             favs = loaded.take(6).map { it.pkg }
             prefs.saveFavs(favs)
@@ -289,6 +304,10 @@ fun HomeRoot(tick: Int, homeTick: Int, resumeTick: Int) {
     BackHandler {
         when {
             pinAsk != null -> pinAsk = null
+            showQuick -> {
+                showQuick = false
+                quickBack++
+            }
             showMore -> {
                 showMore = false
                 moreBack++
@@ -446,10 +465,14 @@ fun HomeRoot(tick: Int, homeTick: Int, resumeTick: Int) {
         }
     }
         val uiScale = cfg.uiScale / 100f
+    // Vista previa en vivo: en Apariencia y Dock el fondo no se oscurece ni se desenfoca,
+    // y la primera ficha del dock se ve "enfocada" para que se note cada cambio.
+    val preview = screen == "settings" && settingsCat <= 1
     val dimLayer: Long = when (screen) {
         "all", "hidden" -> 0x99000000
         "walls" -> 0xAA000000
-        "settings", "edit" -> 0x40000000
+        "settings" -> if (preview) 0x14000000L else 0x40000000L
+        "edit" -> 0x40000000
         "inputs" -> 0x55000000
         else -> 0L
     }
@@ -460,10 +483,17 @@ fun HomeRoot(tick: Int, homeTick: Int, resumeTick: Int) {
     val panelOpen = screen == "settings" || screen == "edit" || screen == "inputs" ||
         menuApp != null || showPower
     val blurDp by animateDpAsState(
-        if (cfg.blur && panelOpen) 24.dp else 0.dp, tween(350), label = "blur"
+        if (cfg.blur && panelOpen && !preview) 24.dp else 0.dp, tween(350), label = "blur"
     )
-
-    Box(
+    // Fondo animado (video / GIF): se pausa con paneles, menus o cuando hay otra app abierta.
+    val wallPaused = cfg.pauseWall &&
+        (appPaused || (screen != "home" && !preview) || menuApp != null || showPower || showMore)
+    val bdApp: AppInfo? = when {
+        screen == "home" -> backdropApp
+        preview -> dock.firstOrNull()
+        else -> null
+    }
+        Box(
         Modifier
             .fillMaxSize()
             .background(Color(0xFF0B1020))
@@ -502,8 +532,8 @@ fun HomeRoot(tick: Int, homeTick: Int, resumeTick: Int) {
                 targetState = selected,
                 animationSpec = tween(if (cfg.fade) 700 else 1),
                 label = "wall"
-            ) { f -> WallpaperLayer(f) }
-            FocusBackdrop(if (screen == "home") backdropApp else null, cfg.dynBg)
+            ) { f -> WallpaperLayer(f, wallPaused) }
+            FocusBackdrop(bdApp, cfg.dynBg)
             Box(
                 Modifier.fillMaxSize().background(
                     Brush.verticalGradient(listOf(Color(0x22000000), Color.Transparent, Color(0x99000000)))
@@ -560,7 +590,7 @@ fun HomeRoot(tick: Int, homeTick: Int, resumeTick: Int) {
                                     Box(
                                         Modifier
                                             .fillMaxSize()
-                                            .focusProperties { canFocus = live && !showMore }
+                                            .focusProperties { canFocus = live && !showMore && !showQuick }
                                     ) {
                                         HomeScreen(
                                             dock = dock,
@@ -592,7 +622,11 @@ fun HomeRoot(tick: Int, homeTick: Int, resumeTick: Int) {
                                                 }
                                             },
                                             dockState = dockState,
-                                            focusTick = focusTick
+                                            focusTick = focusTick,
+                                            loading = !appsLoaded,
+                                            previewDock = preview,
+                                            onQuick = { if (live) showQuick = true },
+                                            quickBack = quickBack
                                         )
                                     }
                                     AnimatedVisibility(
@@ -620,6 +654,7 @@ fun HomeRoot(tick: Int, homeTick: Int, resumeTick: Int) {
                                                 prefs.putInt("bottom", 0)
                                                 prefs.putInt("glow", 2)
                                             },
+                                            onCategory = { settingsCat = it },
                                             onWalls = { screen = "walls" },
                                             onEdit = { screen = "edit" },
                                             onInputs = {
@@ -690,6 +725,7 @@ fun HomeRoot(tick: Int, homeTick: Int, resumeTick: Int) {
                                     { cfg.setSort(it) },
                                     { menuApp = it },
                                     focusSearch = searchFocus,
+                                    loading = !appsLoaded,
                                     onHidden = if (hiddenApps.isNotEmpty()) {
                                         { guarded(cfg.lockHidden) { screen = "hidden" } }
                                     } else {
@@ -812,9 +848,22 @@ fun HomeRoot(tick: Int, homeTick: Int, resumeTick: Int) {
                             }
                         )
                     }
+                    if (showQuick) {
+                        QuickPanel(
+                            cfg = cfg,
+                            onSettings = {
+                                showQuick = false
+                                quickBack++
+                                guarded(cfg.lockSettings) { screen = "settings" }
+                            },
+                            onClose = {
+                                showQuick = false
+                                quickBack++
+                            }
+                        )
+                    }
                     if (showPower) {
-                        PowerMenu(
-                            accessOn = PowerService.instance != null,
+                        accessOn = PowerService.instance != null,
                             onPick = { powerPick(it) },
                             onClose = { showPower = false }
                         )
