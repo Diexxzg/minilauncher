@@ -37,6 +37,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import android.content.Context
+import androidx.compose.ui.platform.LocalConfiguration
 import android.content.Intent
 import android.media.tv.TvContract
 import android.media.tv.TvInputManager
@@ -73,11 +74,22 @@ fun HomeScreen(
     onInputs: () -> Unit,
     cfg: Cfg,
     recents: List<AppInfo> = emptyList(),
-    onMenu: (AppInfo) -> Unit = {}
+    onMenu: (AppInfo) -> Unit = {},
+    rows: List<Pair<String, List<AppInfo>>> = emptyList(),
+    net: NetState = NetState(),
+    onVoice: () -> Unit = {},
+    onPower: () -> Unit = {},
+    dockState: LazyListState? = null,
+    focusTick: Int = 0
 ) {
     val st = LocalDock.current
     val f = st.scalePct / 100f
     val ctx = LocalContext.current
+    val conf = LocalConfiguration.current
+    val us = LocalUiScale.current
+    val accent = LocalAccent.current
+    val ownState = rememberLazyListState()
+    val dState = dockState ?: ownState
     var listenerOn by remember { mutableStateOf(true) }
     LaunchedEffect(Unit) {
         while (true) {
@@ -86,6 +98,8 @@ fun HomeScreen(
             delay(3000)
         }
     }
+    // Alto maximo de las filas para que nunca tapen la barra superior.
+    val maxH = (conf.screenHeightDp / us * 0.64f).dp
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.align(Alignment.TopStart).padding(32.dp)) {
             if (cfg.showWeather) WeatherText(cfg.city, cfg.fahrenheit)
@@ -105,11 +119,15 @@ fun HomeScreen(
                 )
             }
             Clock(cfg.clock24)
+            GlassBox(onClick = onVoice, modifier = Modifier.size(44.dp), shape = CircleShape) {
+                MicIcon(Color.White)
+            }
             GlassBox(onClick = onInputs, modifier = Modifier.size(44.dp), shape = CircleShape) {
                 InputIcon(Color.White)
             }
-            GlassBox(onClick = onWifi, modifier = Modifier.size(44.dp), shape = CircleShape) {
-                WifiIcon(Color.White)
+            NetPill(net, onWifi)
+            GlassBox(onClick = onPower, modifier = Modifier.size(44.dp), shape = CircleShape) {
+                PowerIcon(Color.White)
             }
             GlassBox(onClick = onSettings, modifier = Modifier.size(44.dp), shape = CircleShape) {
                 GearIcon(Color.White)
@@ -120,65 +138,106 @@ fun HomeScreen(
                 ScaledPill(media, art, cfg.musicSize)
             }
         }
-        CompositionLocalProvider(LocalBringIntoViewSpec provides CenterSpec) {
-        Column(
-            Modifier
+        // De abajo hacia arriba: dock, recientes y las filas extra (Streaming, Juegos...).
+        LazyColumn(
+            modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
-                .padding(bottom = st.bottom.dp)
+                .heightIn(max = maxH)
+                .padding(bottom = st.bottom.dp),
+            reverseLayout = true,
+            contentPadding = PaddingValues(top = 8.dp)
         ) {
-        if (cfg.showRecents && recents.isNotEmpty()) {
-            Text(
-                "Recientes", color = Color(0xCCFFFFFF), fontSize = 16.sp,
-                fontWeight = FontWeight.Medium,
-                modifier = Modifier.padding(start = 32.dp)
-            )
-            LazyRow(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                contentPadding = PaddingValues(start = 28.dp, end = 28.dp, top = 14.dp, bottom = 4.dp)
-            ) {
-                items(recents, key = { it.pkg }) { app ->
-                    AppTile(
-                        app, Modifier, useSize = false, fixedScale = 0.7f,
-                        onLongClick = { onMenu(app) }
-                    ) { onLaunch(app) }
+            item(key = "dock") {
+                CompositionLocalProvider(LocalBringIntoViewSpec provides CenterSpec) {
+                    LazyRow(
+                        state = dState,
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(st.spacing.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        contentPadding = PaddingValues(start = 28.dp, end = 28.dp, top = 36.dp, bottom = 36.dp)
+                    ) {
+                        itemsIndexed(dock, key = { _, app -> app.pkg }) { i, app ->
+                            AppTile(
+                                app, if (i == 0) Modifier.autoFocusOn(focusTick) else Modifier,
+                                onLongClick = { onMenu(app) }
+                            ) { onLaunch(app) }
+                        }
+                        item(key = "all_apps") {
+                            GlassBox(
+                                onClick = onAll,
+                                modifier = (if (dock.isEmpty()) Modifier.autoFocusOn(focusTick) else Modifier)
+                                    .size((144 * f).dp, (84 * f).dp),
+                                shape = RoundedCornerShape(st.corner.dp),
+                                glow = accent ?: Color.White,
+                                glowLevel = st.glow,
+                                cornerDp = st.corner.dp
+                            ) {
+                                Text("Todas las apps", color = Color.White, fontSize = 14.sp)
+                            }
+                        }
+                    }
                 }
             }
-        }
-        LazyRow(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(st.spacing.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            contentPadding = PaddingValues(start = 28.dp, end = 28.dp, top = 36.dp, bottom = 36.dp)
-        ) {
-            itemsIndexed(dock, key = { _, app -> app.pkg }) { i, app ->
-                AppTile(
-                    app, if (i == 0) Modifier.autoFocus() else Modifier,
-                    onLongClick = { onMenu(app) }
-                ) { onLaunch(app) }
-            }
-            item(key = "all_apps") {
-                GlassBox(
-                    onClick = onAll,
-                    modifier = (if (dock.isEmpty()) Modifier.autoFocus() else Modifier)
-                        .size((144 * f).dp, (84 * f).dp),
-                    shape = RoundedCornerShape(st.corner.dp),
-                    glow = Color.White,
-                    glowLevel = st.glow,
-                    cornerDp = st.corner.dp
-                ) {
-                    Text("Todas las apps", color = Color.White, fontSize = 14.sp)
+            if (cfg.showRecents && recents.isNotEmpty()) {
+                item(key = "recents") {
+                    Column {
+                        Text(
+                            "Recientes", color = Color(0xCCFFFFFF), fontSize = 16.sp,
+                            fontWeight = FontWeight.Medium,
+                            modifier = Modifier.padding(start = 32.dp)
+                        )
+                        CompositionLocalProvider(LocalBringIntoViewSpec provides CenterSpec) {
+                            LazyRow(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                contentPadding = PaddingValues(start = 28.dp, end = 28.dp, top = 14.dp, bottom = 4.dp)
+                            ) {
+                                items(recents, key = { it.pkg }) { app ->
+                                    AppTile(
+                                        app, Modifier, useSize = false, fixedScale = 0.7f,
+                                        onLongClick = { onMenu(app) }
+                                    ) { onLaunch(app) }
+                                }
+                            }
+                        }
+                    }
                 }
             }
-        }
-        }
+            itemsIndexed(rows, key = { i, _ -> "row" + i }) { _, r ->
+                Column {
+                    Text(
+                        r.first, color = Color(0xCCFFFFFF), fontSize = 16.sp,
+                        fontWeight = FontWeight.Medium,
+                        modifier = Modifier.padding(start = 32.dp, top = 6.dp)
+                    )
+                    CompositionLocalProvider(LocalBringIntoViewSpec provides CenterSpec) {
+                        LazyRow(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            contentPadding = PaddingValues(start = 28.dp, end = 28.dp, top = 18.dp, bottom = 10.dp)
+                        ) {
+                            items(r.second, key = { it.pkg }) { app ->
+                                AppTile(
+                                    app, Modifier, useSize = false, fixedScale = 0.8f,
+                                    onLongClick = { onMenu(app) }
+                                ) { onLaunch(app) }
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }
 
 @Composable
-fun SearchField(value: String, onChange: (String) -> Unit, modifier: Modifier = Modifier) {
+fun SearchField(
+    value: String,
+    onChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
+    focusIt: Boolean = false
+) {
     var focused by remember { mutableStateOf(false) }
     val shape = RoundedCornerShape(14.dp)
     Box(
@@ -200,7 +259,10 @@ fun SearchField(value: String, onChange: (String) -> Unit, modifier: Modifier = 
             singleLine = true,
             textStyle = TextStyle(color = Color.White, fontSize = 18.sp),
             cursorBrush = SolidColor(Color.White),
-            modifier = Modifier.fillMaxWidth().onFocusChanged { focused = it.isFocused }
+            modifier = Modifier
+                .fillMaxWidth()
+                .then(if (focusIt) Modifier.autoFocus() else Modifier)
+                .onFocusChanged { focused = it.isFocused }
         )
         if (value.isEmpty()) {
             Text("Buscar apps…", color = Color(0x99FFFFFF), fontSize = 18.sp)
@@ -216,6 +278,9 @@ fun AllApps(
     sort: Int,
     onSort: (Int) -> Unit,
     onMenu: (AppInfo) -> Unit,
+    focusSearch: Boolean = false,
+    onHidden: (() -> Unit)? = null,
+    title: String? = null,
     onLaunch: (AppInfo) -> Unit
 ) {
     var query by remember { mutableStateOf("") }
@@ -230,14 +295,20 @@ fun AllApps(
     }
     val firstPkg = remember { list.firstOrNull()?.pkg }
     Column(
-        Modifier.fillMaxSize().background(Color(0x99000000)).padding(48.dp),
+        Modifier.fillMaxSize().padding(48.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
+        if (title != null) {
+            Text(title, color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Medium)
+        }
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            SearchField(query, { query = it }, Modifier.weight(1f))
+            SearchField(query, { query = it }, Modifier.weight(1f), focusIt = focusSearch)
+            if (onHidden != null) {
+                SmallBtn("Ocultas") { onHidden() }
+            }
             Box(Modifier.width(320.dp)) {
                 ChoiceRow("Orden", listOf("A-Z", "Más usadas", "Recientes"), sort) { onSort(it) }
             }
@@ -252,7 +323,7 @@ fun AllApps(
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     AppTile(
                         app,
-                        if (query.isEmpty() && app.pkg == firstPkg) Modifier.autoFocus() else Modifier,
+                        if (!focusSearch && query.isEmpty() && app.pkg == firstPkg) Modifier.autoFocus() else Modifier,
                         useSize = false,
                         onLongClick = { onMenu(app) }
                     ) { onLaunch(app) }
