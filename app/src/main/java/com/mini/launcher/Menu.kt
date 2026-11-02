@@ -107,7 +107,10 @@ fun AppMenu(
     onHide: () -> Unit,
     onSize: (Int) -> Unit,
     onInfo: () -> Unit,
-    onUninstall: () -> Unit
+    onUninstall: () -> Unit,
+    rowNames: List<String?> = emptyList(),
+    inRow: List<Boolean> = emptyList(),
+    onRow: (Int) -> Unit = {}
 ) {
     val shape = RoundedCornerShape(26.dp)
     Dialog(
@@ -144,6 +147,13 @@ fun AppMenu(
             if (isFav) {
                 ActionRow("Mover a la izquierda") { onMoveL() }
                 ActionRow("Mover a la derecha") { onMoveR() }
+            }
+            for (i in rowNames.indices) {
+                val rn = rowNames[i]
+                if (rn != null) {
+                    val on = inRow.getOrElse(i) { false }
+                    SwitchRow("En la fila " + rn, on) { v -> if (v != on) onRow(i) }
+                }
             }
             SliderRow("Tamaño", size, 50, 200, 10, "%") { onSize(it) }
             ActionRow(if (isHidden) "Mostrar en el inicio" else "Ocultar") { onHide() }
