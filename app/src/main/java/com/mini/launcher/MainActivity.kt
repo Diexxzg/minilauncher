@@ -862,8 +862,9 @@ fun HomeRoot(tick: Int, homeTick: Int, resumeTick: Int, appPaused: Boolean = fal
                             }
                         )
                     }
-                    if (showPower) {
-                        accessOn = PowerService.instance != null,
+                                        if (showPower) {
+                        PowerMenu(
+                            accessOn = PowerService.instance != null,
                             onPick = { powerPick(it) },
                             onClose = { showPower = false }
                         )
