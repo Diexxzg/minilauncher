@@ -162,6 +162,7 @@ fun GlassBox(
     glow: Color? = null,
     glowLevel: Int = 2,
     cornerDp: Dp = 18.dp,
+    onFocusChange: ((Boolean) -> Unit)? = null,
     content: @Composable BoxScope.() -> Unit
 ) {
     var focused by remember { mutableStateOf(false) }
@@ -219,6 +220,7 @@ fun GlassBox(
                     playSoftFocus(view, vol)
                 }
                 focused = it.isFocused
+                onFocusChange?.invoke(it.isFocused)
             }
             .then(
                 if (onLongClick != null) Modifier.combinedClickable(
@@ -238,6 +240,7 @@ fun AppTile(
     fixedScale: Float? = null,
     bannerStyle: Boolean = false,
     onLongClick: (() -> Unit)? = null,
+    onFocusChange: ((Boolean) -> Unit)? = null,
     onClick: () -> Unit
 ) {
     val st = LocalDock.current
@@ -260,7 +263,8 @@ fun AppTile(
         shape = RoundedCornerShape(st.corner.dp),
         glow = LocalAccent.current ?: Color(app.glow),
         glowLevel = st.glow,
-        cornerDp = st.corner.dp
+        cornerDp = st.corner.dp,
+        onFocusChange = onFocusChange
     ) {
         if (app.banner) {
             Image(app.art, app.label, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
