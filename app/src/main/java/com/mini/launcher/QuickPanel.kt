@@ -29,6 +29,8 @@ import androidx.compose.ui.unit.sp
 @Composable
 fun QuickPanel(
     cfg: Cfg,
+    profile: Int,
+    onProfile: (Int) -> Unit,
     onSettings: () -> Unit,
     onClose: () -> Unit
 ) {
@@ -58,6 +60,10 @@ fun QuickPanel(
             // El brillo es lo contrario de "Oscurecer fondo": 100% = sin oscurecer.
             SliderRow("Brillo del fondo", 100 - cfg.dim, 20, 100, 5, "%", Modifier.autoFocus()) {
                 cfg.setDim(100 - it)
+            }
+            // Perfil de diseno: la primera opcion ("Personalizado") solo indica el estado actual.
+            ChoiceRow("Perfil de diseño", PROFILE_OPTIONS, profile) {
+                onProfile(if (it > 0) it - 1 else 0)
             }
             ChoiceRow("Tema", Themes.list.map { it.name }, cfg.theme) { cfg.setTheme(it) }
             ChoiceRow("Sonido", listOf("Apagado", "Suave", "Medio"), cfg.soundLevel) {
