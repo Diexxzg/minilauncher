@@ -41,6 +41,7 @@ class Cfg(private val p: Prefs) {
     private var _pin by mutableStateOf(p.getStr("pin", ""))
     private var _dynBg by mutableStateOf(p.getInt("dynBg", 2).coerceIn(0, 2))
     private var _screenAnim by mutableStateOf(p.getInt("screenAnim", 1) == 1)
+    private var _pauseWall by mutableStateOf(p.getInt("pauseWall", 1) == 1)
     private val _rows = mutableStateListOf(
         p.getInt("row0", 0), p.getInt("row1", 0), p.getInt("row2", 0)
     )
@@ -78,6 +79,8 @@ class Cfg(private val p: Prefs) {
     val dynBg: Int get() = _dynBg
     /** Fundido / deslizamiento corto al cambiar de pantalla. */
     val screenAnim: Boolean get() = _screenAnim
+    /** Pausa el fondo animado (video / GIF) mientras hay un panel, un menu o una app abierta. */
+    val pauseWall: Boolean get() = _pauseWall
 
     /** Indice (en ROW_NAMES) de la fila extra i (0..2). */
     fun row(i: Int): Int = _rows[i]
@@ -224,5 +227,10 @@ class Cfg(private val p: Prefs) {
     fun setScreenAnim(v: Boolean) {
         _screenAnim = v
         p.putInt("screenAnim", if (v) 1 else 0)
+    }
+
+    fun setPauseWall(v: Boolean) {
+        _pauseWall = v
+        p.putInt("pauseWall", if (v) 1 else 0)
     }
 }
