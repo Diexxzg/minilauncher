@@ -42,6 +42,14 @@ class Cfg(private val p: Prefs) {
     private var _dynBg by mutableStateOf(p.getInt("dynBg", 2).coerceIn(0, 2))
     private var _screenAnim by mutableStateOf(p.getInt("screenAnim", 1) == 1)
     private var _pauseWall by mutableStateOf(p.getInt("pauseWall", 1) == 1)
+    // Paquete A: tarjeta de app enfocada, modo ahorro, modo noche y proteccion contra quemado.
+    private var _focusCard by mutableStateOf(p.getInt("focusCard", 1) == 1)
+    private var _saver by mutableStateOf(p.getInt("saver", 0) == 1)
+    private var _saverHint by mutableStateOf(p.getInt("saverHint", 1) == 1)
+    private var _night by mutableStateOf(p.getInt("night", 0) == 1)
+    private var _nightFrom by mutableStateOf(p.getInt("nightFrom", 22).coerceIn(0, 23))
+    private var _nightTo by mutableStateOf(p.getInt("nightTo", 7).coerceIn(0, 23))
+    private var _burnIn by mutableStateOf(p.getInt("burnIn", 1) == 1)
     private val _rows = mutableStateListOf(
         p.getInt("row0", 0), p.getInt("row1", 0), p.getInt("row2", 0)
     )
@@ -81,6 +89,26 @@ class Cfg(private val p: Prefs) {
     val screenAnim: Boolean get() = _screenAnim
     /** Pausa el fondo animado (video / GIF) mientras hay un panel, un menu o una app abierta. */
     val pauseWall: Boolean get() = _pauseWall
+
+    /** Texto bajo el dock con el nombre de la app enfocada, notificaciones y ultimo uso. */
+    val focusCard: Boolean get() = _focusCard
+    /** Modo ahorro: apaga desenfoque, animaciones, fondo dinamico y brillo de color. */
+    val saver: Boolean get() = _saver
+    /** Sugerir el modo ahorro si los fotogramas por segundo bajan mucho. */
+    val saverHint: Boolean get() = _saverHint
+    /** Modo noche automatico entre dos horas. */
+    val night: Boolean get() = _night
+    val nightFrom: Int get() = _nightFrom
+    val nightTo: Int get() = _nightTo
+    /** Mueve lentamente el reloj del modo ambiente. */
+    val burnIn: Boolean get() = _burnIn
+
+    /** true si la hora (0..23) cae dentro del horario nocturno; admite cruzar la medianoche. */
+    fun nightActive(hour: Int): Boolean = when {
+        _nightFrom == _nightTo -> false
+        _nightFrom < _nightTo -> hour >= _nightFrom && hour < _nightTo
+        else -> hour >= _nightFrom || hour < _nightTo
+    }
 
     /** Indice (en ROW_NAMES) de la fila extra i (0..2). */
     fun row(i: Int): Int = _rows[i]
@@ -232,5 +260,40 @@ class Cfg(private val p: Prefs) {
     fun setPauseWall(v: Boolean) {
         _pauseWall = v
         p.putInt("pauseWall", if (v) 1 else 0)
+    }
+
+    fun setFocusCard(v: Boolean) {
+        _focusCard = v
+        p.putInt("focusCard", if (v) 1 else 0)
+    }
+
+    fun setSaver(v: Boolean) {
+        _saver = v
+        p.putInt("saver", if (v) 1 else 0)
+    }
+
+    fun setSaverHint(v: Boolean) {
+        _saverHint = v
+        p.putInt("saverHint", if (v) 1 else 0)
+    }
+
+    fun setNight(v: Boolean) {
+        _night = v
+        p.putInt("night", if (v) 1 else 0)
+    }
+
+    fun setNightFrom(v: Int) {
+        _nightFrom = v.coerceIn(0, 23)
+        p.putInt("nightFrom", _nightFrom)
+    }
+
+    fun setNightTo(v: Int) {
+        _nightTo = v.coerceIn(0, 23)
+        p.putInt("nightTo", _nightTo)
+    }
+
+    fun setBurnIn(v: Boolean) {
+        _burnIn = v
+        p.putInt("burnIn", if (v) 1 else 0)
     }
 }
