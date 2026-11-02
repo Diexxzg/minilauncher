@@ -143,8 +143,9 @@ fun Modifier.autoFocus(): Modifier {
 
 /** Igual que autoFocus, pero vuelve a pedir el foco cada vez que cambia key. */
 @Composable
-fun Modifier.autoFocusOn(key: Any?): Modifier {
-    val fr = remember { FocusRequester() }
+fun Modifier.autoFocusOn(key: Any?, requester: FocusRequester? = null): Modifier {
+    val own = remember { FocusRequester() }
+    val fr = requester ?: own
     LaunchedEffect(key) {
         delay(150)
         runCatching { fr.requestFocus() }
