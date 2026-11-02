@@ -811,4 +811,20 @@ fun HomeRoot(tick: Int, homeTick: Int, resumeTick: Int) {
                                 moreBack++
                             }
                         )
-      
+                    }
+                    if (showPower) {
+                        PowerMenu(
+                            accessOn = PowerService.instance != null,
+                            onPick = { powerPick(it) },
+                            onClose = { showPower = false }
+                        )
+                    }
+                    val pa = pinAsk
+                    if (pa != null) {
+                        PinPad(pa, pinErr) { pinAsk = null }
+                    }
+                }
+            }
+        }
+    }
+}
