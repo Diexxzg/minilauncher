@@ -17,7 +17,14 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -139,6 +146,11 @@ fun HomeRoot(tick: Int, homeTick: Int, resumeTick: Int) {
     var showPower by remember { mutableStateOf(false) }
     var searchFocus by remember { mutableStateOf(false) }
     var focusTick by remember { mutableIntStateOf(0) }
+    var showMore by remember { mutableStateOf(false) }
+    var moreBack by remember { mutableIntStateOf(0) }
+    var focusedApp by remember { mutableStateOf<AppInfo?>(null) }
+    var backdropApp by remember { mutableStateOf<AppInfo?>(null) }
+    var prevScreen by remember { mutableStateOf("home") }
     var accentTarget by remember { mutableStateOf(Color.White) }
     val dockState = rememberLazyListState()
 
@@ -157,10 +169,23 @@ fun HomeRoot(tick: Int, homeTick: Int, resumeTick: Int) {
         menuApp = null
         pinAsk = null
         showPower = false
+        showMore = false
         if (homeTick > 0) {
             dockState.animateScrollToItem(0)
             focusTick++
         }
+    }
+
+    // Fondo segun la app enfocada: espera un instante para no parpadear al recorrer el dock.
+    LaunchedEffect(focusedApp?.pkg) {
+        delay(250)
+        backdropApp = focusedApp
+    }
+
+    // Al cerrar Configuracion el inicio no se recompone: se devuelve el foco a la primera ficha.
+    LaunchedEffect(screen) {
+        if (screen == "home" && prevScreen == "settings") focusTick++
+        prevScreen = screen
     }
 
     LaunchedEffect(resumeTick) {
@@ -264,6 +289,10 @@ fun HomeRoot(tick: Int, homeTick: Int, resumeTick: Int) {
     BackHandler {
         when {
             pinAsk != null -> pinAsk = null
+            showMore -> {
+                showMore = false
+                moreBack++
+            }
             showPower -> showPower = false
             screen == "walls" || screen == "edit" || screen == "dock" -> screen = "settings"
             screen == "hidden" -> screen = "all"
@@ -399,8 +428,7 @@ fun HomeRoot(tick: Int, homeTick: Int, resumeTick: Int) {
             }
         }
     }
-
-    // ---- Voz / busqueda ----
+        // ---- Voz / busqueda ----
     fun startVoice() {
         if (cfg.voiceMode == 0 && launchAssistant(ctx)) return
         searchFocus = true
@@ -425,6 +453,8 @@ fun HomeRoot(tick: Int, homeTick: Int, resumeTick: Int) {
         "inputs" -> 0x55000000
         else -> 0L
     }
+
+    val dimColor by animateColorAsState(Color(dimLayer), tween(300), label = "dim")
 
     // Desenfoque del fondo mientras hay un panel abierto (solo Android 12 o superior).
     val panelOpen = screen == "settings" || screen == "edit" || screen == "inputs" ||
@@ -473,6 +503,7 @@ fun HomeRoot(tick: Int, homeTick: Int, resumeTick: Int) {
                 animationSpec = tween(if (cfg.fade) 700 else 1),
                 label = "wall"
             ) { f -> WallpaperLayer(f) }
+            FocusBackdrop(if (screen == "home") backdropApp else null, cfg.dynBg)
             Box(
                 Modifier.fillMaxSize().background(
                     Brush.verticalGradient(listOf(Color(0x22000000), Color.Transparent, Color(0x99000000)))
@@ -502,8 +533,8 @@ fun HomeRoot(tick: Int, homeTick: Int, resumeTick: Int) {
                 LocalBadges provides badges
             ) {
                 Box(Modifier.fillMaxSize()) {
-                    if (dimLayer != 0L) {
-                        Box(Modifier.fillMaxSize().background(Color(dimLayer)))
+                    if (dimColor.alpha > 0.001f) {
+                        Box(Modifier.fillMaxSize().background(dimColor))
                     }
                     if (screen == "settings" && cfg.overscan > 0) {
                         // Guia: el borde del area segura mientras ajustas el margen.
@@ -515,175 +546,198 @@ fun HomeRoot(tick: Int, homeTick: Int, resumeTick: Int) {
                         )
                     }
                     Box(Modifier.fillMaxSize().padding((cfg.overscan / uiScale).dp)) {
-                        when (screen) {
-                            "home" -> HomeScreen(
-                                dock = dock,
-                                media = m,
-                                art = art,
-                                onLaunch = { openApp(it) },
-                                onAll = {
-                                    searchFocus = false
-                                    screen = "all"
-                                },
-                                onSettings = {
-                                    guarded(cfg.lockSettings) { screen = "settings" }
-                                },
-                                onWifi = { openSystem(ctx, "wifi") },
-                                onInputs = {
-                                    inputs = listInputs(ctx)
-                                    screen = "inputs"
-                                },
-                                cfg = cfg,
-                                recents = recentApps,
-                                onMenu = { menuApp = it },
-                                rows = rowList,
-                                net = net,
-                                onVoice = { startVoice() },
-                                onPower = { showPower = true },
-                                dockState = dockState,
-                                focusTick = focusTick
-                            )
-                            "inputs" -> InputsPanel(
-                                items = inputs,
-                                onPick = {
-                                    openInput(ctx, it)
-                                    screen = "home"
-                                },
-                                onClose = { screen = "home" }
-                            )
-                            "all" -> AllApps(
-                                visible, usage, recents, cfg.sort,
-                                { cfg.setSort(it) },
-                                { menuApp = it },
-                                focusSearch = searchFocus,
-                                onHidden = if (hiddenApps.isNotEmpty()) {
-                                    { guarded(cfg.lockHidden) { screen = "hidden" } }
-                                } else {
-                                    null
-                                }
-                            ) { openApp(it) }
-                            "hidden" -> AllApps(
-                                hiddenApps, usage, recents, cfg.sort,
-                                { cfg.setSort(it) },
-                                { menuApp = it },
-                                title = "Apps ocultas"
-                            ) { openApp(it) }
-                            "settings" -> {
-                                Box(Modifier.fillMaxSize().focusProperties { canFocus = false }) {
-                                    HomeScreen(
-                                        dock = dock, media = m, art = art,
-                                        onLaunch = {}, onAll = {}, onSettings = {}, onWifi = {},
-                                        onInputs = {}, cfg = cfg, recents = recentApps,
-                                        rows = rowList, net = net, dockState = dockState
-                                    )
-                                }
-                                SettingsScreen(
-                                    style = style,
-                                    cfg = cfg,
-                                    onSet = onSet,
-                                    onResetDock = {
-                                        scalePct = 100
-                                        spacing = 16
-                                        corner = 18
-                                        bottom = 0
-                                        glowLvl = 2
-                                        prefs.putInt("scale", 100)
-                                        prefs.putInt("spacing", 16)
-                                        prefs.putInt("corner", 18)
-                                        prefs.putInt("bottom", 0)
-                                        prefs.putInt("glow", 2)
-                                    },
-                                    onWalls = { screen = "walls" },
-                                    onEdit = { screen = "edit" },
-                                    onInputs = {
-                                        inputs = listInputs(ctx)
-                                        screen = "inputs"
-                                    },
-                                    onOpen = { openSystem(ctx, it) },
-                                    onSetHome = { requestHome(ctx) { homeLauncher.launch(it) } },
-                                    onBackup = {
-                                        scope.launch {
-                                            val ok = withContext(Dispatchers.IO) { writeBackup(ctx, prefs) }
-                                            toast(
-                                                ctx,
-                                                if (ok) "Copia guardada en: " + backupFile(ctx).path
-                                                else "No se pudo guardar la copia."
-                                            )
-                                        }
-                                    },
-                                    onRestore = {
-                                        scope.launch {
-                                            val ok = withContext(Dispatchers.IO) { readBackup(ctx, prefs) }
-                                            if (ok) {
-                                                toast(ctx, "Copia restaurada.")
-                                                findActivity(ctx)?.recreate()
-                                            } else {
-                                                toast(ctx, "No hay una copia válida para restaurar.")
+                        AnimatedContent(
+                            targetState = screen,
+                            modifier = Modifier.fillMaxSize(),
+                            transitionSpec = { screenTransition(initialState, targetState, cfg.screenAnim) },
+                            label = "screen",
+                            contentKey = { if (it == "home" || it == "settings") "homeLayer" else it }
+                        ) { s ->
+                            when (s) {
+                                "home", "settings" -> Box(Modifier.fillMaxSize()) {
+                                    // El inicio queda debajo de Configuracion: asi no se duplica al abrir o cerrar el panel.
+                                    val live = s == "home"
+                                    Box(
+                                        Modifier
+                                            .fillMaxSize()
+                                            .focusProperties { canFocus = live && !showMore }
+                                    ) {
+                                        HomeScreen(
+                                            dock = dock,
+                                            media = m,
+                                            art = art,
+                                            onLaunch = { if (live) openApp(it) },
+                                            onAll = {
+                                                if (live) {
+                                                    searchFocus = false
+                                                    screen = "all"
+                                                }
+                                            },
+                                            onSettings = {
+                                                if (live) guarded(cfg.lockSettings) { screen = "settings" }
+                                            },
+                                            onWifi = { if (live) openSystem(ctx, "wifi") },
+                                            cfg = cfg,
+                                            recents = recentApps,
+                                            onMenu = { if (live) menuApp = it },
+                                            rows = rowList,
+                                            net = net,
+                                            onMore = { if (live) showMore = true },
+                                            moreBack = moreBack,
+                                            onFocusApp = { a, f ->
+                                                if (f) {
+                                                    focusedApp = a
+                                                } else if (focusedApp?.pkg == a.pkg) {
+                                                    focusedApp = null
+                                                }
+                                            },
+                                            dockState = dockState,
+                                            focusTick = focusTick
+                                        )
+                                    }
+                                    AnimatedVisibility(
+                                        visible = s == "settings",
+                                        enter = if (cfg.screenAnim) {
+                                            fadeIn(tween(240)) + slideInVertically(tween(280, easing = FastOutSlowInEasing)) { h -> h / 24 }
+                                        } else {
+                                            EnterTransition.None
+                                        },
+                                        exit = if (cfg.screenAnim) fadeOut(tween(160)) else ExitTransition.None
+                                    ) {
+                                        SettingsScreen(
+                                            style = style,
+                                            cfg = cfg,
+                                            onSet = onSet,
+                                            onResetDock = {
+                                                scalePct = 100
+                                                spacing = 16
+                                                corner = 18
+                                                bottom = 0
+                                                glowLvl = 2
+                                                prefs.putInt("scale", 100)
+                                                prefs.putInt("spacing", 16)
+                                                prefs.putInt("corner", 18)
+                                                prefs.putInt("bottom", 0)
+                                                prefs.putInt("glow", 2)
+                                            },
+                                            onWalls = { screen = "walls" },
+                                            onEdit = { screen = "edit" },
+                                            onInputs = {
+                                                inputs = listInputs(ctx)
+                                                screen = "inputs"
+                                            },
+                                            onOpen = { openSystem(ctx, it) },
+                                            onSetHome = { requestHome(ctx) { homeLauncher.launch(it) } },
+                                            onBackup = {
+                                                scope.launch {
+                                                    val ok = withContext(Dispatchers.IO) { writeBackup(ctx, prefs) }
+                                                    toast(
+                                                        ctx,
+                                                        if (ok) "Copia guardada en: " + backupFile(ctx).path
+                                                        else "No se pudo guardar la copia."
+                                                    )
+                                                }
+                                            },
+                                            onRestore = {
+                                                scope.launch {
+                                                    val ok = withContext(Dispatchers.IO) { readBackup(ctx, prefs) }
+                                                    if (ok) {
+                                                        toast(ctx, "Copia restaurada.")
+                                                        findActivity(ctx)?.recreate()
+                                                    } else {
+                                                        toast(ctx, "No hay una copia válida para restaurar.")
+                                                    }
+                                                }
+                                            },
+                                            onNetPerm = {
+                                                val perms = ArrayList<String>()
+                                                perms.add(Manifest.permission.ACCESS_FINE_LOCATION)
+                                                if (Build.VERSION.SDK_INT >= 31) {
+                                                    perms.add(Manifest.permission.BLUETOOTH_CONNECT)
+                                                }
+                                                try {
+                                                    netPerm.launch(perms.toTypedArray())
+                                                } catch (e: Exception) {
+                                                    toast(ctx, "Esta TV no permite pedir ese permiso.")
+                                                }
+                                            },
+                                            onPin = { kind ->
+                                                when (kind) {
+                                                    "create" -> createFlow()
+                                                    "change" -> askVerify { createFlow() }
+                                                    "remove" -> askVerify {
+                                                        cfg.setPin("")
+                                                        cfg.setLockSettings(false)
+                                                        cfg.setLockHidden(false)
+                                                        pinAsk = null
+                                                        toast(ctx, "PIN eliminado.")
+                                                    }
+                                                }
                                             }
-                                        }
+                                        )
+                                    }
+                                }
+                                "inputs" -> InputsPanel(
+                                    items = inputs,
+                                    onPick = {
+                                        openInput(ctx, it)
+                                        screen = "home"
                                     },
-                                    onNetPerm = {
-                                        val perms = ArrayList<String>()
-                                        perms.add(Manifest.permission.ACCESS_FINE_LOCATION)
-                                        if (Build.VERSION.SDK_INT >= 31) {
-                                            perms.add(Manifest.permission.BLUETOOTH_CONNECT)
-                                        }
-                                        try {
-                                            netPerm.launch(perms.toTypedArray())
-                                        } catch (e: Exception) {
-                                            toast(ctx, "Esta TV no permite pedir ese permiso.")
-                                        }
+                                    onClose = { screen = "home" }
+                                )
+                                "all" -> AllApps(
+                                    visible, usage, recents, cfg.sort,
+                                    { cfg.setSort(it) },
+                                    { menuApp = it },
+                                    focusSearch = searchFocus,
+                                    onHidden = if (hiddenApps.isNotEmpty()) {
+                                        { guarded(cfg.lockHidden) { screen = "hidden" } }
+                                    } else {
+                                        null
+                                    }
+                                ) { openApp(it) }
+                                "hidden" -> AllApps(
+                                    hiddenApps, usage, recents, cfg.sort,
+                                    { cfg.setSort(it) },
+                                    { menuApp = it },
+                                    title = "Apps ocultas"
+                                ) { openApp(it) }
+                                "walls" -> WallPicker(
+                                    files = walls,
+                                    current = if (wallName.isEmpty()) (walls.firstOrNull()?.name ?: "") else wallName,
+                                    onPick = { n ->
+                                        wallName = n
+                                        prefs.wallpaper = n
                                     },
-                                    onPin = { kind ->
-                                        when (kind) {
-                                            "create" -> createFlow()
-                                            "change" -> askVerify { createFlow() }
-                                            "remove" -> askVerify {
-                                                cfg.setPin("")
-                                                cfg.setLockSettings(false)
-                                                cfg.setLockHidden(false)
-                                                pinAsk = null
-                                                toast(ctx, "PIN eliminado.")
-                                            }
-                                        }
+                                    onAdd = { picker.launch(arrayOf("image/*", "video/*")) }
+                                )
+                                "edit" -> EditApps(
+                                    apps = apps,
+                                    favs = favs,
+                                    hidden = hidden,
+                                    sizes = sizes,
+                                    onFav = { p ->
+                                        favs = if (p in favs) favs - p else favs + p
+                                        prefs.saveFavs(favs)
+                                    },
+                                    onUp = { p ->
+                                        favs = move(favs, p, -1)
+                                        prefs.saveFavs(favs)
+                                    },
+                                    onDown = { p ->
+                                        favs = move(favs, p, 1)
+                                        prefs.saveFavs(favs)
+                                    },
+                                    onHide = { p ->
+                                        hidden = if (p in hidden) hidden - p else hidden + p
+                                        prefs.saveHidden(hidden)
+                                    },
+                                    onSize = { p, v ->
+                                        sizes = sizes + (p to v)
+                                        prefs.saveSizes(sizes)
                                     }
                                 )
                             }
-                            "walls" -> WallPicker(
-                                files = walls,
-                                current = if (wallName.isEmpty()) (walls.firstOrNull()?.name ?: "") else wallName,
-                                onPick = { n ->
-                                    wallName = n
-                                    prefs.wallpaper = n
-                                },
-                                onAdd = { picker.launch(arrayOf("image/*", "video/*")) }
-                            )
-                            "edit" -> EditApps(
-                                apps = apps,
-                                favs = favs,
-                                hidden = hidden,
-                                sizes = sizes,
-                                onFav = { p ->
-                                    favs = if (p in favs) favs - p else favs + p
-                                    prefs.saveFavs(favs)
-                                },
-                                onUp = { p ->
-                                    favs = move(favs, p, -1)
-                                    prefs.saveFavs(favs)
-                                },
-                                onDown = { p ->
-                                    favs = move(favs, p, 1)
-                                    prefs.saveFavs(favs)
-                                },
-                                onHide = { p ->
-                                    hidden = if (p in hidden) hidden - p else hidden + p
-                                    prefs.saveHidden(hidden)
-                                },
-                                onSize = { p, v ->
-                                    sizes = sizes + (p to v)
-                                    prefs.saveSizes(sizes)
-                                }
-                            )
                         }
                     }
                     val ma = menuApp
@@ -736,19 +790,25 @@ fun HomeRoot(tick: Int, homeTick: Int, resumeTick: Int) {
                             }
                         )
                     }
-                    if (showPower) {
-                        PowerMenu(
-                            accessOn = PowerService.instance != null,
-                            onPick = { powerPick(it) },
-                            onClose = { showPower = false }
+                    if (showMore) {
+                        MoreMenu(
+                            onVoice = {
+                                showMore = false
+                                moreBack++
+                                startVoice()
+                            },
+                            onInputs = {
+                                showMore = false
+                                inputs = listInputs(ctx)
+                                screen = "inputs"
+                            },
+                            onPower = {
+                                showMore = false
+                                showPower = true
+                            },
+                            onClose = {
+                                showMore = false
+                                moreBack++
+                            }
                         )
-                    }
-                    val pa = pinAsk
-                    if (pa != null) {
-                        PinPad(pa, pinErr) { pinAsk = null }
-                    }
-                }
-            }
-        }
-    }
-}
+      
