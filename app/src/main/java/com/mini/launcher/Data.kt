@@ -117,6 +117,23 @@ class Prefs(ctx: Context) {
     fun saveSizes(m: Map<String, Int>) {
         sp.edit().putString("sizes", m.entries.joinToString(",") { it.key + ":" + it.value }).apply()
     }
+    fun rowApps(i: Int): List<String> =
+        (sp.getString("rowApps$i", "") ?: "").split(",").filter { it.isNotEmpty() }
+    fun saveRowApps(i: Int, l: List<String>) {
+        sp.edit().putString("rowApps$i", l.joinToString(",")).apply()
+    }
+    // Apps ya vistas: las que no estan aqui se marcan como "NUEVA".
+    fun hasSeen(): Boolean = sp.contains("seen")
+    fun seen(): Set<String> =
+        (sp.getString("seen", "") ?: "").split(",").filter { it.isNotEmpty() }.toSet()
+    fun saveSeen(s: Set<String>) {
+        sp.edit().putString("seen", s.joinToString(",")).apply()
+    }
+    fun markSeen(p: String): Set<String> {
+        val s = seen() + p
+        saveSeen(s)
+        return s
+    }
     var wallpaper: String
         get() = sp.getString("wall", "") ?: ""
         set(v) { sp.edit().putString("wall", v).apply() }
@@ -276,12 +293,30 @@ fun openSystem(ctx: Context, key: String) {
             "android.settings.DISPLAY_SETTINGS",
             "com.android.tv.settings/.device.display.DisplayActivity"
         )
+        "access" -> listOf("android.settings.ACCESSIBILITY_SETTINGS")
+        "dream" -> listOf(
+            "android.settings.DREAM_SETTINGS",
+            "android.settings.DISPLAY_SETTINGS"
+        )
         else -> listOf("android.settings.SETTINGS")
     }
     for (t in targets) {
         if (tryStart(ctx, t)) return
     }
     tryStart(ctx, "android.settings.SETTINGS")
+}
+
+/** Abre el asistente de voz del sistema. Devuelve false si la TV no tiene uno. */
+fun launchAssistant(ctx: Context): Boolean {
+    val actions = listOf(
+        "android.intent.action.VOICE_COMMAND",
+        "android.intent.action.ASSIST",
+        "android.intent.action.VOICE_ASSIST"
+    )
+    for (a in actions) {
+        if (tryIntent(ctx, Intent(a))) return true
+    }
+    return false
 }
 
 fun backupFile(ctx: Context): File {
