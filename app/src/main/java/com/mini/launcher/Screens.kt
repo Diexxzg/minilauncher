@@ -82,7 +82,11 @@ fun HomeScreen(
     moreBack: Int = 0,
     onFocusApp: (AppInfo, Boolean) -> Unit = { _, _ -> },
     dockState: LazyListState? = null,
-    focusTick: Int = 0
+    focusTick: Int = 0,
+    loading: Boolean = false,
+    previewDock: Boolean = false,
+    onQuick: () -> Unit = {},
+    quickBack: Int = 0
 ) {
     val st = LocalDock.current
     val f = st.scalePct / 100f
@@ -101,6 +105,16 @@ fun HomeScreen(
             seenMore = moreBack
             delay(150)
             runCatching { moreFr.requestFocus() }
+        }
+    }
+    // Al cerrar los accesos rapidos el foco vuelve al boton de ajustes.
+    val gearFr = remember { FocusRequester() }
+    var seenQuick by remember { mutableIntStateOf(quickBack) }
+    LaunchedEffect(quickBack) {
+        if (quickBack != seenQuick) {
+            seenQuick = quickBack
+            delay(150)
+            runCatching { gearFr.requestFocus() }
         }
     }
     LaunchedEffect(Unit) {
@@ -148,7 +162,13 @@ fun HomeScreen(
             ) {
                 MoreIcon(Color.White)
             }
-            GlassBox(onClick = onSettings, modifier = Modifier.size(44.dp), shape = CircleShape) {
+            // Pulsacion larga: accesos rapidos (brillo del fondo, tema y sonido).
+            GlassBox(
+                onClick = onSettings,
+                onLongClick = onQuick,
+                modifier = Modifier.size(44.dp).focusRequester(gearFr),
+                shape = CircleShape
+            ) {
                 GearIcon(Color.White)
             }
         }
@@ -180,8 +200,13 @@ fun HomeScreen(
                             AppTile(
                                 app, if (i == 0) Modifier.autoFocusOn(focusTick) else Modifier,
                                 onLongClick = { onMenu(app) },
-                                onFocusChange = { onFocusApp(app, it) }
+                                onFocusChange = { onFocusApp(app, it) },
+                                preview = previewDock && i == 0
                             ) { onLaunch(app) }
+                        }
+                        if (loading && dock.isEmpty()) {
+                            // Esqueletos mientras se leen las apps instaladas.
+                            items(5, key = { "skeleton$it" }) { SkeletonTile(f, st.corner) }
                         }
                         item(key = "all_apps") {
                             GlassBox(
@@ -258,7 +283,8 @@ fun SearchField(
     value: String,
     onChange: (String) -> Unit,
     modifier: Modifier = Modifier,
-    focusIt: Boolean = false
+    focusIt: Boolean = false,
+    placeholder: String = "Buscar apps…"
 ) {
     var focused by remember { mutableStateOf(false) }
     val shape = RoundedCornerShape(14.dp)
@@ -287,7 +313,7 @@ fun SearchField(
                 .onFocusChanged { focused = it.isFocused }
         )
         if (value.isEmpty()) {
-            Text("Buscar apps…", color = Color(0x99FFFFFF), fontSize = 18.sp)
+            Text(placeholder, color = Color(0x99FFFFFF), fontSize = 18.sp, maxLines = 1)
         }
     }
 }
@@ -303,12 +329,24 @@ fun AllApps(
     focusSearch: Boolean = false,
     onHidden: (() -> Unit)? = null,
     title: String? = null,
+    loading: Boolean = false,
     onLaunch: (AppInfo) -> Unit
 ) {
     var query by remember { mutableStateOf("") }
-    val list = remember(apps, query, sort, usage, recents) {
+    var cat by remember { mutableIntStateOf(0) }
+    val pm = LocalContext.current.packageManager
+    // Categoria de cada app (Juegos, Streaming, Musica, Herramientas, Otras).
+    val catOf = remember(apps) { apps.associate { it.pkg to appCategory(pm, it.pkg) } }
+    val catCount = remember(catOf) {
+        IntArray(APP_CATS.size).also { a -> catOf.values.forEach { a[it]++ } }
+    }
+    // Solo se ofrecen las categorias que tienen apps; si hay una sola, no se muestran filtros.
+    val shownCats = remember(catCount) { (1 until APP_CATS.size).filter { catCount[it] > 0 } }
+    val catSel = if (cat in shownCats) cat else 0
+    val list = remember(apps, query, sort, usage, recents, catSel, catOf) {
         val q = query.trim()
-        val f = if (q.isEmpty()) apps else apps.filter { it.label.contains(q, ignoreCase = true) }
+        val base = if (catSel == 0) apps else apps.filter { catOf[it.pkg] == catSel }
+        val f = if (q.isEmpty()) base else base.filter { it.label.contains(q, ignoreCase = true) }
         when (sort) {
             1 -> f.sortedByDescending { usage[it.pkg] ?: 0 }
             2 -> f.sortedBy { val i = recents.indexOf(it.pkg); if (i < 0) Int.MAX_VALUE else i }
@@ -335,6 +373,41 @@ fun AllApps(
                 ChoiceRow("Orden", listOf("A-Z", "Más usadas", "Recientes"), sort) { onSort(it) }
             }
         }
+        if (shownCats.size > 1) {
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 4.dp)
+            ) {
+                item(key = "cat0") {
+                    CatChip("Todas (" + apps.size + ")", catSel == 0) { cat = 0 }
+                }
+                items(shownCats, key = { "cat$it" }) { c ->
+                    CatChip(APP_CATS[c] + " (" + catCount[c] + ")", catSel == c) { cat = c }
+                }
+            }
+        }
+        if (loading && apps.isEmpty()) {
+            // Esqueletos mientras se leen las apps instaladas.
+            LazyVerticalGrid(
+                columns = GridCells.Adaptive(168.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+                contentPadding = PaddingValues(8.dp),
+                userScrollEnabled = false
+            ) {
+                items(12, key = { "sk$it" }) { _ ->
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        SkeletonBox(Modifier.size(144.dp, 84.dp), 18.dp)
+                        SkeletonBox(Modifier.padding(top = 8.dp).size(90.dp, 12.dp), 6.dp)
+                    }
+                }
+            }
+        } else if (list.isEmpty()) {
+            Text(
+                "Sin resultados", color = Color(0x99FFFFFF), fontSize = 16.sp,
+                modifier = Modifier.padding(8.dp)
+            )
+        }
         LazyVerticalGrid(
             columns = GridCells.Adaptive(168.dp),
             horizontalArrangement = Arrangement.spacedBy(16.dp),
@@ -357,5 +430,19 @@ fun AllApps(
                 }
             }
         }
+    }
+}
+
+/** Boton de filtro de categoria: la seleccionada se marca con el color del tema. */
+@Composable
+fun CatChip(label: String, selected: Boolean, onClick: () -> Unit) {
+    GlassBox(onClick, Modifier.height(38.dp), shape = RoundedCornerShape(19.dp)) {
+        Text(
+            label,
+            color = if (selected) Themes.current.acc else Color.White,
+            fontSize = 14.sp,
+            fontWeight = if (selected) FontWeight.Medium else FontWeight.Normal,
+            modifier = Modifier.padding(horizontal = 16.dp)
+        )
     }
 }
