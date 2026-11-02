@@ -1,8 +1,14 @@
 package com.mini.launcher
 
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+
+/** Nombres disponibles para las filas extra (indice 0 = fila desactivada). */
+val ROW_NAMES = listOf(
+    "Desactivada", "Streaming", "Juegos", "Herramientas", "Música", "Familia", "Deportes", "Noticias"
+)
 
 /** Ajustes de inicio, fondo y musica (se guardan en Prefs). */
 class Cfg(private val p: Prefs) {
@@ -21,6 +27,19 @@ class Cfg(private val p: Prefs) {
     private var _musicSize by mutableStateOf(p.getInt("musicSize", 80))
     private var _musicPos by mutableStateOf(p.getInt("musicPos", 0))
 
+    // Nuevos
+    private var _overscan by mutableStateOf(p.getInt("overscan", 0))
+    private var _uiScale by mutableStateOf(p.getInt("uiScale", 100))
+    private var _glowSrc by mutableStateOf(p.getInt("glowSrc", 0))
+    private var _sounds by mutableStateOf(p.getInt("sounds", 1) == 1)
+    private var _voiceMode by mutableStateOf(p.getInt("voiceMode", 0))
+    private var _lockSettings by mutableStateOf(p.getInt("lockSettings", 0) == 1)
+    private var _lockHidden by mutableStateOf(p.getInt("lockHidden", 0) == 1)
+    private var _pin by mutableStateOf(p.getStr("pin", ""))
+    private val _rows = mutableStateListOf(
+        p.getInt("row0", 0), p.getInt("row1", 0), p.getInt("row2", 0)
+    )
+
     val clock24: Boolean get() = _clock24
     val showDate: Boolean get() = _showDate
     val showWeather: Boolean get() = _showWeather
@@ -35,6 +54,24 @@ class Cfg(private val p: Prefs) {
     val sort: Int get() = _sort
     val musicSize: Int get() = _musicSize
     val musicPos: Int get() = _musicPos
+
+    val overscan: Int get() = _overscan
+    val uiScale: Int get() = _uiScale
+    val glowSrc: Int get() = _glowSrc
+    val sounds: Boolean get() = _sounds
+    val voiceMode: Int get() = _voiceMode
+    val lockSettings: Boolean get() = _lockSettings
+    val lockHidden: Boolean get() = _lockHidden
+    val pinHash: String get() = _pin
+    val pinSet: Boolean get() = _pin.isNotEmpty()
+
+    /** Indice (en ROW_NAMES) de la fila extra i (0..2). */
+    fun row(i: Int): Int = _rows[i]
+
+    fun setRow(i: Int, v: Int) {
+        _rows[i] = v
+        p.putInt("row$i", v)
+    }
 
     fun setClock24(v: Boolean) {
         _clock24 = v
@@ -106,4 +143,43 @@ class Cfg(private val p: Prefs) {
         p.putInt("musicPos", v)
     }
 
+    fun setOverscan(v: Int) {
+        _overscan = v
+        p.putInt("overscan", v)
+    }
+
+    fun setUiScale(v: Int) {
+        _uiScale = v
+        p.putInt("uiScale", v)
+    }
+
+    fun setGlowSrc(v: Int) {
+        _glowSrc = v
+        p.putInt("glowSrc", v)
+    }
+
+    fun setSounds(v: Boolean) {
+        _sounds = v
+        p.putInt("sounds", if (v) 1 else 0)
+    }
+
+    fun setVoiceMode(v: Int) {
+        _voiceMode = v
+        p.putInt("voiceMode", v)
+    }
+
+    fun setLockSettings(v: Boolean) {
+        _lockSettings = v
+        p.putInt("lockSettings", if (v) 1 else 0)
+    }
+
+    fun setLockHidden(v: Boolean) {
+        _lockHidden = v
+        p.putInt("lockHidden", if (v) 1 else 0)
+    }
+
+    fun setPin(hash: String) {
+        _pin = hash
+        p.putStr("pin", hash)
+    }
 }
