@@ -91,6 +91,28 @@ fun WallPicker(files: List<File>, current: String, onPick: (String) -> Unit, onA
 }
 
 @Composable
+fun GhostBtn(text: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    var focused by remember { mutableStateOf(false) }
+    val shape = RoundedCornerShape(10.dp)
+    Box(
+        modifier
+            .height(34.dp)
+            .widthIn(min = 34.dp)
+            .clip(shape)
+            .background(if (focused) Color(0x2BFFFFFF) else Color(0x14FFFFFF))
+            .then(if (focused) Modifier.border(1.dp, Color(0x66FFFFFF), shape) else Modifier)
+            .onFocusChanged { focused = it.isFocused }
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text, color = if (focused) Color.White else Color(0xCCFFFFFF), fontSize = 14.sp,
+            modifier = Modifier.padding(horizontal = 10.dp)
+        )
+    }
+}
+
+@Composable
 fun EditApps(
     apps: List<AppInfo>,
     favs: List<String>,
@@ -104,47 +126,64 @@ fun EditApps(
 ) {
     val ordered = favs.mapNotNull { p -> apps.firstOrNull { it.pkg == p } } +
         apps.filter { it.pkg !in favs }
-    Column(
-        Modifier.fillMaxSize().background(Color(0xAA000000)).padding(48.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        Text("Editar apps", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Medium)
-        Text(
-            "Las favoritas salen primero y en este orden en la barra de abajo.",
-            color = Color(0xCCFFFFFF), fontSize = 13.sp
-        )
-        LazyColumn(
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-            contentPadding = PaddingValues(vertical = 8.dp, horizontal = 4.dp)
-        ) {
-            itemsIndexed(ordered, key = { _, app -> app.pkg }) { i, app ->
-                val isFav = app.pkg in favs
-                val pct = sizes[app.pkg] ?: 100
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Image(app.art, null, Modifier.size(36.dp))
-                    Text(
-                        app.label + if (app.pkg in hidden) "  (oculta)" else "",
-                        color = Color.White, fontSize = 16.sp, maxLines = 1,
-                        overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f)
-                    )
-                    SmallBtn(
-                        if (isFav) "★ Favorita" else "☆ Favorita",
-                        if (i == 0) Modifier.autoFocus() else Modifier
-                    ) { onFav(app.pkg) }
-                    if (isFav) {
-                        SmallBtn("▲") { onUp(app.pkg) }
-                        SmallBtn("▼") { onDown(app.pkg) }
+    GlassPanelFrame(0.62f, 0.8f, 520f, 860f, false) {
+        Column(Modifier.fillMaxSize().padding(start = 18.dp, end = 18.dp, top = 16.dp, bottom = 14.dp)) {
+            Row(Modifier.padding(start = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                GearIcon(Color(0x99FFFFFF), 14)
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    "CONFIGURACIÓN", color = Color(0x99FFFFFF), fontSize = 13.sp,
+                    letterSpacing = 1.sp, fontWeight = FontWeight.Normal
+                )
+            }
+            Text(
+                "Editar apps", color = Color.White, fontSize = 28.sp,
+                fontWeight = FontWeight.Normal,
+                modifier = Modifier.padding(start = 6.dp, top = 2.dp)
+            )
+            Text(
+                "Las favoritas salen primero y en este orden en la barra de abajo.",
+                color = Color(0x99FFFFFF), fontSize = 13.sp,
+                modifier = Modifier.padding(start = 6.dp, top = 2.dp)
+            )
+            Spacer(Modifier.height(10.dp))
+            Box(Modifier.fillMaxWidth().height(1.dp).background(Color(0x22FFFFFF)))
+            Spacer(Modifier.height(6.dp))
+            LazyColumn(
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+                contentPadding = PaddingValues(vertical = 4.dp)
+            ) {
+                itemsIndexed(ordered, key = { _, app -> app.pkg }) { i, app ->
+                    val isFav = app.pkg in favs
+                    val pct = sizes[app.pkg] ?: 100
+                    Row(
+                        Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 3.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Image(app.art, null, Modifier.size(32.dp))
+                        Text(
+                            app.label + if (app.pkg in hidden) "  (oculta)" else "",
+                            color = Color(0xF2FFFFFF), fontSize = 16.sp, maxLines = 1,
+                            overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f)
+                        )
+                        GhostBtn(
+                            if (isFav) "★ Favorita" else "☆ Favorita",
+                            if (i == 0) Modifier.autoFocus() else Modifier
+                        ) { onFav(app.pkg) }
+                        if (isFav) {
+                            GhostBtn("▲") { onUp(app.pkg) }
+                            GhostBtn("▼") { onDown(app.pkg) }
+                        }
+                        GhostBtn("−") { onSize(app.pkg, (pct - 10).coerceIn(50, 200)) }
+                        Text(
+                            pct.toString() + "%", color = Color(0xE6FFFFFF), fontSize = 14.sp,
+                            textAlign = TextAlign.Center, modifier = Modifier.width(46.dp)
+                        )
+                        GhostBtn("+") { onSize(app.pkg, (pct + 10).coerceIn(50, 200)) }
+                        GhostBtn(if (app.pkg in hidden) "Mostrar" else "Ocultar") { onHide(app.pkg) }
                     }
-                    SmallBtn("−") { onSize(app.pkg, (pct - 10).coerceIn(50, 200)) }
-                    Text(
-                        pct.toString() + "%", color = Color.White, fontSize = 14.sp,
-                        textAlign = TextAlign.Center, modifier = Modifier.width(52.dp)
-                    )
-                    SmallBtn("+") { onSize(app.pkg, (pct + 10).coerceIn(50, 200)) }
-                    SmallBtn(if (app.pkg in hidden) "Mostrar" else "Ocultar") { onHide(app.pkg) }
                 }
             }
         }
@@ -152,7 +191,6 @@ fun EditApps(
 }
 
 class InputItem(val id: String, val label: String)
-
 fun listInputs(ctx: Context): List<InputItem> {
     return try {
         val tm = ctx.getSystemService(Context.TV_INPUT_SERVICE) as TvInputManager
