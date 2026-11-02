@@ -95,10 +95,10 @@ fun readNet(ctx: Context): NetState {
 
 /** Boton de la barra superior: estado real de Wi-Fi / Ethernet / Bluetooth. */
 @Composable
-fun NetPill(net: NetState, onClick: () -> Unit) {
+fun NetPill(net: NetState, onClick: () -> Unit, modifier: Modifier = Modifier) {
     GlassBox(
         onClick = onClick,
-        modifier = Modifier.height(44.dp).widthIn(min = 44.dp),
+        modifier = modifier.height(44.dp).widthIn(min = 44.dp),
         shape = CircleShape
     ) {
         Row(
