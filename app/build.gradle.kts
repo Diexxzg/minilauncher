@@ -11,8 +11,8 @@ android {
         applicationId = "com.mini.launcher"
         minSdk = 26
         targetSdk = 34
-        versionCode = 5
-        versionName = "2.3"
+        versionCode = 7
+        versionName = "2.5"
     }
     buildTypes {
         release {
