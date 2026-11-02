@@ -88,7 +88,9 @@ fun HomeScreen(
     loading: Boolean = false,
     previewDock: Boolean = false,
     onQuick: () -> Unit = {},
-    quickBack: Int = 0
+    quickBack: Int = 0,
+    focusedApp: AppInfo? = null,
+    lastUsed: Map<String, Long> = emptyMap()
 ) {
     val st = LocalDock.current
     val f = st.scalePct / 100f
@@ -191,6 +193,18 @@ fun HomeScreen(
             reverseLayout = true,
             contentPadding = PaddingValues(top = 8.dp)
         ) {
+            if (cfg.focusCard) {
+                // Primer elemento de la columna invertida = lo mas bajo: texto bajo el dock.
+                item(key = "focusCard") {
+                    val fa = focusedApp
+                    FocusCard(
+                        fa,
+                        if (fa != null) (LocalBadges.current.unread[fa.pkg] ?: 0) else 0,
+                        if (fa != null) lastUsed[fa.pkg] else null,
+                        Modifier.offset(y = (-14).dp)
+                    )
+                }
+            }
             item(key = "dock") {
                 CompositionLocalProvider(LocalBringIntoViewSpec provides CenterSpec) {
                     LazyRow(
