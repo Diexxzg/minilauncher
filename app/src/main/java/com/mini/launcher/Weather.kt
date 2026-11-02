@@ -1,11 +1,14 @@
 package com.mini.launcher
 
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.TextUnit
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -96,9 +99,12 @@ fun WeatherText(
     var text by remember(key) {
         mutableStateOf<String?>(if (WeatherCache.key == key) WeatherCache.text else null)
     }
+    // Mientras llega el primer dato se muestra un esqueleto; si falla, no se muestra nada.
+    var tried by remember(key) { mutableStateOf(text != null) }
     LaunchedEffect(key) {
         while (true) {
             val r = withContext(Dispatchers.IO) { fetchWeather(city, fahrenheit) }
+            tried = true
             if (r != null) {
                 text = r
                 WeatherCache.key = key
@@ -112,6 +118,11 @@ fun WeatherText(
         Text(
             t, color = Color(0xEBFFFFFF), fontSize = size,
             fontWeight = FontWeight.Medium, modifier = modifier
+        )
+    } else if (!tried) {
+        SkeletonBox(
+            modifier.width((size.value * 7f).dp).height((size.value * 1.15f).dp),
+            corner = 6.dp
         )
     }
 }
