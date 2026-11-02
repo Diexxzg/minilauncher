@@ -30,7 +30,7 @@ class FillVideoView(ctx: Context) : VideoView(ctx) {
 }
 
 @Composable
-fun WallpaperLayer(file: File?) {
+fun WallpaperLayer(file: File?, paused: Boolean = false) {
     if (file == null) return
     val ctx = LocalContext.current
     val ext = file.extension.lowercase()
@@ -54,6 +54,10 @@ fun WallpaperLayer(file: File?) {
                     v.tag = file.path
                     v.setVideoPath(file.path)
                     v.start()
+                    // Si ya hay un panel abierto, queda en pausa mostrando el primer cuadro.
+                    if (paused) v.pause()
+                } else if (paused) {
+                    if (v.isPlaying) v.pause()
                 } else if (!v.isPlaying) {
                     v.start()
                 }
@@ -79,10 +83,14 @@ fun WallpaperLayer(file: File?) {
             },
             update = { iv ->
                 val d = drawable
-                iv.setImageDrawable(d)
+                if (iv.drawable !== d) iv.setImageDrawable(d)
                 if (d is AnimatedImageDrawable) {
                     d.repeatCount = AnimatedImageDrawable.REPEAT_INFINITE
-                    d.start()
+                    if (paused) {
+                        if (d.isRunning) d.stop()
+                    } else if (!d.isRunning) {
+                        d.start()
+                    }
                 }
             }
         )
