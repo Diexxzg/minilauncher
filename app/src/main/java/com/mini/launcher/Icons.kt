@@ -28,6 +28,8 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -106,6 +108,81 @@ fun GearIcon(color: Color, s: Int = 22) {
                 strokeWidth = w * 0.12f,
                 cap = StrokeCap.Round
             )
+        }
+    }
+}
+
+
+/** Iconos de linea fina para las pestanas del panel de configuracion. */
+@Composable
+fun LineIcon(kind: String, color: Color, s: Int = 24) {
+    Canvas(Modifier.size(s.dp)) {
+        val w = size.width
+        val sw = w * 0.075f
+        val st = Stroke(sw, cap = StrokeCap.Round, join = StrokeJoin.Round)
+        when (kind) {
+            "palette" -> {
+                drawCircle(color, radius = w * 0.4f, center = Offset(w * 0.5f, w * 0.5f), style = st)
+                drawCircle(color, radius = sw * 0.7f, center = Offset(w * 0.34f, w * 0.42f))
+                drawCircle(color, radius = sw * 0.7f, center = Offset(w * 0.52f, w * 0.3f))
+                drawCircle(color, radius = sw * 0.7f, center = Offset(w * 0.69f, w * 0.44f))
+                drawCircle(color, radius = w * 0.09f, center = Offset(w * 0.56f, w * 0.68f), style = st)
+            }
+            "folder" -> {
+                val p = Path()
+                p.moveTo(w * 0.1f, w * 0.26f)
+                p.lineTo(w * 0.38f, w * 0.26f)
+                p.lineTo(w * 0.47f, w * 0.38f)
+                p.lineTo(w * 0.9f, w * 0.38f)
+                p.lineTo(w * 0.9f, w * 0.8f)
+                p.lineTo(w * 0.1f, w * 0.8f)
+                p.close()
+                drawPath(p, color, style = st)
+            }
+            "home" -> {
+                val roof = Path()
+                roof.moveTo(w * 0.1f, w * 0.48f)
+                roof.lineTo(w * 0.5f, w * 0.14f)
+                roof.lineTo(w * 0.9f, w * 0.48f)
+                drawPath(roof, color, style = st)
+                val body = Path()
+                body.moveTo(w * 0.2f, w * 0.42f)
+                body.lineTo(w * 0.2f, w * 0.84f)
+                body.lineTo(w * 0.8f, w * 0.84f)
+                body.lineTo(w * 0.8f, w * 0.42f)
+                drawPath(body, color, style = st)
+                val door = Path()
+                door.moveTo(w * 0.42f, w * 0.84f)
+                door.lineTo(w * 0.42f, w * 0.62f)
+                door.lineTo(w * 0.58f, w * 0.62f)
+                door.lineTo(w * 0.58f, w * 0.84f)
+                drawPath(door, color, style = st)
+            }
+            "music" -> {
+                drawCircle(color, radius = w * 0.13f, center = Offset(w * 0.38f, w * 0.74f), style = st)
+                drawLine(color, Offset(w * 0.51f, w * 0.74f), Offset(w * 0.51f, w * 0.18f), strokeWidth = sw, cap = StrokeCap.Round)
+                drawLine(color, Offset(w * 0.51f, w * 0.18f), Offset(w * 0.8f, w * 0.34f), strokeWidth = sw, cap = StrokeCap.Round)
+            }
+            "device" -> {
+                drawRoundRect(
+                    color = color,
+                    topLeft = Offset(w * 0.3f, w * 0.1f),
+                    size = Size(w * 0.4f, w * 0.8f),
+                    cornerRadius = CornerRadius(w * 0.08f, w * 0.08f),
+                    style = st
+                )
+                drawLine(color, Offset(w * 0.44f, w * 0.78f), Offset(w * 0.56f, w * 0.78f), strokeWidth = sw, cap = StrokeCap.Round)
+            }
+            "globe" -> {
+                drawCircle(color, radius = w * 0.4f, center = Offset(w * 0.5f, w * 0.5f), style = st)
+                drawOval(color, topLeft = Offset(w * 0.3f, w * 0.1f), size = Size(w * 0.4f, w * 0.8f), style = st)
+                drawLine(color, Offset(w * 0.1f, w * 0.5f), Offset(w * 0.9f, w * 0.5f), strokeWidth = sw, cap = StrokeCap.Round)
+            }
+            else -> {
+                drawCircle(color, radius = w * 0.4f, center = Offset(w * 0.5f, w * 0.5f), style = st)
+                drawCircle(color, radius = sw * 0.7f, center = Offset(w * 0.5f, w * 0.31f))
+                drawLine(color, Offset(w * 0.5f, w * 0.45f), Offset(w * 0.5f, w * 0.7f), strokeWidth = sw, cap = StrokeCap.Round)
+            }
         }
     }
 }
