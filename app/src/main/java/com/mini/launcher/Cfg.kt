@@ -39,6 +39,8 @@ class Cfg(private val p: Prefs) {
     private var _lockSettings by mutableStateOf(p.getInt("lockSettings", 0) == 1)
     private var _lockHidden by mutableStateOf(p.getInt("lockHidden", 0) == 1)
     private var _pin by mutableStateOf(p.getStr("pin", ""))
+    private var _dynBg by mutableStateOf(p.getInt("dynBg", 2).coerceIn(0, 2))
+    private var _screenAnim by mutableStateOf(p.getInt("screenAnim", 1) == 1)
     private val _rows = mutableStateListOf(
         p.getInt("row0", 0), p.getInt("row1", 0), p.getInt("row2", 0)
     )
@@ -72,6 +74,10 @@ class Cfg(private val p: Prefs) {
     val lockHidden: Boolean get() = _lockHidden
     val pinHash: String get() = _pin
     val pinSet: Boolean get() = _pin.isNotEmpty()
+    /** Fondo segun la app enfocada: 0 = apagado, 1 = degradado, 2 = banner + degradado. */
+    val dynBg: Int get() = _dynBg
+    /** Fundido / deslizamiento corto al cambiar de pantalla. */
+    val screenAnim: Boolean get() = _screenAnim
 
     /** Indice (en ROW_NAMES) de la fila extra i (0..2). */
     fun row(i: Int): Int = _rows[i]
@@ -208,5 +214,15 @@ class Cfg(private val p: Prefs) {
     fun setPin(hash: String) {
         _pin = hash
         p.putStr("pin", hash)
+    }
+
+    fun setDynBg(v: Int) {
+        _dynBg = v
+        p.putInt("dynBg", v)
+    }
+
+    fun setScreenAnim(v: Boolean) {
+        _screenAnim = v
+        p.putInt("screenAnim", if (v) 1 else 0)
     }
 }
