@@ -1,8 +1,13 @@
 package com.mini.launcher
 
+import android.content.Context
+import android.media.AudioManager
 import android.os.SystemClock
+import android.view.View
 import android.view.SoundEffectConstants
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
@@ -24,6 +29,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.ClipOp
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
@@ -45,6 +51,7 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
@@ -75,6 +82,19 @@ val LocalAccent = compositionLocalOf<Color?> { null }
 
 /** Sonido suave al mover el foco. */
 val LocalSounds = compositionLocalOf { false }
+
+/** Volumen del sonido de navegacion (0..1). */
+val LocalSoundVol = compositionLocalOf { 0.3f }
+
+/** Reproduce el sonido de foco a volumen bajo (si el sistema tiene los sonidos activados). */
+fun playSoftFocus(view: View, vol: Float) {
+    val am = view.context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+    if (am != null) {
+        am.playSoundEffect(AudioManager.FX_FOCUS_NAVIGATION_RIGHT, vol)
+    } else {
+        view.playSoundEffect(SoundEffectConstants.NAVIGATION_RIGHT)
+    }
+}
 
 /** Insignias: apps nuevas y notificaciones sin leer por paquete. */
 class Badges(val newPkgs: Set<String>, val unread: Map<String, Int>)
@@ -147,54 +167,47 @@ fun GlassBox(
     var focused by remember { mutableStateOf(false) }
     val view = LocalView.current
     val sounds = LocalSounds.current
+    val vol = LocalSoundVol.current
     val born = remember { SystemClock.elapsedRealtime() }
+    val th = Themes.current
+    // Sin rebote ni pulso: todo se mueve con curvas suaves y sin parpadeo.
     val sc = animateFloatAsState(
-        if (focused) 1.07f else 1f,
-        spring(dampingRatio = 0.7f, stiffness = 320f),
+        if (focused) 1.05f else 1f,
+        tween(220, easing = FastOutSlowInEasing),
         label = "scale"
     )
     val lift = animateFloatAsState(
         if (focused) 1f else 0f,
-        spring(dampingRatio = 0.8f, stiffness = 300f),
+        tween(220, easing = FastOutSlowInEasing),
         label = "lift"
     )
     val gl = animateFloatAsState(if (focused) 1f else 0f, tween(260), label = "glow")
-    // Pulso suave del brillo mientras la ficha tiene el foco (solo corre con foco).
-    val pulse = remember { Animatable(0f) }
-    LaunchedEffect(focused) {
-        if (focused && glow != null) {
-            delay(300)
-            while (true) {
-                pulse.animateTo(1f, tween(1200, easing = FastOutSlowInEasing))
-                pulse.animateTo(0f, tween(1200, easing = FastOutSlowInEasing))
-            }
-        } else {
-            pulse.snapTo(0f)
-        }
-    }
+    val bgColor by animateColorAsState(
+        if (focused) th.focusBg else Color(0x66121416), tween(200), label = "bg"
+    )
+    val borderColor by animateColorAsState(
+        if (focused) th.focusBorder else Color(0x26FFFFFF), tween(200), label = "border"
+    )
+    val borderW by animateDpAsState(if (focused) 2.dp else 1.dp, tween(200), label = "borderW")
     Box(
         modifier = modifier
             .zIndex(if (focused) 1f else 0f)
             .graphicsLayer {
                 scaleX = sc.value
                 scaleY = sc.value
-                translationY = -4.dp.toPx() * lift.value
+                translationY = -3.dp.toPx() * lift.value
             }
             .then(
                 if (glow != null) Modifier.softGlow(
-                    glow, glowLevel, { gl.value * (0.8f + 0.2f * pulse.value) }, cornerDp
+                    glow, glowLevel, { gl.value }, cornerDp
                 )
                 else Modifier
             )
             .clip(shape)
-            .background(if (focused) Color(0x55FFFFFF) else Color(0x66121416))
+            .background(bgColor)
             .then(
                 if (glow == null) {
-                    Modifier.border(
-                        if (focused) 2.dp else 1.dp,
-                        if (focused) Color(0xDDFFFFFF) else Color(0x26FFFFFF),
-                        shape
-                    )
+                    Modifier.border(borderW, borderColor, shape)
                 } else {
                     Modifier
                 }
@@ -203,7 +216,7 @@ fun GlassBox(
                 if (it.isFocused && !focused && sounds &&
                     SystemClock.elapsedRealtime() - born > 600L
                 ) {
-                    view.playSoundEffect(SoundEffectConstants.NAVIGATION_RIGHT)
+                    playSoftFocus(view, vol)
                 }
                 focused = it.isFocused
             }
@@ -223,6 +236,7 @@ fun AppTile(
     modifier: Modifier = Modifier,
     useSize: Boolean = true,
     fixedScale: Float? = null,
+    bannerStyle: Boolean = false,
     onLongClick: (() -> Unit)? = null,
     onClick: () -> Unit
 ) {
@@ -250,6 +264,27 @@ fun AppTile(
     ) {
         if (app.banner) {
             Image(app.art, app.label, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+        } else if (bannerStyle) {
+            // Apps sin banner: se les arma uno con el color de la app y su icono al centro.
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.linearGradient(
+                            listOf(Color(app.glow).copy(alpha = 0.6f), Color(0xE60B1020))
+                        )
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Image(app.art, null, Modifier.size((40 * f).dp))
+                    Text(
+                        app.label, color = Color.White, fontSize = 13.sp, maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                    )
+                }
+            }
         } else {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Image(app.art, null, Modifier.size((40 * f).dp))
@@ -293,7 +328,7 @@ fun AppTile(
 }
 
 @Composable
-fun Clock(h24: Boolean = false) {
+fun Clock(h24: Boolean = false, size: TextUnit = 32.sp, ampmSize: TextUnit = 17.sp) {
     var now by remember { mutableStateOf(Date()) }
     LaunchedEffect(Unit) {
         while (true) {
@@ -306,20 +341,20 @@ fun Clock(h24: Boolean = false) {
     val txt = buildAnnotatedString {
         append(timeF.format(now))
         if (!h24) {
-            withStyle(SpanStyle(fontSize = 17.sp, fontWeight = FontWeight.Normal, color = Color(0xCCFFFFFF))) {
+            withStyle(SpanStyle(fontSize = ampmSize, fontWeight = FontWeight.Normal, color = Color(0xCCFFFFFF))) {
                 append(" " + ampmF.format(now))
             }
         }
     }
     Text(
-        txt, color = Color(0xF2FFFFFF), fontSize = 32.sp,
-        fontWeight = FontWeight.Normal,
+        txt, color = Color(0xF2FFFFFF), fontSize = size,
+        fontWeight = if (size.value > 40f) FontWeight.Light else FontWeight.Normal,
         style = TextStyle(shadow = Shadow(Color(0xAA000000), Offset(0f, 2f), 8f))
     )
 }
 
 @Composable
-fun DateText(modifier: Modifier = Modifier) {
+fun DateText(modifier: Modifier = Modifier, size: TextUnit = 16.sp) {
     var now by remember { mutableStateOf(Date()) }
     LaunchedEffect(Unit) {
         while (true) {
@@ -330,7 +365,7 @@ fun DateText(modifier: Modifier = Modifier) {
     val f = remember { SimpleDateFormat("EEEE, d 'de' MMMM", Locale.forLanguageTag("es-VE")) }
     Text(
         f.format(now).replaceFirstChar { it.uppercase() },
-        color = Color(0xCCFFFFFF), fontSize = 16.sp,
+        color = Color(0xCCFFFFFF), fontSize = size,
         fontWeight = FontWeight.Medium,
         style = TextStyle(shadow = Shadow(Color(0xAA000000), Offset(0f, 2f), 8f)),
         modifier = modifier
