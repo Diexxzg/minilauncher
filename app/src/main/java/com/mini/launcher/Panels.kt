@@ -66,7 +66,7 @@ fun WallThumb(f: File, selected: Boolean, modifier: Modifier = Modifier, onClick
 
 @Composable
 fun WallPicker(files: List<File>, current: String, onPick: (String) -> Unit, onAdd: () -> Unit) {
-    Box(Modifier.fillMaxSize().background(Color(0xAA000000)).padding(48.dp)) {
+    Box(Modifier.fillMaxSize().padding(48.dp)) {
         Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Text("Fondos de pantalla", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Medium)
             LazyRow(
@@ -219,7 +219,7 @@ fun openInput(ctx: Context, id: String) {
 @Composable
 fun InputsPanel(items: List<InputItem>, onPick: (String) -> Unit, onClose: () -> Unit) {
     val shape = RoundedCornerShape(28.dp)
-    Box(Modifier.fillMaxSize().background(Color(0x55000000)), contentAlignment = Alignment.CenterEnd) {
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.CenterEnd) {
         Column(
             Modifier
                 .padding(32.dp)
