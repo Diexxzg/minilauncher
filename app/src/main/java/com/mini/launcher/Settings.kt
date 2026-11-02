@@ -498,4 +498,28 @@ fun SettingsScreen(
                             while (true) {
                                 var frames = 0
                                 val start = withFrameNanos { it }
-                            
+                                                                var t = start
+                                while (t - start < 1_000_000_000L) {
+                                    t = withFrameNanos { it }
+                                    frames++
+                                }
+                                fps = frames
+                            }
+                        }
+                        val wallCount = remember { listWalls(ctx).size }
+                        InfoRow("Versión", version)
+                        InfoRow("Permiso de música", if (listenerOn) "Activo" else "Falta permitir")
+                        InfoRow("Fotogramas por segundo", fps.toString())
+                        InfoRow("Apps instaladas", AppCache.apps.size.toString())
+                        InfoRow("Fondos guardados", wallCount.toString())
+                        InfoRow("Android", android.os.Build.VERSION.RELEASE + " (API " + android.os.Build.VERSION.SDK_INT + ")")
+                        InfoRow("Dispositivo", android.os.Build.MODEL)
+                        ActionRow("Guardar copia de seguridad") { onBackup() }
+                        ActionRow("Restaurar copia de seguridad") { onRestore() }
+                    }
+                }
+                }
+            }
+        }
+    }
+}
