@@ -1,5 +1,9 @@
 package com.mini.launcher
 
+import android.os.SystemClock
+import android.view.SoundEffectConstants
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
@@ -32,6 +36,8 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -57,6 +63,23 @@ class DockStyle(
 )
 
 val LocalDock = compositionLocalOf { DockStyle(100, 16, 18, 0, 2, emptyMap()) }
+
+/** Escala global de la interfaz (1f = 100%). */
+val LocalUiScale = compositionLocalOf { 1f }
+
+/** Margen de seguridad (overscan) en dp, medido sin escala. */
+val LocalOverscan = compositionLocalOf { 0 }
+
+/** Color de acento tomado del fondo; null = usar el color de cada app. */
+val LocalAccent = compositionLocalOf<Color?> { null }
+
+/** Sonido suave al mover el foco. */
+val LocalSounds = compositionLocalOf { false }
+
+/** Insignias: apps nuevas y notificaciones sin leer por paquete. */
+class Badges(val newPkgs: Set<String>, val unread: Map<String, Int>)
+
+val LocalBadges = compositionLocalOf { Badges(emptySet(), emptyMap()) }
 
 object TileBounds {
     var last: Rect? = null
@@ -98,6 +121,17 @@ fun Modifier.autoFocus(): Modifier {
     return this.focusRequester(fr)
 }
 
+/** Igual que autoFocus, pero vuelve a pedir el foco cada vez que cambia key. */
+@Composable
+fun Modifier.autoFocusOn(key: Any?): Modifier {
+    val fr = remember { FocusRequester() }
+    LaunchedEffect(key) {
+        delay(150)
+        runCatching { fr.requestFocus() }
+    }
+    return this.focusRequester(fr)
+}
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun GlassBox(
@@ -111,21 +145,45 @@ fun GlassBox(
     content: @Composable BoxScope.() -> Unit
 ) {
     var focused by remember { mutableStateOf(false) }
+    val view = LocalView.current
+    val sounds = LocalSounds.current
+    val born = remember { SystemClock.elapsedRealtime() }
     val sc = animateFloatAsState(
-        if (focused) 1.06f else 1f,
-        spring(dampingRatio = 0.75f, stiffness = 380f),
+        if (focused) 1.07f else 1f,
+        spring(dampingRatio = 0.7f, stiffness = 320f),
         label = "scale"
     )
-    val gl = animateFloatAsState(if (focused) 1f else 0f, tween(220), label = "glow")
+    val lift = animateFloatAsState(
+        if (focused) 1f else 0f,
+        spring(dampingRatio = 0.8f, stiffness = 300f),
+        label = "lift"
+    )
+    val gl = animateFloatAsState(if (focused) 1f else 0f, tween(260), label = "glow")
+    // Pulso suave del brillo mientras la ficha tiene el foco (solo corre con foco).
+    val pulse = remember { Animatable(0f) }
+    LaunchedEffect(focused) {
+        if (focused && glow != null) {
+            delay(300)
+            while (true) {
+                pulse.animateTo(1f, tween(1200, easing = FastOutSlowInEasing))
+                pulse.animateTo(0f, tween(1200, easing = FastOutSlowInEasing))
+            }
+        } else {
+            pulse.snapTo(0f)
+        }
+    }
     Box(
         modifier = modifier
             .zIndex(if (focused) 1f else 0f)
             .graphicsLayer {
                 scaleX = sc.value
                 scaleY = sc.value
+                translationY = -4.dp.toPx() * lift.value
             }
             .then(
-                if (glow != null) Modifier.softGlow(glow, glowLevel, { gl.value }, cornerDp)
+                if (glow != null) Modifier.softGlow(
+                    glow, glowLevel, { gl.value * (0.8f + 0.2f * pulse.value) }, cornerDp
+                )
                 else Modifier
             )
             .clip(shape)
@@ -141,7 +199,14 @@ fun GlassBox(
                     Modifier
                 }
             )
-            .onFocusChanged { focused = it.isFocused }
+            .onFocusChanged {
+                if (it.isFocused && !focused && sounds &&
+                    SystemClock.elapsedRealtime() - born > 600L
+                ) {
+                    view.playSoundEffect(SoundEffectConstants.NAVIGATION_RIGHT)
+                }
+                focused = it.isFocused
+            }
             .then(
                 if (onLongClick != null) Modifier.combinedClickable(
                     onClick = onClick, onLongClick = onLongClick
@@ -165,6 +230,9 @@ fun AppTile(
     val f = fixedScale
         ?: if (useSize) (st.scalePct / 100f) * ((st.sizes[app.pkg] ?: 100) / 100f) else 1f
     val holder = remember { arrayOfNulls<LayoutCoordinates>(1) }
+    val badges = LocalBadges.current
+    val unread = badges.unread[app.pkg] ?: 0
+    val isNew = app.pkg in badges.newPkgs
     GlassBox(
         onClick = {
             val c = holder[0]
@@ -176,7 +244,7 @@ fun AppTile(
             .size((144 * f).dp, (84 * f).dp)
             .onGloballyPositioned { holder[0] = it },
         shape = RoundedCornerShape(st.corner.dp),
-        glow = Color(app.glow),
+        glow = LocalAccent.current ?: Color(app.glow),
         glowLevel = st.glow,
         cornerDp = st.corner.dp
     ) {
@@ -189,6 +257,35 @@ fun AppTile(
                     app.label, color = Color.White, fontSize = 13.sp, maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                )
+            }
+        }
+        if (unread > 0) {
+            Box(
+                Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(5.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFFE5484D))
+                    .padding(horizontal = 6.dp, vertical = 2.dp)
+            ) {
+                Text(
+                    if (unread > 99) "99+" else unread.toString(),
+                    color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold
+                )
+            }
+        } else if (isNew) {
+            Box(
+                Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(5.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFF3DD68C))
+                    .padding(horizontal = 7.dp, vertical = 2.dp)
+            ) {
+                Text(
+                    "NUEVA", color = Color(0xFF062B1B), fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold
                 )
             }
         }
