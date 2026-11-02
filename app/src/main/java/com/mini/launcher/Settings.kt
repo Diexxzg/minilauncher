@@ -68,6 +68,7 @@ private val CATS = listOf(
     "music" to "Música",
     "device" to "Apps",
     "globe" to "Sistema",
+    "lock" to "Seguridad",
     "info" to "Acerca de"
 )
 
@@ -352,11 +353,13 @@ fun GlassPanelFrame(
     val st = LocalDock.current
     val conf = LocalConfiguration.current
     val dens = androidx.compose.ui.platform.LocalDensity.current
+    val us = LocalUiScale.current
+    val ov = LocalOverscan.current / us
     var shown by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { shown = true }
     val p by animateFloatAsState(if (shown) 1f else 0f, tween(300), label = "panelIn")
-    val wDp = conf.screenWidthDp.toFloat()
-    val hDp = conf.screenHeightDp.toFloat()
+    val wDp = conf.screenWidthDp.toFloat() / us - 2f * ov
+    val hDp = conf.screenHeightDp.toFloat() / us - 2f * ov
     val topRes = if (avoidDock) 88f else 36f
     val botRes = if (avoidDock) 84f * st.scalePct / 100f + 72f + st.bottom + 24f else 36f
     val avail = (hDp - topRes - botRes).coerceAtLeast(240f)
@@ -366,7 +369,7 @@ fun GlassPanelFrame(
     val shape = RoundedCornerShape(22.dp)
     val panelBg = Brush.verticalGradient(listOf(Color(0xCC1B1D20), Color(0xCC121416)))
     val panelBorder = Brush.verticalGradient(listOf(Color(0x55FFFFFF), Color(0x1AFFFFFF)))
-    Box(Modifier.fillMaxSize().background(Color(0x40000000))) {
+    Box(Modifier.fillMaxSize()) {
         Box(
             Modifier
                 .align(Alignment.TopCenter)
@@ -398,7 +401,6 @@ fun GlassPanelFrame(
         }
     }
 }
-
 // ---------- Pantalla ----------
 
 @Composable
@@ -413,7 +415,9 @@ fun SettingsScreen(
     onOpen: (String) -> Unit,
     onSetHome: () -> Unit,
     onBackup: () -> Unit,
-    onRestore: () -> Unit
+    onRestore: () -> Unit,
+    onNetPerm: () -> Unit,
+    onPin: (String) -> Unit
 ) {
     val ctx = LocalContext.current
     val conf = LocalConfiguration.current
@@ -460,12 +464,24 @@ fun SettingsScreen(
                         ) { cfg.setRot(it) }
                         SwitchRow("Transición suave", cfg.fade) { cfg.setFade(it) }
                         ChoiceRow("Brillo de color", GLOW_NAMES, style.glow) { onSet("glow", it) }
+                        ChoiceRow(
+                            "Color del brillo",
+                            listOf("Color de cada app", "Color del fondo"),
+                            cfg.glowSrc
+                        ) { cfg.setGlowSrc(it) }
+                        SliderRow("Tamaño de la interfaz", cfg.uiScale, 70, 130, 5, "%") { cfg.setUiScale(it) }
+                        SliderRow("Margen de seguridad", cfg.overscan, 0, 60, 2, " dp") { cfg.setOverscan(it) }
+                        SwitchRow("Sonidos de navegación", cfg.sounds) { cfg.setSounds(it) }
                     }
                     1 -> {
                         SliderRow("Tamaño general", style.scalePct, 50, 180, 10, "%") { onSet("scale", it) }
                         SliderRow("Separación", style.spacing, 0, 48, 2, " dp") { onSet("spacing", it) }
                         SliderRow("Redondeo", style.corner, 0, 40, 2, " dp") { onSet("corner", it) }
                         SliderRow("Margen inferior", style.bottom, 0, 80, 2, " dp") { onSet("bottom", it) }
+                        ChoiceRow("Fila extra 1", ROW_NAMES, cfg.row(0)) { cfg.setRow(0, it) }
+                        ChoiceRow("Fila extra 2", ROW_NAMES, cfg.row(1)) { cfg.setRow(1, it) }
+                        ChoiceRow("Fila extra 3", ROW_NAMES, cfg.row(2)) { cfg.setRow(2, it) }
+                        InfoRow("Asignar apps", "mantén OK en la app")
                         ActionRow("Restablecer dock") { onResetDock() }
                     }
                     2 -> {
@@ -482,6 +498,11 @@ fun SettingsScreen(
                             cfg.setFahrenheit(it == 1)
                         }
                         SwitchRow("Mostrar recientes", cfg.showRecents) { cfg.setShowRecents(it) }
+                        ChoiceRow(
+                            "Botón de voz",
+                            listOf("Asistente de voz", "Buscar apps"),
+                            cfg.voiceMode
+                        ) { cfg.setVoiceMode(it) }
                         ChoiceRow(
                             "Modo ambiente",
                             listOf("Desactivado", "2 min", "5 min", "10 min", "20 min"),
@@ -507,7 +528,23 @@ fun SettingsScreen(
                         ActionRow("Wi-Fi") { onOpen("wifi") }
                         ActionRow("Entradas (HDMI)") { onInputs() }
                         ActionRow("Todos los ajustes de Android") { onOpen("all") }
+                        ActionRow("Bluetooth") { onOpen("bt") }
+                        ActionRow("Permitir nombre de red y Bluetooth") { onNetPerm() }
+                        ActionRow("Menú de energía (accesibilidad)") { onOpen("access") }
+                        ActionRow("Protector de pantalla del sistema") { onOpen("dream") }
                         ActionRow("Establecer como inicio predeterminado") { onSetHome() }
+                    }
+                    6 -> {
+                        if (!cfg.pinSet) {
+                            ActionRow("Crear PIN de 4 dígitos") { onPin("create") }
+                            InfoRow("Estado", "Sin PIN")
+                        } else {
+                            ActionRow("Cambiar PIN") { onPin("change") }
+                            ActionRow("Quitar PIN") { onPin("remove") }
+                            SwitchRow("Proteger ajustes", cfg.lockSettings) { cfg.setLockSettings(it) }
+                            SwitchRow("Proteger apps ocultas", cfg.lockHidden) { cfg.setLockHidden(it) }
+                            InfoRow("Estado", "PIN activo")
+                        }
                     }
                     else -> {
                         val version = remember {
