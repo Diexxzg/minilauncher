@@ -433,6 +433,10 @@ fun SettingsScreen(
     onRestore: () -> Unit,
     onNetPerm: () -> Unit,
     onPin: (String) -> Unit,
+    onProfile: (Int) -> Unit = {},
+    onBackupSave: () -> Unit = {},
+    onBackupShare: () -> Unit = {},
+    onRestorePick: () -> Unit = {},
     onCategory: (Int) -> Unit = {}
 ) {
     val ctx = LocalContext.current
@@ -442,12 +446,20 @@ fun SettingsScreen(
     LaunchedEffect(cat) { onCategory(cat) }
 
     val cityOpts = if (cfg.city in CITIES) CITIES else listOf(cfg.city) + CITIES
+    // Perfil que coincide con los ajustes actuales (0 = personalizado).
+    val profSel = profileIndex(style.scalePct, style.spacing, style.corner, style.glow, cfg)
 
     // Todas las opciones en una sola lista: sirve para mostrar una categoria y para buscar.
     val items = buildList<SItem> {
         // ---- Apariencia ----
         add(SItem(0, "Cambiar fondo de pantalla", "imagen video wallpaper") {
             ActionRow("Cambiar fondo de pantalla") { onWalls() }
+        })
+        add(SItem(0, "Perfil de diseño", "cine compacto minimalista clasico estilo dock") {
+            // Izquierda/derecha cambia de perfil; la opcion "Personalizado" solo indica el estado.
+            ChoiceRow("Perfil de diseño", PROFILE_OPTIONS, profSel) {
+                onProfile(if (it > 0) it - 1 else 0)
+            }
         })
         add(SItem(0, "Tema de color", "colores acento") {
             ChoiceRow("Tema de color", Themes.list.map { it.name }, cfg.theme) { cfg.setTheme(it) }
@@ -497,6 +509,23 @@ fun SettingsScreen(
         add(SItem(0, "Margen de seguridad", "overscan bordes") {
             SliderRow("Margen de seguridad", cfg.overscan, 0, 60, 2, " dp") { cfg.setOverscan(it) }
         })
+        add(SItem(0, "Modo ahorro", "tv lenta rendimiento fps animaciones desenfoque brillo ahorrar") {
+            SwitchRow("Modo ahorro (TV modesta)", cfg.saver) { cfg.setSaver(it) }
+        })
+        add(SItem(0, "Sugerir modo ahorro", "fps lento aviso rendimiento") {
+            SwitchRow("Sugerir modo ahorro si va lenta", cfg.saverHint) { cfg.setSaverHint(it) }
+        })
+        add(SItem(0, "Modo noche automático", "noche brillo horario oscuro") {
+            SwitchRow("Modo noche automático", cfg.night) { cfg.setNight(it) }
+        })
+        if (cfg.night) {
+            add(SItem(0, "Noche desde", "modo noche hora inicio horario") {
+                SliderRow("Noche desde las", cfg.nightFrom, 0, 23, 1, ":00") { cfg.setNightFrom(it) }
+            })
+            add(SItem(0, "Noche hasta", "modo noche hora fin horario") {
+                SliderRow("Noche hasta las", cfg.nightTo, 0, 23, 1, ":00") { cfg.setNightTo(it) }
+            })
+        }
         add(SItem(0, "Sonido al mover el foco", "audio clic") {
             ChoiceRow(
                 "Sonido al mover el foco",
@@ -516,6 +545,9 @@ fun SettingsScreen(
         })
         add(SItem(1, "Margen inferior", "dock") {
             SliderRow("Margen inferior", style.bottom, 0, 80, 2, " dp") { onSet("bottom", it) }
+        })
+        add(SItem(1, "Tarjeta de la app enfocada", "nombre notificaciones ultimo uso texto bajo dock") {
+            SwitchRow("Tarjeta bajo el dock", cfg.focusCard) { cfg.setFocusCard(it) }
         })
         add(SItem(1, "Fila extra 1", "streaming juegos filas") {
             ChoiceRow("Fila extra 1", ROW_NAMES, cfg.row(0)) { cfg.setRow(0, it) }
@@ -573,6 +605,9 @@ fun SettingsScreen(
                 listOf("Desactivado", "2 min", "5 min", "10 min", "20 min"),
                 cfg.ambient
             ) { cfg.setAmbient(it) }
+        })
+        add(SItem(2, "Protección contra quemado", "ambiente reloj mover pantalla oled") {
+            SwitchRow("Mover el reloj en modo ambiente", cfg.burnIn) { cfg.setBurnIn(it) }
         })
         // ---- Música ----
         add(SItem(3, "Mostrar reproductor", "música") {
@@ -639,6 +674,15 @@ fun SettingsScreen(
         })
         add(SItem(7, "Restaurar copia de seguridad", "backup respaldo") {
             ActionRow("Restaurar copia de seguridad") { onRestore() }
+        })
+        add(SItem(7, "Guardar copia en…", "backup respaldo elegir carpeta usb ubicación") {
+            ActionRow("Guardar copia en… (elegir dónde)") { onBackupSave() }
+        })
+        add(SItem(7, "Compartir copia de seguridad", "backup respaldo enviar archivo") {
+            ActionRow("Compartir copia de seguridad") { onBackupShare() }
+        })
+        add(SItem(7, "Restaurar desde un archivo…", "backup respaldo elegir archivo importar") {
+            ActionRow("Restaurar desde un archivo…") { onRestorePick() }
         })
     }
 
