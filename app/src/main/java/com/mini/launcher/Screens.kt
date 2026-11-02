@@ -102,8 +102,17 @@ fun HomeScreen(
     val maxH = (conf.screenHeightDp / us * 0.64f).dp
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.align(Alignment.TopStart).padding(32.dp)) {
-            if (cfg.showWeather) WeatherText(cfg.city, cfg.fahrenheit)
-            if (cfg.showDate) DateText(Modifier.padding(top = 2.dp))
+            if (cfg.bigClock) {
+                // Reloj grande, con la fecha y el clima debajo.
+                Clock(cfg.clock24, size = 68.sp, ampmSize = 24.sp)
+                if (cfg.showDate) DateText(Modifier.padding(top = 2.dp), size = 20.sp)
+                if (cfg.showWeather) {
+                    WeatherText(cfg.city, cfg.fahrenheit, Modifier.padding(top = 4.dp), size = 18.sp)
+                }
+            } else {
+                if (cfg.showWeather) WeatherText(cfg.city, cfg.fahrenheit)
+                if (cfg.showDate) DateText(Modifier.padding(top = 2.dp))
+            }
         }
         Row(
             Modifier.align(Alignment.TopEnd).padding(32.dp),
@@ -118,7 +127,7 @@ fun HomeScreen(
                     color = Color(0xB3FFFFFF), fontSize = 14.sp
                 )
             }
-            Clock(cfg.clock24)
+            if (!cfg.bigClock) Clock(cfg.clock24)
             GlassBox(onClick = onVoice, modifier = Modifier.size(44.dp), shape = CircleShape) {
                 MicIcon(Color.White)
             }
@@ -195,7 +204,7 @@ fun HomeScreen(
                             ) {
                                 items(recents, key = { it.pkg }) { app ->
                                     AppTile(
-                                        app, Modifier, useSize = false, fixedScale = 0.7f,
+                                        app, Modifier, useSize = false, fixedScale = 0.85f, bannerStyle = true,
                                         onLongClick = { onMenu(app) }
                                     ) { onLaunch(app) }
                                 }
