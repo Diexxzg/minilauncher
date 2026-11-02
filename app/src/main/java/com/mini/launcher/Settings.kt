@@ -86,9 +86,9 @@ private const val PANEL_H = 0.62f
 // Escala interna del contenido del panel (menor = mas pequeño).
 private const val PANEL_SCALE = 0.84f
 
-private val ACC = Color(0xFF9FB4FF)
-private val ACC_DIM = Color(0xFF6F86D6)
-private val ACCENT: Brush = Brush.horizontalGradient(listOf(ACC_DIM, ACC))
+private val ACC: Color get() = Themes.current.acc
+private val ACC_DIM: Color get() = Themes.current.accDim
+private val ACCENT: Brush get() = Brush.horizontalGradient(listOf(ACC_DIM, ACC))
 private val TAB_IDLE = Color(0xB3C8D2F0)
 
 // ---------- Controles ----------
@@ -367,7 +367,7 @@ fun GlassPanelFrame(
     val ph = (hDp * hFrac).coerceIn(240f, avail)
     val top = topRes + (avail - ph) / 2f
     val shape = RoundedCornerShape(22.dp)
-    val panelBg = Brush.verticalGradient(listOf(Color(0xCC1B1D20), Color(0xCC121416)))
+    val panelBg = Brush.verticalGradient(listOf(Themes.current.panelTop, Themes.current.panelBottom))
     val panelBorder = Brush.verticalGradient(listOf(Color(0x55FFFFFF), Color(0x1AFFFFFF)))
     Box(Modifier.fillMaxSize()) {
         Box(
@@ -456,6 +456,8 @@ fun SettingsScreen(
                 when (cat) {
                     0 -> {
                         ActionRow("Cambiar fondo de pantalla") { onWalls() }
+                        ChoiceRow("Tema de color", Themes.list.map { it.name }, cfg.theme) { cfg.setTheme(it) }
+                        SwitchRow("Desenfoque al abrir paneles", cfg.blur) { cfg.setBlur(it) }
                         SliderRow("Oscurecer fondo", cfg.dim, 0, 80, 5, "%") { cfg.setDim(it) }
                         ChoiceRow(
                             "Rotación de fondos",
@@ -466,12 +468,16 @@ fun SettingsScreen(
                         ChoiceRow("Brillo de color", GLOW_NAMES, style.glow) { onSet("glow", it) }
                         ChoiceRow(
                             "Color del brillo",
-                            listOf("Color de cada app", "Color del fondo"),
+                            listOf("Color de cada app", "Color del fondo", "Color del tema"),
                             cfg.glowSrc
                         ) { cfg.setGlowSrc(it) }
                         SliderRow("Tamaño de la interfaz", cfg.uiScale, 70, 130, 5, "%") { cfg.setUiScale(it) }
                         SliderRow("Margen de seguridad", cfg.overscan, 0, 60, 2, " dp") { cfg.setOverscan(it) }
-                        SwitchRow("Sonidos de navegación", cfg.sounds) { cfg.setSounds(it) }
+                        ChoiceRow(
+                            "Sonido al mover el foco",
+                            listOf("Apagado", "Suave", "Medio"),
+                            cfg.soundLevel
+                        ) { cfg.setSoundLevel(it) }
                     }
                     1 -> {
                         SliderRow("Tamaño general", style.scalePct, 50, 180, 10, "%") { onSet("scale", it) }
@@ -485,6 +491,7 @@ fun SettingsScreen(
                         ActionRow("Restablecer dock") { onResetDock() }
                     }
                     2 -> {
+                        SwitchRow("Reloj grande", cfg.bigClock) { cfg.setBigClock(it) }
                         ChoiceRow("Formato de hora", listOf("12 horas", "24 horas"), if (cfg.clock24) 1 else 0) {
                             cfg.setClock24(it == 1)
                         }
