@@ -62,13 +62,13 @@ import androidx.compose.ui.unit.sp
 import androidx.core.app.NotificationManagerCompat
 
 private val CATS = listOf(
-    "🎨" to "Apariencia",
-    "🗂️" to "Dock",
-    "🏠" to "Inicio",
-    "🎵" to "Música",
-    "📱" to "Apps",
-    "🌐" to "Sistema",
-    "ℹ️" to "Acerca de"
+    "palette" to "Apariencia",
+    "folder" to "Dock",
+    "home" to "Inicio",
+    "music" to "Música",
+    "device" to "Apps",
+    "globe" to "Sistema",
+    "info" to "Acerca de"
 )
 
 private val CITIES = listOf(
@@ -78,16 +78,15 @@ private val CITIES = listOf(
 
 private val GLOW_NAMES = listOf("Apagado", "Suave", "Medio", "Fuerte", "Máximo")
 
-// ---------- Estilo (sakura + neon) ----------
+// ---------- Estilo (cristal oscuro) ----------
 // Para cambiar el tamaño del panel: PANEL_W = ancho (fraccion de pantalla), PANEL_H = alto.
-private const val PANEL_W = 0.40f
+private const val PANEL_W = 0.38f
 private const val PANEL_H = 0.72f
 
-private val PINK = Color(0xFFFF8FB8)
-private val VIOLET = Color(0xFFB69CFF)
-private val CYAN = Color(0xFF7AE3FF)
-private val ACCENT: Brush = Brush.horizontalGradient(listOf(PINK, VIOLET))
-private val IDLE_BORDER: Brush = SolidColor(Color(0x1FFFFFFF))
+private val ACC = Color(0xFF9FB4FF)
+private val ACC_DIM = Color(0xFF6F86D6)
+private val ACCENT: Brush = Brush.horizontalGradient(listOf(ACC_DIM, ACC))
+private val TAB_IDLE = Color(0xB3C8D2F0)
 
 // ---------- Controles ----------
 
@@ -99,23 +98,18 @@ fun FocusRow(
     content: @Composable RowScope.(Boolean) -> Unit
 ) {
     var focused by remember { mutableStateOf(false) }
-    val shape = RoundedCornerShape(14.dp)
-    val bg: Brush = if (focused) {
-        Brush.horizontalGradient(listOf(Color(0x55FF8FB8), Color(0x33B69CFF)))
-    } else {
-        SolidColor(Color(0x14FFFFFF))
-    }
+    val shape = RoundedCornerShape(12.dp)
     val base = modifier
         .fillMaxWidth()
         .clip(shape)
-        .background(bg)
-        .border(if (focused) 1.5.dp else 1.dp, if (focused) ACCENT else IDLE_BORDER, shape)
+        .background(if (focused) Color(0x2BFFFFFF) else Color.Transparent)
+        .then(if (focused) Modifier.border(1.dp, Color(0x66FFFFFF), shape) else Modifier)
         .drawBehind {
             if (focused) {
                 drawRoundRect(
-                    color = PINK,
-                    topLeft = Offset(6.dp.toPx(), size.height * 0.25f),
-                    size = Size(3.dp.toPx(), size.height * 0.5f),
+                    color = ACC,
+                    topLeft = Offset(6.dp.toPx(), size.height * 0.28f),
+                    size = Size(3.dp.toPx(), size.height * 0.44f),
                     cornerRadius = CornerRadius(2.dp.toPx())
                 )
             }
@@ -134,7 +128,7 @@ fun FocusRow(
         .onFocusChanged { focused = it.isFocused }
     val clickable = if (onClick != null) base.clickable(onClick = onClick) else base.focusable()
     Row(
-        clickable.padding(start = 20.dp, end = 14.dp, top = 11.dp, bottom = 11.dp),
+        clickable.padding(start = 22.dp, end = 16.dp, top = 12.dp, bottom = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         content(this, focused)
@@ -160,26 +154,36 @@ fun SliderRow(
             true
         }
     ) { focused ->
-        Text(label, color = Color.White, fontSize = 16.sp, modifier = Modifier.weight(1f))
-        Box(
-            Modifier
-                .width(110.dp)
-                .height(6.dp)
-                .clip(RoundedCornerShape(3.dp))
-                .background(Color(0x33FFFFFF))
-        ) {
-            val frac = ((value - min).toFloat() / (max - min).toFloat()).coerceIn(0f, 1f)
+        Text(label, color = Color(0xF2FFFFFF), fontSize = 17.sp, modifier = Modifier.weight(1f))
+        val frac = ((value - min).toFloat() / (max - min).toFloat()).coerceIn(0f, 1f)
+        Box(Modifier.width(150.dp).height(16.dp)) {
             Box(
                 Modifier
-                    .fillMaxHeight()
-                    .fillMaxWidth(frac)
-                    .alpha(if (focused) 1f else 0.75f)
-                    .background(ACCENT)
+                    .align(Alignment.CenterStart)
+                    .fillMaxWidth()
+                    .height(4.dp)
+                    .clip(RoundedCornerShape(2.dp))
+                    .background(Color(0x40FFFFFF))
+            ) {
+                Box(
+                    Modifier
+                        .fillMaxHeight()
+                        .fillMaxWidth(frac)
+                        .background(if (focused) ACC else Color(0x99FFFFFF))
+                )
+            }
+            Box(
+                Modifier
+                    .align(Alignment.CenterStart)
+                    .offset(x = (136f * frac).dp)
+                    .size(14.dp)
+                    .clip(CircleShape)
+                    .background(Color.White)
             )
         }
         Text(
-            value.toString() + unit, color = Color.White, fontSize = 15.sp,
-            textAlign = TextAlign.End, modifier = Modifier.width(66.dp)
+            value.toString() + unit, color = Color(0xE6FFFFFF), fontSize = 16.sp,
+            textAlign = TextAlign.End, modifier = Modifier.width(62.dp)
         )
     }
 }
@@ -199,13 +203,13 @@ fun SwitchRow(
         },
         onClick = { onChange(!checked) }
     ) {
-        Text(label, color = Color.White, fontSize = 16.sp, modifier = Modifier.weight(1f))
+        Text(label, color = Color(0xF2FFFFFF), fontSize = 17.sp, modifier = Modifier.weight(1f))
         Box(
             Modifier
                 .width(46.dp)
                 .height(26.dp)
                 .clip(RoundedCornerShape(13.dp))
-                .background(if (checked) ACCENT else SolidColor(Color(0x55FFFFFF)))
+                .background(if (checked) ACCENT else SolidColor(Color(0x40FFFFFF)))
                 .padding(3.dp),
             contentAlignment = if (checked) Alignment.CenterEnd else Alignment.CenterStart
         ) {
@@ -232,11 +236,11 @@ fun ChoiceRow(
         },
         onClick = { onSelect((sel + 1) % options.size) }
     ) { focused ->
-        Text(label, color = Color.White, fontSize = 16.sp, modifier = Modifier.weight(1f))
+        Text(label, color = Color(0xF2FFFFFF), fontSize = 17.sp, modifier = Modifier.weight(1f))
         Text(
             (if (focused) "‹  " else "") + options[sel] + (if (focused) "  ›" else ""),
-            color = if (focused) Color(0xFFFFD9E8) else Color(0xDDFFFFFF),
-            fontSize = 15.sp, fontWeight = FontWeight.Medium
+            color = if (focused) Color.White else Color(0xCCFFFFFF),
+            fontSize = 16.sp, fontWeight = FontWeight.Normal
         )
     }
 }
@@ -244,19 +248,19 @@ fun ChoiceRow(
 @Composable
 fun ActionRow(text: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
     FocusRow(modifier = modifier, onClick = onClick) { focused ->
-        Text(text, color = Color.White, fontSize = 16.sp, modifier = Modifier.weight(1f))
-        Text("›", color = if (focused) PINK else Color(0xAAFFFFFF), fontSize = 20.sp)
+        Text(text, color = Color(0xF2FFFFFF), fontSize = 17.sp, modifier = Modifier.weight(1f))
+        Text("›", color = if (focused) ACC else Color(0xAAFFFFFF), fontSize = 22.sp)
     }
 }
 
 @Composable
 fun InfoRow(label: String, value: String) {
     Row(
-        Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 7.dp),
+        Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 7.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(label, color = Color(0xB3FFFFFF), fontSize = 15.sp, modifier = Modifier.weight(1f))
-        Text(value, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Medium)
+        Text(label, color = Color(0xA6FFFFFF), fontSize = 16.sp, modifier = Modifier.weight(1f))
+        Text(value, color = Color(0xF2FFFFFF), fontSize = 16.sp, fontWeight = FontWeight.Normal)
     }
 }
 
@@ -267,13 +271,9 @@ fun InfoRow(label: String, value: String) {
 @Composable
 fun CategoryBar(selected: Int, modifier: Modifier = Modifier, onSelect: (Int) -> Unit) {
     var focused by remember { mutableStateOf(false) }
-    val shape = RoundedCornerShape(16.dp)
-    Row(
+    Column(
         modifier
             .fillMaxWidth()
-            .clip(shape)
-            .background(Color(0x14FFFFFF))
-            .border(if (focused) 1.5.dp else 1.dp, if (focused) ACCENT else IDLE_BORDER, shape)
             .onKeyEvent { e ->
                 if (e.type == KeyEventType.KeyDown) {
                     when (e.key) {
@@ -293,28 +293,43 @@ fun CategoryBar(selected: Int, modifier: Modifier = Modifier, onSelect: (Int) ->
             }
             .onFocusChanged { focused = it.isFocused }
             .focusable()
-            .padding(4.dp),
-        horizontalArrangement = Arrangement.spacedBy(4.dp)
     ) {
-        CATS.forEachIndexed { i, c ->
-            val sel = i == selected
-            val chipBg: Brush = if (sel) {
-                Brush.horizontalGradient(listOf(Color(0x77FF8FB8), Color(0x66B69CFF)))
-            } else {
-                SolidColor(Color.Transparent)
-            }
-            Box(
-                Modifier
-                    .weight(1f)
-                    .height(38.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(chipBg)
-                    .pointerInput(i) { detectTapGestures { onSelect(i) } },
-                contentAlignment = Alignment.Center
-            ) {
-                Text(c.first, fontSize = 18.sp, modifier = Modifier.alpha(if (sel) 1f else 0.5f))
+        Row(Modifier.fillMaxWidth()) {
+            CATS.forEachIndexed { i, c ->
+                val sel = i == selected
+                Box(
+                    Modifier
+                        .weight(1f)
+                        .height(46.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(if (sel && focused) Color(0x2EFFFFFF) else Color.Transparent)
+                        .pointerInput(i) { detectTapGestures { onSelect(i) } },
+                    contentAlignment = Alignment.Center
+                ) {
+                    LineIcon(c.first, if (sel) ACC else TAB_IDLE, 24)
+                    if (sel) {
+                        Box(
+                            Modifier
+                                .align(Alignment.BottomCenter)
+                                .width(34.dp)
+                                .height(2.dp)
+                                .clip(RoundedCornerShape(1.dp))
+                                .background(ACC)
+                        )
+                    }
+                }
             }
         }
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(if (focused) 2.dp else 1.dp)
+                .background(
+                    Brush.horizontalGradient(
+                        listOf(Color.Transparent, ACC.copy(alpha = if (focused) 0.9f else 0.55f), Color.Transparent)
+                    )
+                )
+        )
     }
 }
 
@@ -341,27 +356,22 @@ fun SettingsScreen(
     LaunchedEffect(Unit) { shown = true }
     val p by animateFloatAsState(if (shown) 1f else 0f, tween(380), label = "settingsIn")
 
-    val shape = RoundedCornerShape(28.dp)
-    val pw = (conf.screenWidthDp * PANEL_W).coerceIn(400f, 580f).dp
+    val shape = RoundedCornerShape(22.dp)
+    val pw = (conf.screenWidthDp * PANEL_W).coerceIn(400f, 560f).dp
     val ph = (conf.screenHeightDp * PANEL_H).dp
-    val panelBg = Brush.linearGradient(listOf(Color(0xF2171229), Color(0xF20E1527)))
-    val panelBorder = Brush.linearGradient(
-        listOf(PINK.copy(alpha = 0.75f), Color(0x22FFFFFF), CYAN.copy(alpha = 0.6f))
-    )
-    val rule = Brush.horizontalGradient(
-        listOf(Color.Transparent, PINK.copy(alpha = 0.6f), VIOLET.copy(alpha = 0.6f), Color.Transparent)
-    )
+    val panelBg = Brush.verticalGradient(listOf(Color(0xCC1B1D20), Color(0xCC121416)))
+    val panelBorder = Brush.verticalGradient(listOf(Color(0x55FFFFFF), Color(0x1AFFFFFF)))
 
     // El inicio se ve a la izquierda casi sin oscurecer para ver los cambios en vivo.
     Box(
         Modifier
             .fillMaxSize()
-            .background(Brush.horizontalGradient(listOf(Color.Transparent, Color(0x55000000))))
+            .background(Brush.horizontalGradient(listOf(Color.Transparent, Color(0x44000000))))
     ) {
         Box(
             Modifier
                 .align(Alignment.TopEnd)
-                .padding(top = 64.dp, end = 32.dp)
+                .padding(top = 88.dp, end = 32.dp)
                 .width(pw)
                 .height(ph)
                 .graphicsLayer {
@@ -371,57 +381,46 @@ fun SettingsScreen(
                 .clip(shape)
                 .background(panelBg)
                 .drawBehind {
+                    // Brillo suave arriba, efecto cristal.
                     drawRect(
-                        Brush.radialGradient(
-                            listOf(Color(0x33FF8FB8), Color.Transparent),
-                            center = Offset(size.width, 0f),
-                            radius = size.width * 0.9f
-                        )
-                    )
-                    drawRect(
-                        Brush.radialGradient(
-                            listOf(Color(0x2A7AE3FF), Color.Transparent),
-                            center = Offset(0f, size.height),
-                            radius = size.width * 0.8f
+                        Brush.verticalGradient(
+                            listOf(Color(0x14FFFFFF), Color.Transparent),
+                            startY = 0f,
+                            endY = size.height * 0.4f
                         )
                     )
                 }
-                .border(1.5.dp, panelBorder, shape)
+                .border(1.dp, panelBorder, shape)
         ) {
-            // Marca de agua de flor de sakura.
-            Text(
-                "✿",
-                color = Color.White.copy(alpha = 0.05f),
-                fontSize = 150.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.align(Alignment.BottomEnd).offset(x = 18.dp, y = 28.dp)
-            )
-            Column(Modifier.fillMaxSize().padding(start = 18.dp, end = 18.dp, top = 16.dp, bottom = 14.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        Text(
-                            "✿  CONFIGURACIÓN",
-                            color = PINK, fontSize = 11.sp, letterSpacing = 2.sp,
-                            fontWeight = FontWeight.Medium
-                        )
-                        Text(
-                            CATS[cat].second, color = Color.White, fontSize = 24.sp,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    }
-                    Text("✦", color = VIOLET.copy(alpha = 0.9f), fontSize = 18.sp)
-                }
-                Spacer(Modifier.height(10.dp))
+            Column(Modifier.fillMaxSize().padding(start = 18.dp, end = 18.dp, top = 12.dp, bottom = 14.dp)) {
                 CategoryBar(cat, Modifier.autoFocus()) { cat = it }
+                Spacer(Modifier.height(16.dp))
+                Row(
+                    Modifier.padding(start = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    GearIcon(Color(0x99FFFFFF), 14)
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        "CONFIGURACIÓN",
+                        color = Color(0x99FFFFFF), fontSize = 13.sp, letterSpacing = 1.sp,
+                        fontWeight = FontWeight.Normal
+                    )
+                }
+                Text(
+                    CATS[cat].second, color = Color.White, fontSize = 28.sp,
+                    fontWeight = FontWeight.Normal,
+                    modifier = Modifier.padding(start = 6.dp, top = 2.dp)
+                )
                 Spacer(Modifier.height(10.dp))
-                Box(Modifier.fillMaxWidth().height(1.dp).background(rule))
-                Spacer(Modifier.height(10.dp))
+                Box(Modifier.fillMaxWidth().height(1.dp).background(Color(0x22FFFFFF)))
+                Spacer(Modifier.height(8.dp))
                 Column(
                     Modifier
                         .weight(1f)
                         .fillMaxWidth()
                         .verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                 when (cat) {
                     0 -> {
@@ -498,28 +497,4 @@ fun SettingsScreen(
                             while (true) {
                                 var frames = 0
                                 val start = withFrameNanos { it }
-                                                                var t = start
-                                while (t - start < 1_000_000_000L) {
-                                    t = withFrameNanos { it }
-                                    frames++
-                                }
-                                fps = frames
-                            }
-                        }
-                        val wallCount = remember { listWalls(ctx).size }
-                        InfoRow("Versión", version)
-                        InfoRow("Permiso de música", if (listenerOn) "Activo" else "Falta permitir")
-                        InfoRow("Fotogramas por segundo", fps.toString())
-                        InfoRow("Apps instaladas", AppCache.apps.size.toString())
-                        InfoRow("Fondos guardados", wallCount.toString())
-                        InfoRow("Android", android.os.Build.VERSION.RELEASE + " (API " + android.os.Build.VERSION.SDK_INT + ")")
-                        InfoRow("Dispositivo", android.os.Build.MODEL)
-                        ActionRow("Guardar copia de seguridad") { onBackup() }
-                        ActionRow("Restaurar copia de seguridad") { onRestore() }
-                    }
-                }
-                }
-            }
-        }
-    }
-}
+                                                               
