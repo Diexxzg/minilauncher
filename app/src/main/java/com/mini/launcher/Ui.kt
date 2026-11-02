@@ -33,6 +33,9 @@ import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -126,12 +129,12 @@ fun GlassBox(
                 else Modifier
             )
             .clip(shape)
-            .background(if (focused) Color(0x44FFFFFF) else Color(0x22FFFFFF))
+            .background(if (focused) Color(0x55FFFFFF) else Color(0x66121416))
             .then(
                 if (glow == null) {
                     Modifier.border(
                         if (focused) 2.dp else 1.dp,
-                        if (focused) Color(0xDDFFFFFF) else Color(0x33FFFFFF),
+                        if (focused) Color(0xDDFFFFFF) else Color(0x26FFFFFF),
                         shape
                     )
                 } else {
@@ -201,10 +204,19 @@ fun Clock(h24: Boolean = false) {
             delay(10_000)
         }
     }
-    val f = remember(h24) { SimpleDateFormat(if (h24) "HH:mm" else "h:mm a", Locale.getDefault()) }
+    val timeF = remember(h24) { SimpleDateFormat(if (h24) "HH:mm" else "h:mm", Locale.getDefault()) }
+    val ampmF = remember { SimpleDateFormat("a", Locale.getDefault()) }
+    val txt = buildAnnotatedString {
+        append(timeF.format(now))
+        if (!h24) {
+            withStyle(SpanStyle(fontSize = 17.sp, fontWeight = FontWeight.Normal, color = Color(0xCCFFFFFF))) {
+                append(" " + ampmF.format(now))
+            }
+        }
+    }
     Text(
-        f.format(now), color = Color(0xEBFFFFFF), fontSize = 22.sp,
-        fontWeight = FontWeight.Medium,
+        txt, color = Color(0xF2FFFFFF), fontSize = 32.sp,
+        fontWeight = FontWeight.Normal,
         style = TextStyle(shadow = Shadow(Color(0xAA000000), Offset(0f, 2f), 8f))
     )
 }
