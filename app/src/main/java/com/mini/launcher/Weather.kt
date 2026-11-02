@@ -20,6 +20,8 @@ const val CITY = "Caracas"
 object WeatherCache {
     var key: String = ""
     var text: String? = null
+    var lineKey: String = ""
+    var line: String? = null
 }
 
 fun httpGet(url: String): String? {
@@ -47,7 +49,8 @@ fun codeToEmoji(c: Int): String {
     }
 }
 
-fun fetchWeather(city: String, fahrenheit: Boolean = false): String? {
+/** Devuelve (codigo del clima, temperatura, nombre de la ciudad). */
+fun fetchWeatherRaw(city: String, fahrenheit: Boolean): Triple<Int, Long, String>? {
     try {
         val g = httpGet(
             "https://geocoding-api.open-meteo.com/v1/search?count=1&language=es&name=" +
@@ -65,10 +68,21 @@ fun fetchWeather(city: String, fahrenheit: Boolean = false): String? {
         ) ?: return null
         val cur = JSONObject(w).getJSONObject("current")
         val t = Math.round(cur.getDouble("temperature_2m"))
-        return codeToEmoji(cur.getInt("weather_code")) + " " + t + "° · " + o.optString("name", city)
+        return Triple(cur.getInt("weather_code"), t, o.optString("name", city))
     } catch (e: Exception) {
         return null
     }
+}
+
+fun fetchWeather(city: String, fahrenheit: Boolean = false): String? {
+    val r = fetchWeatherRaw(city, fahrenheit) ?: return null
+    return codeToEmoji(r.first) + " " + r.second + "° · " + r.third
+}
+
+/** Texto para el modo ambiente: "Caracas, 21°C". */
+fun fetchWeatherLine(city: String, fahrenheit: Boolean = false): String? {
+    val r = fetchWeatherRaw(city, fahrenheit) ?: return null
+    return r.third + ", " + r.second + (if (fahrenheit) "°F" else "°C")
 }
 
 @Composable
