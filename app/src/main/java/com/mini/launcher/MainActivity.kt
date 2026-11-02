@@ -21,6 +21,9 @@ import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.ui.draw.blur
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -125,9 +128,6 @@ fun HomeRoot(tick: Int, homeTick: Int, resumeTick: Int) {
     var menuApp by remember { mutableStateOf<AppInfo?>(null) }
     var minute by remember { mutableLongStateOf(System.currentTimeMillis() / 60_000L) }
     val lastInput = remember { mutableLongStateOf(SystemClock.elapsedRealtime()) }
-    var launching by remember { mutableStateOf<AppInfo?>(null) }
-    var launchRect by remember { mutableStateOf<Rect?>(null) }
-    val prog = remember { Animatable(0f) }
 
     // Nuevo: insignias, filas, red, PIN, energia, busqueda y acento.
     var seen by remember { mutableStateOf(prefs.seen()) }
@@ -145,6 +145,10 @@ fun HomeRoot(tick: Int, homeTick: Int, resumeTick: Int) {
     val style = remember(scalePct, spacing, corner, bottom, glowLvl, sizes) {
         DockStyle(scalePct, spacing, corner, bottom, glowLvl, sizes)
     }
+
+    // Tema de color: se fija antes de dibujar nada y se actualiza al cambiarlo.
+    remember { Themes.set(cfg.theme); 0 }
+    SideEffect { Themes.set(cfg.theme) }
 
     // Tecla Home: si ya estas en el inicio, vuelve al principio de la fila, devuelve el
     // foco a la primera ficha y sale del modo ambiente / menus.
@@ -307,9 +311,7 @@ fun HomeRoot(tick: Int, homeTick: Int, resumeTick: Int) {
 
     fun startNow(a: AppInfo) {
         val opts = try {
-            ActivityOptions.makeCustomAnimation(
-                ctx, android.R.anim.fade_in, android.R.anim.fade_out
-            ).toBundle()
+            ActivityOptions.makeCustomAnimation(ctx, 0, 0).toBundle()
         } catch (e: Exception) {
             null
         }
@@ -325,23 +327,8 @@ fun HomeRoot(tick: Int, homeTick: Int, resumeTick: Int) {
         recents = prefs.pushRecent(a.pkg)
         usage = prefs.bumpUsage(a.pkg)
         seen = prefs.markSeen(a.pkg)
-        val r = TileBounds.last
         TileBounds.last = null
-        if (r == null) {
-            startNow(a)
-            return
-        }
-        launchRect = r
-        launching = a
-        // La app se lanza ya; la animacion corre encima mientras arranca.
         startNow(a)
-        scope.launch {
-            prog.snapTo(0f)
-            prog.animateTo(1f, tween(220, easing = FastOutSlowInEasing))
-            delay(600)
-            launching = null
-            prog.snapTo(0f)
-        }
     }
 
     val onSet: (String, Int) -> Unit = { k, v ->
@@ -430,8 +417,7 @@ fun HomeRoot(tick: Int, homeTick: Int, resumeTick: Int) {
             else -> openSystem(ctx, "access")
         }
     }
-
-    val uiScale = cfg.uiScale / 100f
+        val uiScale = cfg.uiScale / 100f
     val dimLayer: Long = when (screen) {
         "all", "hidden" -> 0x99000000
         "walls" -> 0xAA000000
@@ -439,6 +425,13 @@ fun HomeRoot(tick: Int, homeTick: Int, resumeTick: Int) {
         "inputs" -> 0x55000000
         else -> 0L
     }
+
+    // Desenfoque del fondo mientras hay un panel abierto (solo Android 12 o superior).
+    val panelOpen = screen == "settings" || screen == "edit" || screen == "inputs" ||
+        menuApp != null || showPower
+    val blurDp by animateDpAsState(
+        if (cfg.blur && panelOpen) 24.dp else 0.dp, tween(350), label = "blur"
+    )
 
     Box(
         Modifier
@@ -458,18 +451,36 @@ fun HomeRoot(tick: Int, homeTick: Int, resumeTick: Int) {
                 }
             }
     ) {
-        Crossfade(
-            targetState = selected,
-            animationSpec = tween(if (cfg.fade) 700 else 1),
-            label = "wall"
-        ) { f -> WallpaperLayer(f) }
         Box(
-            Modifier.fillMaxSize().background(
-                Brush.verticalGradient(listOf(Color(0x22000000), Color.Transparent, Color(0x99000000)))
+            Modifier
+                .fillMaxSize()
+                .then(
+                    if (blurDp.value > 0.5f) {
+                        Modifier
+                            .graphicsLayer {
+                                val z = 1f + 0.08f * (blurDp.value / 24f)
+                                scaleX = z
+                                scaleY = z
+                            }
+                            .blur(blurDp)
+                    } else {
+                        Modifier
+                    }
+                )
+        ) {
+            Crossfade(
+                targetState = selected,
+                animationSpec = tween(if (cfg.fade) 700 else 1),
+                label = "wall"
+            ) { f -> WallpaperLayer(f) }
+            Box(
+                Modifier.fillMaxSize().background(
+                    Brush.verticalGradient(listOf(Color(0x22000000), Color.Transparent, Color(0x99000000)))
+                )
             )
-        )
-        if (cfg.dim > 0) {
-            Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = cfg.dim / 100f)))
+            if (cfg.dim > 0) {
+                Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = cfg.dim / 100f)))
+            }
         }
         if (screen == "ambient") {
             AmbientScreen(cfg, m) { screen = "home" }
@@ -481,8 +492,13 @@ fun HomeRoot(tick: Int, homeTick: Int, resumeTick: Int) {
                 LocalDensity provides Density(baseDensity.density * uiScale, baseDensity.fontScale),
                 LocalUiScale provides uiScale,
                 LocalOverscan provides cfg.overscan,
-                LocalAccent provides (if (cfg.glowSrc == 1) accent else null),
+                LocalAccent provides when (cfg.glowSrc) {
+                    1 -> accent
+                    2 -> Themes.current.acc
+                    else -> null
+                },
                 LocalSounds provides cfg.sounds,
+                LocalSoundVol provides (if (cfg.soundLevel == 2) 0.7f else 0.3f),
                 LocalBadges provides badges
             ) {
                 Box(Modifier.fillMaxSize()) {
@@ -730,30 +746,6 @@ fun HomeRoot(tick: Int, homeTick: Int, resumeTick: Int) {
                     val pa = pinAsk
                     if (pa != null) {
                         PinPad(pa, pinErr) { pinAsk = null }
-                    }
-                    val la = launching
-                    val lr = launchRect
-                    if (la != null && lr != null) {
-                        Canvas(Modifier.fillMaxSize()) {
-                            val p = prog.value
-                            val l = lerp(lr.left, 0f, p)
-                            val t = lerp(lr.top, 0f, p)
-                            val w = lerp(lr.width, size.width, p)
-                            val h = lerp(lr.height, size.height, p)
-                            val rad = lerp(style.corner.dp.toPx(), 0f, p)
-                            val path = Path()
-                            path.addRoundRect(RoundRect(l, t, l + w, t + h, CornerRadius(rad, rad)))
-                            clipPath(path) {
-                                drawRect(Color(0xFF0B1020))
-                                if (la.banner) {
-                                    drawImage(
-                                        la.art,
-                                        dstOffset = IntOffset(l.toInt(), t.toInt()),
-                                        dstSize = IntSize(w.toInt(), h.toInt())
-                                    )
-                                }
-                            }
-                        }
                     }
                 }
             }
