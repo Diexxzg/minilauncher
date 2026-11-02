@@ -9,6 +9,8 @@ import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.TextStyle
@@ -63,7 +65,7 @@ private val CenterSpec = object : BringIntoViewSpec {
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class, ExperimentalComposeUiApi::class)
 @Composable
 fun HomeScreen(
     dock: List<AppInfo>,
@@ -109,6 +111,8 @@ fun HomeScreen(
     }
     // Al cerrar los accesos rapidos el foco vuelve al boton de ajustes.
     val gearFr = remember { FocusRequester() }
+    // Destino de "Abajo" desde la barra superior: la primera app del dock (o "Todas las apps").
+    val dockFr = remember { FocusRequester() }
     var seenQuick by remember { mutableIntStateOf(quickBack) }
     LaunchedEffect(quickBack) {
         if (quickBack != seenQuick) {
@@ -154,10 +158,10 @@ fun HomeScreen(
                 )
             }
             if (!cfg.bigClock) Clock(cfg.clock24)
-            NetPill(net, onWifi)
+            NetPill(net, onWifi, Modifier.focusProperties { down = dockFr })
             GlassBox(
                 onClick = onMore,
-                modifier = Modifier.size(44.dp).focusRequester(moreFr),
+                modifier = Modifier.size(44.dp).focusRequester(moreFr).focusProperties { down = dockFr },
                 shape = CircleShape
             ) {
                 MoreIcon(Color.White)
@@ -166,7 +170,7 @@ fun HomeScreen(
             GlassBox(
                 onClick = onSettings,
                 onLongClick = onQuick,
-                modifier = Modifier.size(44.dp).focusRequester(gearFr),
+                modifier = Modifier.size(44.dp).focusRequester(gearFr).focusProperties { down = dockFr },
                 shape = CircleShape
             ) {
                 GearIcon(Color.White)
@@ -198,7 +202,7 @@ fun HomeScreen(
                     ) {
                         itemsIndexed(dock, key = { _, app -> app.pkg }) { i, app ->
                             AppTile(
-                                app, if (i == 0) Modifier.autoFocusOn(focusTick) else Modifier,
+                                app, if (i == 0) Modifier.autoFocusOn(focusTick, dockFr) else Modifier,
                                 onLongClick = { onMenu(app) },
                                 onFocusChange = { onFocusApp(app, it) },
                                 preview = previewDock && i == 0
@@ -211,7 +215,7 @@ fun HomeScreen(
                         item(key = "all_apps") {
                             GlassBox(
                                 onClick = onAll,
-                                modifier = (if (dock.isEmpty()) Modifier.autoFocusOn(focusTick) else Modifier)
+                                modifier = (if (dock.isEmpty()) Modifier.autoFocusOn(focusTick, dockFr) else Modifier)
                                     .size((144 * f).dp, (84 * f).dp),
                                 shape = RoundedCornerShape(st.corner.dp),
                                 glow = accent ?: Color.White,
