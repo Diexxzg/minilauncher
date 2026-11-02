@@ -1,0 +1,11 @@
+# Llave de firma: nunca se sube al repositorio
+keystore.properties
+*.jks
+*.keystore
+
+# Build
+build/
+.gradle/
+local.properties
+.idea/
+*.iml
