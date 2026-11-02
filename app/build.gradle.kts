@@ -1,7 +1,25 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
 }
+
+// Llave de firma propia (opcional). Se lee de keystore.properties (local) o de variables de
+// entorno (GitHub Actions). Si no existe, se firma con la llave de debug como antes.
+val keystoreProps = Properties().apply {
+    val f = rootProject.file("keystore.properties")
+    if (f.exists()) f.inputStream().use { load(it) }
+}
+
+fun signingValue(prop: String, env: String): String? =
+    (keystoreProps.getProperty(prop) ?: System.getenv(env))?.takeIf { it.isNotBlank() }
+
+val ksFile = signingValue("storeFile", "KEYSTORE_FILE")
+val ksPass = signingValue("storePassword", "KEYSTORE_PASSWORD")
+val ksAlias = signingValue("keyAlias", "KEY_ALIAS")
+val ksKeyPass = signingValue("keyPassword", "KEY_PASSWORD")
+val hasOwnKey = ksFile != null && ksPass != null && ksAlias != null && ksKeyPass != null
 
 android {
     namespace = "com.mini.launcher"
@@ -14,6 +32,16 @@ android {
         versionCode = 7
         versionName = "2.5"
     }
+    signingConfigs {
+        if (hasOwnKey) {
+            create("release") {
+                storeFile = rootProject.file(ksFile!!)
+                storePassword = ksPass
+                keyAlias = ksAlias
+                keyPassword = ksKeyPass
+            }
+        }
+    }
     buildTypes {
         release {
             isMinifyEnabled = true
@@ -23,8 +51,12 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            // Firmado con la llave de debug para poder instalarlo directo (sideload).
-            signingConfig = signingConfigs.getByName("debug")
+            // Con llave propia si esta configurada; si no, con la de debug (sideload directo).
+            signingConfig = if (hasOwnKey) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
         }
     }
     compileOptions {
