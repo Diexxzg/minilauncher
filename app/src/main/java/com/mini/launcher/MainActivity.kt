@@ -162,14 +162,34 @@ fun HomeRoot(tick: Int, homeTick: Int, resumeTick: Int, appPaused: Boolean = fal
     var appsLoaded by remember { mutableStateOf(AppCache.apps.isNotEmpty()) }
     var settingsCat by remember { mutableIntStateOf(0) }
     var focusedApp by remember { mutableStateOf<AppInfo?>(null) }
+    // Ultimo uso de cada app (tarjeta bajo el dock) y aviso de modo ahorro.
+    var lastUsed by remember { mutableStateOf(prefs.lastUsedMap()) }
+    var showSaverHint by remember { mutableStateOf(false) }
+    var saverSkip by remember { mutableStateOf(false) }
     var backdropApp by remember { mutableStateOf<AppInfo?>(null) }
     var prevScreen by remember { mutableStateOf("home") }
     var accentTarget by remember { mutableStateOf(Color.White) }
     val dockState = rememberLazyListState()
 
-    val style = remember(scalePct, spacing, corner, bottom, glowLvl, sizes) {
+    // Modo ahorro y modo noche: valores efectivos. Los ajustes guardados no se tocan, asi que
+    // al apagar el modo todo vuelve a como estaba.
+    val hourNow = remember(minute) { java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY) }
+    val night = cfg.night && cfg.nightActive(hourNow)
+    val eAnim = cfg.screenAnim && !cfg.saver
+    val eFade = cfg.fade && !cfg.saver
+    val eBlur = cfg.blur && !cfg.saver
+    val eDyn = if (cfg.saver) 0 else cfg.dynBg
+    val eGlow = if (cfg.saver) 0 else if (night) (glowLvl - 1).coerceAtLeast(0) else glowLvl
+    val eDim = if (night) (cfg.dim + 30).coerceAtMost(85) else cfg.dim
+
+    // style: lo que se dibuja (con el brillo efectivo). realStyle: lo que muestra Configuracion.
+    val style = remember(scalePct, spacing, corner, bottom, eGlow, sizes) {
+        DockStyle(scalePct, spacing, corner, bottom, eGlow, sizes)
+    }
+    val realStyle = remember(scalePct, spacing, corner, bottom, glowLvl, sizes) {
         DockStyle(scalePct, spacing, corner, bottom, glowLvl, sizes)
     }
+    val profileSel = profileIndex(scalePct, spacing, corner, glowLvl, cfg)
 
     // Tema de color: se fija antes de dibujar nada y se actualiza al cambiarlo.
     remember { Themes.set(cfg.theme); 0 }
@@ -184,6 +204,7 @@ fun HomeRoot(tick: Int, homeTick: Int, resumeTick: Int, appPaused: Boolean = fal
         showPower = false
         showMore = false
         showQuick = false
+        showSaverHint = false
         if (homeTick > 0) {
             dockState.animateScrollToItem(0)
             focusTick++
@@ -304,6 +325,11 @@ fun HomeRoot(tick: Int, homeTick: Int, resumeTick: Int, appPaused: Boolean = fal
     BackHandler {
         when {
             pinAsk != null -> pinAsk = null
+            showSaverHint -> {
+                showSaverHint = false
+                saverSkip = true
+                focusTick++
+            }
             showQuick -> {
                 showQuick = false
                 quickBack++
@@ -327,6 +353,31 @@ fun HomeRoot(tick: Int, homeTick: Int, resumeTick: Int, appPaused: Boolean = fal
                 if (name != null) {
                     wallName = name
                     prefs.wallpaper = name
+                }
+            }
+        }
+    }
+
+    // Copias de seguridad: guardar donde elija el usuario y restaurar desde cualquier archivo.
+    val backupSaver = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/json")
+    ) { uri: Uri? ->
+        if (uri != null) {
+            scope.launch {
+                val ok = withContext(Dispatchers.IO) { writeBackupTo(ctx, prefs, uri) }
+                toast(ctx, if (ok) "Copia guardada." else "No se pudo guardar la copia.")
+            }
+        }
+    }
+    val backupPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
+        if (uri != null) {
+            scope.launch {
+                val ok = withContext(Dispatchers.IO) { readBackupFrom(ctx, prefs, uri) }
+                if (ok) {
+                    toast(ctx, "Copia restaurada.")
+                    findActivity(ctx)?.recreate()
+                } else {
+                    toast(ctx, "Ese archivo no es una copia válida.")
                 }
             }
         }
@@ -374,9 +425,26 @@ fun HomeRoot(tick: Int, homeTick: Int, resumeTick: Int, appPaused: Boolean = fal
     fun openApp(a: AppInfo) {
         recents = prefs.pushRecent(a.pkg)
         usage = prefs.bumpUsage(a.pkg)
+        lastUsed = prefs.markUsed(a.pkg)
         seen = prefs.markSeen(a.pkg)
         TileBounds.last = null
         startNow(a)
+    }
+
+    // Perfil de diseno: aplica de una vez dock, brillo, fondo dinamico, filas y reloj.
+    fun applyProfile(i: Int) {
+        val pr = DESIGN_PROFILES.getOrNull(i) ?: return
+        scalePct = pr.scale
+        spacing = pr.spacing
+        corner = pr.corner
+        glowLvl = pr.glow
+        prefs.putInt("scale", pr.scale)
+        prefs.putInt("spacing", pr.spacing)
+        prefs.putInt("corner", pr.corner)
+        prefs.putInt("glow", pr.glow)
+        cfg.setDynBg(pr.dynBg)
+        cfg.setBigClock(pr.bigClock)
+        for (r in 0..2) cfg.setRow(r, pr.rows[r])
     }
 
     val onSet: (String, Int) -> Unit = { k, v ->
@@ -428,8 +496,7 @@ fun HomeRoot(tick: Int, homeTick: Int, resumeTick: Int, appPaused: Boolean = fal
             }
         }
     }
-
-    fun guarded(on: Boolean, then: () -> Unit) {
+        fun guarded(on: Boolean, then: () -> Unit) {
         if (on && cfg.pinSet) askVerify(then) else then()
     }
 
@@ -483,7 +550,7 @@ fun HomeRoot(tick: Int, homeTick: Int, resumeTick: Int, appPaused: Boolean = fal
     val panelOpen = screen == "settings" || screen == "edit" || screen == "inputs" ||
         menuApp != null || showPower
     val blurDp by animateDpAsState(
-        if (cfg.blur && panelOpen && !preview) 24.dp else 0.dp, tween(350), label = "blur"
+        if (eBlur && panelOpen && !preview) 24.dp else 0.dp, tween(350), label = "blur"
     )
     // Fondo animado (video / GIF): se pausa con paneles, menus o cuando hay otra app abierta.
     val wallPaused = cfg.pauseWall &&
@@ -493,6 +560,13 @@ fun HomeRoot(tick: Int, homeTick: Int, resumeTick: Int, appPaused: Boolean = fal
         preview -> dock.firstOrNull()
         else -> null
     }
+    // Si el control va muy lento varias veces seguidas, se sugiere el modo ahorro.
+    SlowWatch(
+        active = screen == "home" && !cfg.saver && cfg.saverHint && !saverSkip && !showSaverHint &&
+            menuApp == null && !showMore && !showQuick && !showPower && pinAsk == null,
+        lastInputMs = { lastInput.longValue },
+        onSlow = { showSaverHint = true }
+    )
         Box(
         Modifier
             .fillMaxSize()
@@ -530,17 +604,17 @@ fun HomeRoot(tick: Int, homeTick: Int, resumeTick: Int, appPaused: Boolean = fal
         ) {
             Crossfade(
                 targetState = selected,
-                animationSpec = tween(if (cfg.fade) 700 else 1),
+                animationSpec = tween(if (eFade) 700 else 1),
                 label = "wall"
             ) { f -> WallpaperLayer(f, wallPaused) }
-            FocusBackdrop(bdApp, cfg.dynBg)
+            FocusBackdrop(bdApp, eDyn)
             Box(
                 Modifier.fillMaxSize().background(
                     Brush.verticalGradient(listOf(Color(0x22000000), Color.Transparent, Color(0x99000000)))
                 )
             )
-            if (cfg.dim > 0) {
-                Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = cfg.dim / 100f)))
+            if (eDim > 0) {
+                Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = eDim / 100f)))
             }
         }
         if (screen == "ambient") {
@@ -579,7 +653,7 @@ fun HomeRoot(tick: Int, homeTick: Int, resumeTick: Int, appPaused: Boolean = fal
                         AnimatedContent(
                             targetState = screen,
                             modifier = Modifier.fillMaxSize(),
-                            transitionSpec = { screenTransition(initialState, targetState, cfg.screenAnim) },
+                            transitionSpec = { screenTransition(initialState, targetState, eAnim) },
                             label = "screen",
                             contentKey = { if (it == "home" || it == "settings") "homeLayer" else it }
                         ) { s ->
@@ -590,7 +664,7 @@ fun HomeRoot(tick: Int, homeTick: Int, resumeTick: Int, appPaused: Boolean = fal
                                     Box(
                                         Modifier
                                             .fillMaxSize()
-                                            .focusProperties { canFocus = live && !showMore && !showQuick }
+                                            .focusProperties { canFocus = live && !showMore && !showQuick && !showSaverHint }
                                     ) {
                                         HomeScreen(
                                             dock = dock,
@@ -626,20 +700,22 @@ fun HomeRoot(tick: Int, homeTick: Int, resumeTick: Int, appPaused: Boolean = fal
                                             loading = !appsLoaded,
                                             previewDock = preview,
                                             onQuick = { if (live) showQuick = true },
-                                            quickBack = quickBack
+                                            quickBack = quickBack,
+                                            focusedApp = if (preview) dock.firstOrNull() else focusedApp,
+                                            lastUsed = lastUsed
                                         )
                                     }
                                     AnimatedVisibility(
                                         visible = s == "settings",
-                                        enter = if (cfg.screenAnim) {
+                                        enter = if (eAnim) {
                                             fadeIn(tween(240)) + slideInVertically(tween(280, easing = FastOutSlowInEasing)) { h -> h / 24 }
                                         } else {
                                             EnterTransition.None
                                         },
-                                        exit = if (cfg.screenAnim) fadeOut(tween(160)) else ExitTransition.None
+                                        exit = if (eAnim) fadeOut(tween(160)) else ExitTransition.None
                                     ) {
                                         SettingsScreen(
-                                            style = style,
+                                            style = realStyle,
                                             cfg = cfg,
                                             onSet = onSet,
                                             onResetDock = {
@@ -655,6 +731,26 @@ fun HomeRoot(tick: Int, homeTick: Int, resumeTick: Int, appPaused: Boolean = fal
                                                 prefs.putInt("glow", 2)
                                             },
                                             onCategory = { settingsCat = it },
+                                            onProfile = { applyProfile(it) },
+                                            onBackupSave = {
+                                                try {
+                                                    backupSaver.launch(backupName())
+                                                } catch (e: Exception) {
+                                                    toast(ctx, "Esta TV no tiene selector de archivos.")
+                                                }
+                                            },
+                                            onBackupShare = {
+                                                if (!shareBackup(ctx, prefs)) {
+                                                    toast(ctx, "No se pudo compartir la copia.")
+                                                }
+                                            },
+                                            onRestorePick = {
+                                                try {
+                                                    backupPicker.launch(arrayOf("*/*"))
+                                                } catch (e: Exception) {
+                                                    toast(ctx, "Esta TV no tiene selector de archivos.")
+                                                }
+                                            },
                                             onWalls = { screen = "walls" },
                                             onEdit = { screen = "edit" },
                                             onInputs = {
@@ -851,6 +947,8 @@ fun HomeRoot(tick: Int, homeTick: Int, resumeTick: Int, appPaused: Boolean = fal
                     if (showQuick) {
                         QuickPanel(
                             cfg = cfg,
+                            profile = profileSel,
+                            onProfile = { applyProfile(it) },
                             onSettings = {
                                 showQuick = false
                                 quickBack++
@@ -867,6 +965,28 @@ fun HomeRoot(tick: Int, homeTick: Int, resumeTick: Int, appPaused: Boolean = fal
                             accessOn = PowerService.instance != null,
                             onPick = { powerPick(it) },
                             onClose = { showPower = false }
+                        )
+                    }
+                    if (showSaverHint) {
+                        SaverHint(
+                            onEnable = {
+                                cfg.setSaver(true)
+                                showSaverHint = false
+                                saverSkip = true
+                                focusTick++
+                                toast(ctx, "Modo ahorro activado.")
+                            },
+                            onNever = {
+                                cfg.setSaverHint(false)
+                                showSaverHint = false
+                                saverSkip = true
+                                focusTick++
+                            },
+                            onClose = {
+                                showSaverHint = false
+                                saverSkip = true
+                                focusTick++
+                            }
                         )
                     }
                     val pa = pinAsk
