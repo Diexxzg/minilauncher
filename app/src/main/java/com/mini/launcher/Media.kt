@@ -1,5 +1,6 @@
 package com.mini.launcher
 
+import android.app.Notification
 import android.content.ComponentName
 import android.content.Context
 import android.graphics.Bitmap
@@ -42,7 +43,40 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 
-class MediaListener : NotificationListenerService()
+class MediaListener : NotificationListenerService() {
+    override fun onListenerConnected() {
+        super.onListenerConnected()
+        instance = this
+    }
+
+    override fun onListenerDisconnected() {
+        if (instance === this) instance = null
+        super.onListenerDisconnected()
+    }
+
+    companion object {
+        @Volatile
+        var instance: MediaListener? = null
+    }
+}
+
+/** Notificaciones sin leer por paquete (ignora las fijas y los resumenes de grupo). */
+fun unreadCounts(self: String): Map<String, Int> {
+    val l = MediaListener.instance ?: return emptyMap()
+    return try {
+        val out = HashMap<String, Int>()
+        val arr = l.activeNotifications ?: return emptyMap()
+        for (n in arr) {
+            if (n.packageName == self) continue
+            if (n.isOngoing) continue
+            if ((n.notification.flags and Notification.FLAG_GROUP_SUMMARY) != 0) continue
+            out[n.packageName] = (out[n.packageName] ?: 0) + 1
+        }
+        out
+    } catch (e: Exception) {
+        emptyMap()
+    }
+}
 
 class MediaInfo(
     val title: String,
