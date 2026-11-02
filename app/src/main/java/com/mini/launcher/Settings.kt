@@ -80,8 +80,10 @@ private val GLOW_NAMES = listOf("Apagado", "Suave", "Medio", "Fuerte", "Máximo"
 
 // ---------- Estilo (cristal oscuro) ----------
 // Para cambiar el tamaño del panel: PANEL_W = ancho (fraccion de pantalla), PANEL_H = alto.
-private const val PANEL_W = 0.38f
-private const val PANEL_H = 0.72f
+private const val PANEL_W = 0.34f
+private const val PANEL_H = 0.62f
+// Escala interna del contenido del panel (menor = mas pequeño).
+private const val PANEL_SCALE = 0.84f
 
 private val ACC = Color(0xFF9FB4FF)
 private val ACC_DIM = Color(0xFF6F86D6)
@@ -332,6 +334,71 @@ fun CategoryBar(selected: Int, modifier: Modifier = Modifier, onSelect: (Int) ->
         )
     }
 }
+// ---------- Marco de cristal (compartido por Configuracion y Editar apps) ----------
+
+/**
+ * Panel de cristal centrado. Si avoidDock es true se coloca entre la barra superior y
+ * el dock para no taparlo. El contenido se dibuja a PANEL_SCALE para verse mas compacto.
+ */
+@Composable
+fun GlassPanelFrame(
+    wFrac: Float,
+    hFrac: Float,
+    minW: Float,
+    maxW: Float,
+    avoidDock: Boolean,
+    content: @Composable () -> Unit
+) {
+    val st = LocalDock.current
+    val conf = LocalConfiguration.current
+    val dens = androidx.compose.ui.platform.LocalDensity.current
+    var shown by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { shown = true }
+    val p by animateFloatAsState(if (shown) 1f else 0f, tween(300), label = "panelIn")
+    val wDp = conf.screenWidthDp.toFloat()
+    val hDp = conf.screenHeightDp.toFloat()
+    val topRes = if (avoidDock) 88f else 36f
+    val botRes = if (avoidDock) 84f * st.scalePct / 100f + 72f + st.bottom + 24f else 36f
+    val avail = (hDp - topRes - botRes).coerceAtLeast(240f)
+    val pw = (wDp * wFrac).coerceIn(minW, maxOf(minW, maxW))
+    val ph = (hDp * hFrac).coerceIn(240f, avail)
+    val top = topRes + (avail - ph) / 2f
+    val shape = RoundedCornerShape(22.dp)
+    val panelBg = Brush.verticalGradient(listOf(Color(0xCC1B1D20), Color(0xCC121416)))
+    val panelBorder = Brush.verticalGradient(listOf(Color(0x55FFFFFF), Color(0x1AFFFFFF)))
+    Box(Modifier.fillMaxSize().background(Color(0x40000000))) {
+        Box(
+            Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = top.dp)
+                .width(pw.dp)
+                .height(ph.dp)
+                .graphicsLayer {
+                    translationY = (1f - p) * 24.dp.toPx()
+                    alpha = p
+                }
+                .clip(shape)
+                .background(panelBg)
+                .drawBehind {
+                    // Brillo suave arriba, efecto cristal.
+                    drawRect(
+                        Brush.verticalGradient(
+                            listOf(Color(0x14FFFFFF), Color.Transparent),
+                            startY = 0f,
+                            endY = size.height * 0.4f
+                        )
+                    )
+                }
+                .border(1.dp, panelBorder, shape)
+        ) {
+            androidx.compose.runtime.CompositionLocalProvider(
+                androidx.compose.ui.platform.LocalDensity provides
+                    androidx.compose.ui.unit.Density(dens.density * PANEL_SCALE, dens.fontScale)
+            ) { content() }
+        }
+    }
+}
+
 // ---------- Pantalla ----------
 
 @Composable
@@ -351,46 +418,7 @@ fun SettingsScreen(
     val ctx = LocalContext.current
     val conf = LocalConfiguration.current
     var cat by remember { mutableIntStateOf(0) }
-    var shown by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) { shown = true }
-    val p by animateFloatAsState(if (shown) 1f else 0f, tween(380), label = "settingsIn")
-
-    val shape = RoundedCornerShape(22.dp)
-    val pw = (conf.screenWidthDp * PANEL_W).coerceIn(400f, 560f).dp
-    val ph = (conf.screenHeightDp * PANEL_H).dp
-    val panelBg = Brush.verticalGradient(listOf(Color(0xCC1B1D20), Color(0xCC121416)))
-    val panelBorder = Brush.verticalGradient(listOf(Color(0x55FFFFFF), Color(0x1AFFFFFF)))
-
-    // El inicio se ve a la izquierda casi sin oscurecer para ver los cambios en vivo.
-    Box(
-        Modifier
-            .fillMaxSize()
-            .background(Brush.horizontalGradient(listOf(Color.Transparent, Color(0x44000000))))
-    ) {
-        Box(
-            Modifier
-                .align(Alignment.TopEnd)
-                .padding(top = 88.dp, end = 32.dp)
-                .width(pw)
-                .height(ph)
-                .graphicsLayer {
-                    translationX = (1f - p) * 140.dp.toPx()
-                    alpha = p
-                }
-                .clip(shape)
-                .background(panelBg)
-                .drawBehind {
-                    // Brillo suave arriba, efecto cristal.
-                    drawRect(
-                        Brush.verticalGradient(
-                            listOf(Color(0x14FFFFFF), Color.Transparent),
-                            startY = 0f,
-                            endY = size.height * 0.4f
-                        )
-                    )
-                }
-                .border(1.dp, panelBorder, shape)
-        ) {
+    GlassPanelFrame(PANEL_W, PANEL_H, 360f, 500f, true) {
             Column(Modifier.fillMaxSize().padding(start = 18.dp, end = 18.dp, top = 12.dp, bottom = 14.dp)) {
                 CategoryBar(cat, Modifier.autoFocus()) { cat = it }
                 Spacer(Modifier.height(16.dp))
@@ -519,5 +547,4 @@ fun SettingsScreen(
                 }
             }
         }
-    }
 }
