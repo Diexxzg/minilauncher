@@ -235,60 +235,57 @@ fun MusicPill(m: MediaInfo, art: ImageBitmap?) {
     Box(
         Modifier
             .clip(shape)
-            .background(Brush.horizontalGradient(listOf(Color(0x44FFFFFF), Color(0x1AFFFFFF))))
-            .border(1.dp, Color(0x33FFFFFF), shape)
+            .background(Color(0x99141618))
+            .border(1.dp, Color(0x26FFFFFF), shape)
     ) {
         Row(
             Modifier
                 .drawBehind {
                     val frac = if (dur > 0L) (pos.toFloat() / dur.toFloat()).coerceIn(0f, 1f) else 0f
-                    val h = 3.dp.toPx()
-                    drawRect(Color(0x33FFFFFF), Offset(0f, size.height - h), Size(size.width, h))
-                    drawRect(Color.White, Offset(0f, size.height - h), Size(size.width * frac, h))
+                    val h = 2.dp.toPx()
+                    drawRect(Color(0x22FFFFFF), Offset(0f, size.height - h), Size(size.width, h))
+                    drawRect(Color(0x99FFFFFF), Offset(0f, size.height - h), Size(size.width * frac, h))
                 }
-                .padding(start = 10.dp, end = 12.dp, top = 8.dp, bottom = 11.dp),
+                .padding(start = 9.dp, end = 10.dp, top = 8.dp, bottom = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             Box(
-                Modifier.size(44.dp).clip(CircleShape).background(Color(0x33FFFFFF)),
+                Modifier.size(38.dp).clip(CircleShape).background(Color(0x33FFFFFF)),
                 contentAlignment = Alignment.Center
             ) {
                 if (art != null) {
                     Image(art, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
                 } else {
-                    Text("♪", color = Color.White, fontSize = 20.sp)
+                    Text("♪", color = Color.White, fontSize = 18.sp)
                 }
             }
-            Column(Modifier.widthIn(max = 170.dp)) {
+            Column(Modifier.widthIn(max = 230.dp)) {
                 Text(
-                    "REPRODUCIENDO", color = Color(0xB3FFFFFF), fontSize = 12.sp,
-                    letterSpacing = 1.5.sp, fontWeight = FontWeight.Medium
+                    "REPRODUCIENDO:", color = Color(0x99FFFFFF), fontSize = 11.sp,
+                    letterSpacing = 0.5.sp, fontWeight = FontWeight.Normal
                 )
                 Text(
-                    m.title, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold,
-                    maxLines = 1, overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    m.artist, color = Color(0xB3FFFFFF), fontSize = 13.sp,
+                    if (m.artist.isEmpty()) m.title else m.title + " - " + m.artist,
+                    color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Normal,
                     maxLines = 1, overflow = TextOverflow.Ellipsis
                 )
             }
-            Equalizer(m.playing, Color.White)
+            Equalizer(m.playing, Color(0x99FFFFFF))
             Row(
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                CircleBtn(34, { tc.skipToPrevious() }) { Icon24("prev", Color.White, 16) }
-                CircleBtn(42, { if (m.playing) tc.pause() else tc.play() }) {
+                CircleBtn(32, { tc.skipToPrevious() }) { Icon24("prev", Color(0xE6FFFFFF), 14) }
+                CircleBtn(38, { if (m.playing) tc.pause() else tc.play() }) {
                     Box(
-                        Modifier.size(32.dp).clip(CircleShape).background(Color.White),
+                        Modifier.size(30.dp).clip(CircleShape).background(Color(0xFFE3E3E3)),
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon24(if (m.playing) "pause" else "play", Color(0xFF101418), 16)
+                        Icon24(if (m.playing) "pause" else "play", Color(0xFF16181B), 15)
                     }
                 }
-                CircleBtn(34, { tc.skipToNext() }) { Icon24("next", Color.White, 16) }
+                CircleBtn(32, { tc.skipToNext() }) { Icon24("next", Color(0xE6FFFFFF), 14) }
             }
         }
     }
