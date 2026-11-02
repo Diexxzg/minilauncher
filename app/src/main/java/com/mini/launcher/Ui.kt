@@ -163,9 +163,12 @@ fun GlassBox(
     glowLevel: Int = 2,
     cornerDp: Dp = 18.dp,
     onFocusChange: ((Boolean) -> Unit)? = null,
+    preview: Boolean = false,
     content: @Composable BoxScope.() -> Unit
 ) {
     var focused by remember { mutableStateOf(false) }
+    // preview: se ve como enfocada aunque no lo este (vista previa en vivo en Configuracion).
+    val lit = focused || preview
     val view = LocalView.current
     val sounds = LocalSounds.current
     val vol = LocalSoundVol.current
@@ -173,26 +176,26 @@ fun GlassBox(
     val th = Themes.current
     // Sin rebote ni pulso: todo se mueve con curvas suaves y sin parpadeo.
     val sc = animateFloatAsState(
-        if (focused) 1.05f else 1f,
+        if (lit) 1.05f else 1f,
         tween(220, easing = FastOutSlowInEasing),
         label = "scale"
     )
     val lift = animateFloatAsState(
-        if (focused) 1f else 0f,
+        if (lit) 1f else 0f,
         tween(220, easing = FastOutSlowInEasing),
         label = "lift"
     )
-    val gl = animateFloatAsState(if (focused) 1f else 0f, tween(260), label = "glow")
+    val gl = animateFloatAsState(if (lit) 1f else 0f, tween(260), label = "glow")
     val bgColor by animateColorAsState(
-        if (focused) th.focusBg else Color(0x66121416), tween(200), label = "bg"
+        if (lit) th.focusBg else Color(0x66121416), tween(200), label = "bg"
     )
     val borderColor by animateColorAsState(
-        if (focused) th.focusBorder else Color(0x26FFFFFF), tween(200), label = "border"
+        if (lit) th.focusBorder else Color(0x26FFFFFF), tween(200), label = "border"
     )
-    val borderW by animateDpAsState(if (focused) 2.dp else 1.dp, tween(200), label = "borderW")
+    val borderW by animateDpAsState(if (lit) 2.dp else 1.dp, tween(200), label = "borderW")
     Box(
         modifier = modifier
-            .zIndex(if (focused) 1f else 0f)
+            .zIndex(if (lit) 1f else 0f)
             .graphicsLayer {
                 scaleX = sc.value
                 scaleY = sc.value
@@ -241,6 +244,7 @@ fun AppTile(
     bannerStyle: Boolean = false,
     onLongClick: (() -> Unit)? = null,
     onFocusChange: ((Boolean) -> Unit)? = null,
+    preview: Boolean = false,
     onClick: () -> Unit
 ) {
     val st = LocalDock.current
@@ -264,7 +268,8 @@ fun AppTile(
         glow = LocalAccent.current ?: Color(app.glow),
         glowLevel = st.glow,
         cornerDp = st.corner.dp,
-        onFocusChange = onFocusChange
+        onFocusChange = onFocusChange,
+        preview = preview
     ) {
         if (app.banner) {
             Image(app.art, app.label, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
