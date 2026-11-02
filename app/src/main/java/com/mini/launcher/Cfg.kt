@@ -31,7 +31,10 @@ class Cfg(private val p: Prefs) {
     private var _overscan by mutableStateOf(p.getInt("overscan", 0))
     private var _uiScale by mutableStateOf(p.getInt("uiScale", 100))
     private var _glowSrc by mutableStateOf(p.getInt("glowSrc", 0))
-    private var _sounds by mutableStateOf(p.getInt("sounds", 1) == 1)
+    private var _soundLevel by mutableStateOf(p.getInt("sounds", 1).coerceIn(0, 2))
+    private var _theme by mutableStateOf(p.getInt("theme", 0).coerceIn(0, Themes.list.lastIndex))
+    private var _blur by mutableStateOf(p.getInt("blur", 1) == 1)
+    private var _bigClock by mutableStateOf(p.getInt("bigClock", 1) == 1)
     private var _voiceMode by mutableStateOf(p.getInt("voiceMode", 0))
     private var _lockSettings by mutableStateOf(p.getInt("lockSettings", 0) == 1)
     private var _lockHidden by mutableStateOf(p.getInt("lockHidden", 0) == 1)
@@ -58,7 +61,12 @@ class Cfg(private val p: Prefs) {
     val overscan: Int get() = _overscan
     val uiScale: Int get() = _uiScale
     val glowSrc: Int get() = _glowSrc
-    val sounds: Boolean get() = _sounds
+    val sounds: Boolean get() = _soundLevel > 0
+    /** 0 = apagado, 1 = suave, 2 = medio. */
+    val soundLevel: Int get() = _soundLevel
+    val theme: Int get() = _theme
+    val blur: Boolean get() = _blur
+    val bigClock: Boolean get() = _bigClock
     val voiceMode: Int get() = _voiceMode
     val lockSettings: Boolean get() = _lockSettings
     val lockHidden: Boolean get() = _lockHidden
@@ -159,8 +167,27 @@ class Cfg(private val p: Prefs) {
     }
 
     fun setSounds(v: Boolean) {
-        _sounds = v
-        p.putInt("sounds", if (v) 1 else 0)
+        setSoundLevel(if (v) 1 else 0)
+    }
+
+    fun setSoundLevel(v: Int) {
+        _soundLevel = v
+        p.putInt("sounds", v)
+    }
+
+    fun setTheme(v: Int) {
+        _theme = v
+        p.putInt("theme", v)
+    }
+
+    fun setBlur(v: Boolean) {
+        _blur = v
+        p.putInt("blur", if (v) 1 else 0)
+    }
+
+    fun setBigClock(v: Boolean) {
+        _bigClock = v
+        p.putInt("bigClock", if (v) 1 else 0)
     }
 
     fun setVoiceMode(v: Int) {
