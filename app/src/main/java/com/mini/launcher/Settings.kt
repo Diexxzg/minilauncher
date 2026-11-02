@@ -28,6 +28,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.key
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -60,6 +61,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.app.NotificationManagerCompat
+import java.text.Normalizer
 
 private val CATS = listOf(
     "palette" to "Apariencia",
@@ -400,6 +402,20 @@ fun GlassPanelFrame(
         }
     }
 }
+// ---------- Buscador ----------
+
+/** Minusculas y sin acentos, para que "musica" encuentre "Música". */
+private fun norm(s: String): String =
+    Normalizer.normalize(s.lowercase(), Normalizer.Form.NFD).replace(Regex("\\p{Mn}+"), "")
+
+/** Una opcion de Configuracion: categoria, texto buscable y su fila. */
+private class SItem(
+    val cat: Int,
+    val label: String,
+    val keys: String = "",
+    val content: @Composable () -> Unit
+)
+
 // ---------- Pantalla ----------
 
 @Composable
@@ -416,15 +432,242 @@ fun SettingsScreen(
     onBackup: () -> Unit,
     onRestore: () -> Unit,
     onNetPerm: () -> Unit,
-    onPin: (String) -> Unit
+    onPin: (String) -> Unit,
+    onCategory: (Int) -> Unit = {}
 ) {
     val ctx = LocalContext.current
-    val conf = LocalConfiguration.current
     var cat by remember { mutableIntStateOf(0) }
+    var query by remember { mutableStateOf("") }
+    // Avisa de la categoria abierta: en Apariencia y Dock el inicio se ve en vivo detras del panel.
+    LaunchedEffect(cat) { onCategory(cat) }
+
+    val cityOpts = if (cfg.city in CITIES) CITIES else listOf(cfg.city) + CITIES
+
+    // Todas las opciones en una sola lista: sirve para mostrar una categoria y para buscar.
+    val items = buildList<SItem> {
+        // ---- Apariencia ----
+        add(SItem(0, "Cambiar fondo de pantalla", "imagen video wallpaper") {
+            ActionRow("Cambiar fondo de pantalla") { onWalls() }
+        })
+        add(SItem(0, "Tema de color", "colores acento") {
+            ChoiceRow("Tema de color", Themes.list.map { it.name }, cfg.theme) { cfg.setTheme(it) }
+        })
+        add(SItem(0, "Desenfoque al abrir paneles", "blur") {
+            SwitchRow("Desenfoque al abrir paneles", cfg.blur) { cfg.setBlur(it) }
+        })
+        add(SItem(0, "Oscurecer fondo", "brillo") {
+            SliderRow("Oscurecer fondo", cfg.dim, 0, 80, 5, "%") { cfg.setDim(it) }
+        })
+        add(SItem(0, "Rotación de fondos", "cambiar fondos hora") {
+            ChoiceRow(
+                "Rotación de fondos",
+                listOf("Desactivada", "Cada 30 min", "Cada hora", "Según la hora"),
+                cfg.rot
+            ) { cfg.setRot(it) }
+        })
+        add(SItem(0, "Transición suave", "fundido fondo") {
+            SwitchRow("Transición suave", cfg.fade) { cfg.setFade(it) }
+        })
+        add(SItem(0, "Pausar fondo animado", "video gif ahorrar recursos paneles") {
+            SwitchRow("Pausar fondo animado con paneles", cfg.pauseWall) { cfg.setPauseWall(it) }
+        })
+        add(SItem(0, "Fondo según app enfocada", "degradado banner dinamico") {
+            ChoiceRow(
+                "Fondo según app enfocada",
+                listOf("Apagado", "Degradado", "Banner"),
+                cfg.dynBg
+            ) { cfg.setDynBg(it) }
+        })
+        add(SItem(0, "Animar cambio de pantallas", "transiciones animaciones") {
+            SwitchRow("Animar cambio de pantallas", cfg.screenAnim) { cfg.setScreenAnim(it) }
+        })
+        add(SItem(0, "Brillo de color", "glow resplandor") {
+            ChoiceRow("Brillo de color", GLOW_NAMES, style.glow) { onSet("glow", it) }
+        })
+        add(SItem(0, "Color del brillo", "glow acento") {
+            ChoiceRow(
+                "Color del brillo",
+                listOf("Color de cada app", "Color del fondo", "Color del tema"),
+                cfg.glowSrc
+            ) { cfg.setGlowSrc(it) }
+        })
+        add(SItem(0, "Tamaño de la interfaz", "escala zoom") {
+            SliderRow("Tamaño de la interfaz", cfg.uiScale, 70, 130, 5, "%") { cfg.setUiScale(it) }
+        })
+        add(SItem(0, "Margen de seguridad", "overscan bordes") {
+            SliderRow("Margen de seguridad", cfg.overscan, 0, 60, 2, " dp") { cfg.setOverscan(it) }
+        })
+        add(SItem(0, "Sonido al mover el foco", "audio clic") {
+            ChoiceRow(
+                "Sonido al mover el foco",
+                listOf("Apagado", "Suave", "Medio"),
+                cfg.soundLevel
+            ) { cfg.setSoundLevel(it) }
+        })
+        // ---- Dock ----
+        add(SItem(1, "Tamaño general", "dock fichas escala") {
+            SliderRow("Tamaño general", style.scalePct, 50, 180, 10, "%") { onSet("scale", it) }
+        })
+        add(SItem(1, "Separación", "dock espacio") {
+            SliderRow("Separación", style.spacing, 0, 48, 2, " dp") { onSet("spacing", it) }
+        })
+        add(SItem(1, "Redondeo", "dock esquinas") {
+            SliderRow("Redondeo", style.corner, 0, 40, 2, " dp") { onSet("corner", it) }
+        })
+        add(SItem(1, "Margen inferior", "dock") {
+            SliderRow("Margen inferior", style.bottom, 0, 80, 2, " dp") { onSet("bottom", it) }
+        })
+        add(SItem(1, "Fila extra 1", "streaming juegos filas") {
+            ChoiceRow("Fila extra 1", ROW_NAMES, cfg.row(0)) { cfg.setRow(0, it) }
+        })
+        add(SItem(1, "Fila extra 2", "streaming juegos filas") {
+            ChoiceRow("Fila extra 2", ROW_NAMES, cfg.row(1)) { cfg.setRow(1, it) }
+        })
+        add(SItem(1, "Fila extra 3", "streaming juegos filas") {
+            ChoiceRow("Fila extra 3", ROW_NAMES, cfg.row(2)) { cfg.setRow(2, it) }
+        })
+        add(SItem(1, "Asignar apps", "filas mantén ok") {
+            InfoRow("Asignar apps", "mantén OK en la app")
+        })
+        add(SItem(1, "Restablecer dock", "reiniciar valores") {
+            ActionRow("Restablecer dock") { onResetDock() }
+        })
+        // ---- Inicio ----
+        add(SItem(2, "Reloj grande") {
+            SwitchRow("Reloj grande", cfg.bigClock) { cfg.setBigClock(it) }
+        })
+        add(SItem(2, "Formato de hora", "12 24 horas reloj") {
+            ChoiceRow("Formato de hora", listOf("12 horas", "24 horas"), if (cfg.clock24) 1 else 0) {
+                cfg.setClock24(it == 1)
+            }
+        })
+        add(SItem(2, "Mostrar fecha") {
+            SwitchRow("Mostrar fecha", cfg.showDate) { cfg.setShowDate(it) }
+        })
+        add(SItem(2, "Mostrar clima", "tiempo temperatura") {
+            SwitchRow("Mostrar clima", cfg.showWeather) { cfg.setShowWeather(it) }
+        })
+        add(SItem(2, "Ciudad del clima", "tiempo ubicación") {
+            ChoiceRow("Ciudad del clima", cityOpts, cityOpts.indexOf(cfg.city)) {
+                cfg.setCity(cityOpts[it])
+            }
+        })
+        add(SItem(2, "Unidades", "celsius fahrenheit grados temperatura") {
+            ChoiceRow("Unidades", listOf("°C", "°F"), if (cfg.fahrenheit) 1 else 0) {
+                cfg.setFahrenheit(it == 1)
+            }
+        })
+        add(SItem(2, "Mostrar recientes", "historial") {
+            SwitchRow("Mostrar recientes", cfg.showRecents) { cfg.setShowRecents(it) }
+        })
+        add(SItem(2, "Botón de voz", "micrófono asistente búsqueda") {
+            ChoiceRow(
+                "Botón de voz",
+                listOf("Asistente de voz", "Buscar apps"),
+                cfg.voiceMode
+            ) { cfg.setVoiceMode(it) }
+        })
+        add(SItem(2, "Modo ambiente", "protector reposo") {
+            ChoiceRow(
+                "Modo ambiente",
+                listOf("Desactivado", "2 min", "5 min", "10 min", "20 min"),
+                cfg.ambient
+            ) { cfg.setAmbient(it) }
+        })
+        // ---- Música ----
+        add(SItem(3, "Mostrar reproductor", "música") {
+            SwitchRow("Mostrar reproductor", cfg.showMusic) { cfg.setShowMusic(it) }
+        })
+        add(SItem(3, "Tamaño del reproductor", "música") {
+            SliderRow("Tamaño del reproductor", cfg.musicSize, 50, 120, 5, "%") { cfg.setMusicSize(it) }
+        })
+        add(SItem(3, "Posición del reproductor", "música") {
+            ChoiceRow(
+                "Posición del reproductor",
+                listOf("Junto al reloj", "Arriba al centro"),
+                cfg.musicPos
+            ) { cfg.setMusicPos(it) }
+        })
+        add(SItem(3, "Permitir acceso a notificaciones", "música permiso") {
+            ActionRow("Permitir acceso a notificaciones") {
+                tryStart(ctx, "android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS")
+            }
+        })
+        // ---- Apps ----
+        add(SItem(4, "Editar apps", "favoritas orden tamaño ocultas") {
+            ActionRow("Editar apps (favoritas, orden, tamaño, ocultas)") { onEdit() }
+        })
+        // ---- Sistema ----
+        add(SItem(5, "Wi-Fi", "red internet") { ActionRow("Wi-Fi") { onOpen("wifi") } })
+        add(SItem(5, "Entradas (HDMI)", "fuentes") { ActionRow("Entradas (HDMI)") { onInputs() } })
+        add(SItem(5, "Todos los ajustes de Android", "sistema") {
+            ActionRow("Todos los ajustes de Android") { onOpen("all") }
+        })
+        add(SItem(5, "Bluetooth", "control audífonos") { ActionRow("Bluetooth") { onOpen("bt") } })
+        add(SItem(5, "Permitir nombre de red y Bluetooth", "permiso ubicación") {
+            ActionRow("Permitir nombre de red y Bluetooth") { onNetPerm() }
+        })
+        add(SItem(5, "Menú de energía (accesibilidad)", "apagar reiniciar") {
+            ActionRow("Menú de energía (accesibilidad)") { onOpen("access") }
+        })
+        add(SItem(5, "Protector de pantalla del sistema", "dream") {
+            ActionRow("Protector de pantalla del sistema") { onOpen("dream") }
+        })
+        add(SItem(5, "Establecer como inicio predeterminado", "launcher home") {
+            ActionRow("Establecer como inicio predeterminado") { onSetHome() }
+        })
+        // ---- Seguridad ----
+        if (!cfg.pinSet) {
+            add(SItem(6, "Crear PIN de 4 dígitos", "contraseña bloqueo") {
+                ActionRow("Crear PIN de 4 dígitos") { onPin("create") }
+            })
+            add(SItem(6, "Estado del PIN") { InfoRow("Estado", "Sin PIN") })
+        } else {
+            add(SItem(6, "Cambiar PIN", "contraseña") { ActionRow("Cambiar PIN") { onPin("change") } })
+            add(SItem(6, "Quitar PIN", "contraseña") { ActionRow("Quitar PIN") { onPin("remove") } })
+            add(SItem(6, "Proteger ajustes", "bloqueo pin") {
+                SwitchRow("Proteger ajustes", cfg.lockSettings) { cfg.setLockSettings(it) }
+            })
+            add(SItem(6, "Proteger apps ocultas", "bloqueo pin") {
+                SwitchRow("Proteger apps ocultas", cfg.lockHidden) { cfg.setLockHidden(it) }
+            })
+            add(SItem(6, "Estado del PIN") { InfoRow("Estado", "PIN activo") })
+        }
+        // ---- Acerca de ----
+        add(SItem(7, "Guardar copia de seguridad", "backup respaldo") {
+            ActionRow("Guardar copia de seguridad") { onBackup() }
+        })
+        add(SItem(7, "Restaurar copia de seguridad", "backup respaldo") {
+            ActionRow("Restaurar copia de seguridad") { onRestore() }
+        })
+    }
+
+    val q = norm(query.trim())
+    val searching = q.isNotEmpty()
+    val words = q.split(" ").filter { it.isNotEmpty() }
+    val shown = if (searching) {
+        items.filter { si ->
+            val hay = norm(si.label + " " + si.keys + " " + CATS[si.cat].second)
+            words.all { w -> hay.contains(w) }
+        }
+    } else {
+        items.filter { it.cat == cat }
+    }
+
     GlassPanelFrame(PANEL_W, PANEL_H, 360f, 500f, true) {
             Column(Modifier.fillMaxSize().padding(start = 18.dp, end = 18.dp, top = 12.dp, bottom = 14.dp)) {
-                CategoryBar(cat, Modifier.autoFocus()) { cat = it }
-                Spacer(Modifier.height(16.dp))
+                CategoryBar(cat, Modifier.autoFocus()) {
+                    cat = it
+                    query = ""
+                }
+                Spacer(Modifier.height(10.dp))
+                SearchField(
+                    value = query,
+                    onChange = { query = it },
+                    modifier = Modifier.fillMaxWidth().height(42.dp),
+                    placeholder = "Buscar en configuración…"
+                )
+                Spacer(Modifier.height(10.dp))
                 Row(
                     Modifier.padding(start = 6.dp),
                     verticalAlignment = Alignment.CenterVertically
@@ -438,10 +681,18 @@ fun SettingsScreen(
                     )
                 }
                 Text(
-                    CATS[cat].second, color = Color.White, fontSize = 28.sp,
+                    if (searching) "Resultados" else CATS[cat].second,
+                    color = Color.White, fontSize = 28.sp,
                     fontWeight = FontWeight.Normal,
                     modifier = Modifier.padding(start = 6.dp, top = 2.dp)
                 )
+                if (!searching && cat <= 1) {
+                    Text(
+                        "Los cambios se ven en vivo detrás del panel",
+                        color = Color(0x80FFFFFF), fontSize = 12.sp,
+                        modifier = Modifier.padding(start = 6.dp, top = 2.dp)
+                    )
+                }
                 Spacer(Modifier.height(10.dp))
                 Box(Modifier.fillMaxWidth().height(1.dp).background(Color(0x22FFFFFF)))
                 Spacer(Modifier.height(8.dp))
@@ -452,148 +703,59 @@ fun SettingsScreen(
                         .verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                when (cat) {
-                    0 -> {
-                        ActionRow("Cambiar fondo de pantalla") { onWalls() }
-                        ChoiceRow("Tema de color", Themes.list.map { it.name }, cfg.theme) { cfg.setTheme(it) }
-                        SwitchRow("Desenfoque al abrir paneles", cfg.blur) { cfg.setBlur(it) }
-                        SliderRow("Oscurecer fondo", cfg.dim, 0, 80, 5, "%") { cfg.setDim(it) }
-                        ChoiceRow(
-                            "Rotación de fondos",
-                            listOf("Desactivada", "Cada 30 min", "Cada hora", "Según la hora"),
-                            cfg.rot
-                        ) { cfg.setRot(it) }
-                        SwitchRow("Transición suave", cfg.fade) { cfg.setFade(it) }
-                        ChoiceRow(
-                            "Fondo según app enfocada",
-                            listOf("Apagado", "Degradado", "Banner"),
-                            cfg.dynBg
-                        ) { cfg.setDynBg(it) }
-                        SwitchRow("Animar cambio de pantallas", cfg.screenAnim) { cfg.setScreenAnim(it) }
-                        ChoiceRow("Brillo de color", GLOW_NAMES, style.glow) { onSet("glow", it) }
-                        ChoiceRow(
-                            "Color del brillo",
-                            listOf("Color de cada app", "Color del fondo", "Color del tema"),
-                            cfg.glowSrc
-                        ) { cfg.setGlowSrc(it) }
-                        SliderRow("Tamaño de la interfaz", cfg.uiScale, 70, 130, 5, "%") { cfg.setUiScale(it) }
-                        SliderRow("Margen de seguridad", cfg.overscan, 0, 60, 2, " dp") { cfg.setOverscan(it) }
-                        ChoiceRow(
-                            "Sonido al mover el foco",
-                            listOf("Apagado", "Suave", "Medio"),
-                            cfg.soundLevel
-                        ) { cfg.setSoundLevel(it) }
+                    if (cat == 7 && !searching) AboutInfo()
+                    if (searching && shown.isEmpty()) {
+                        InfoRow("Sin resultados", "")
                     }
-                    1 -> {
-                        SliderRow("Tamaño general", style.scalePct, 50, 180, 10, "%") { onSet("scale", it) }
-                        SliderRow("Separación", style.spacing, 0, 48, 2, " dp") { onSet("spacing", it) }
-                        SliderRow("Redondeo", style.corner, 0, 40, 2, " dp") { onSet("corner", it) }
-                        SliderRow("Margen inferior", style.bottom, 0, 80, 2, " dp") { onSet("bottom", it) }
-                        ChoiceRow("Fila extra 1", ROW_NAMES, cfg.row(0)) { cfg.setRow(0, it) }
-                        ChoiceRow("Fila extra 2", ROW_NAMES, cfg.row(1)) { cfg.setRow(1, it) }
-                        ChoiceRow("Fila extra 3", ROW_NAMES, cfg.row(2)) { cfg.setRow(2, it) }
-                        InfoRow("Asignar apps", "mantén OK en la app")
-                        ActionRow("Restablecer dock") { onResetDock() }
+                    var lastCat = -1
+                    for (si in shown) {
+                        if (searching && si.cat != lastCat) {
+                            lastCat = si.cat
+                            Text(
+                                CATS[si.cat].second.uppercase(),
+                                color = Color(0x80FFFFFF), fontSize = 11.sp, letterSpacing = 1.sp,
+                                modifier = Modifier.padding(start = 8.dp, top = 6.dp)
+                            )
+                        }
+                        key(si.cat to si.label) { si.content() }
                     }
-                    2 -> {
-                        SwitchRow("Reloj grande", cfg.bigClock) { cfg.setBigClock(it) }
-                        ChoiceRow("Formato de hora", listOf("12 horas", "24 horas"), if (cfg.clock24) 1 else 0) {
-                            cfg.setClock24(it == 1)
-                        }
-                        SwitchRow("Mostrar fecha", cfg.showDate) { cfg.setShowDate(it) }
-                        SwitchRow("Mostrar clima", cfg.showWeather) { cfg.setShowWeather(it) }
-                        val cityOpts = if (cfg.city in CITIES) CITIES else listOf(cfg.city) + CITIES
-                        ChoiceRow("Ciudad del clima", cityOpts, cityOpts.indexOf(cfg.city)) {
-                            cfg.setCity(cityOpts[it])
-                        }
-                        ChoiceRow("Unidades", listOf("°C", "°F"), if (cfg.fahrenheit) 1 else 0) {
-                            cfg.setFahrenheit(it == 1)
-                        }
-                        SwitchRow("Mostrar recientes", cfg.showRecents) { cfg.setShowRecents(it) }
-                        ChoiceRow(
-                            "Botón de voz",
-                            listOf("Asistente de voz", "Buscar apps"),
-                            cfg.voiceMode
-                        ) { cfg.setVoiceMode(it) }
-                        ChoiceRow(
-                            "Modo ambiente",
-                            listOf("Desactivado", "2 min", "5 min", "10 min", "20 min"),
-                            cfg.ambient
-                        ) { cfg.setAmbient(it) }
-                    }
-                    3 -> {
-                        SwitchRow("Mostrar reproductor", cfg.showMusic) { cfg.setShowMusic(it) }
-                        SliderRow("Tamaño del reproductor", cfg.musicSize, 50, 120, 5, "%") { cfg.setMusicSize(it) }
-                        ChoiceRow(
-                            "Posición del reproductor",
-                            listOf("Junto al reloj", "Arriba al centro"),
-                            cfg.musicPos
-                        ) { cfg.setMusicPos(it) }
-                        ActionRow("Permitir acceso a notificaciones") {
-                            tryStart(ctx, "android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS")
-                        }
-                    }
-                    4 -> {
-                        ActionRow("Editar apps (favoritas, orden, tamaño, ocultas)") { onEdit() }
-                    }
-                    5 -> {
-                        ActionRow("Wi-Fi") { onOpen("wifi") }
-                        ActionRow("Entradas (HDMI)") { onInputs() }
-                        ActionRow("Todos los ajustes de Android") { onOpen("all") }
-                        ActionRow("Bluetooth") { onOpen("bt") }
-                        ActionRow("Permitir nombre de red y Bluetooth") { onNetPerm() }
-                        ActionRow("Menú de energía (accesibilidad)") { onOpen("access") }
-                        ActionRow("Protector de pantalla del sistema") { onOpen("dream") }
-                        ActionRow("Establecer como inicio predeterminado") { onSetHome() }
-                    }
-                    6 -> {
-                        if (!cfg.pinSet) {
-                            ActionRow("Crear PIN de 4 dígitos") { onPin("create") }
-                            InfoRow("Estado", "Sin PIN")
-                        } else {
-                            ActionRow("Cambiar PIN") { onPin("change") }
-                            ActionRow("Quitar PIN") { onPin("remove") }
-                            SwitchRow("Proteger ajustes", cfg.lockSettings) { cfg.setLockSettings(it) }
-                            SwitchRow("Proteger apps ocultas", cfg.lockHidden) { cfg.setLockHidden(it) }
-                            InfoRow("Estado", "PIN activo")
-                        }
-                    }
-                    else -> {
-                        val version = remember {
-                            runCatching {
-                                ctx.packageManager.getPackageInfo(ctx.packageName, 0).versionName
-                            }.getOrNull() ?: "?"
-                        }
-                        val listenerOn = remember {
-                            NotificationManagerCompat.getEnabledListenerPackages(ctx)
-                                .contains(ctx.packageName)
-                        }
-                        var fps by remember { mutableIntStateOf(0) }
-                        LaunchedEffect(Unit) {
-                            while (true) {
-                                var frames = 0
-                                val start = withFrameNanos { it }
-                                                                var t = start
-                                while (t - start < 1_000_000_000L) {
-                                    t = withFrameNanos { it }
-                                    frames++
-                                }
-                                fps = frames
-                            }
-                        }
-                        val wallCount = remember { listWalls(ctx).size }
-                        InfoRow("Versión", version)
-                        InfoRow("Permiso de música", if (listenerOn) "Activo" else "Falta permitir")
-                        InfoRow("Fotogramas por segundo", fps.toString())
-                        InfoRow("Apps instaladas", AppCache.apps.size.toString())
-                        InfoRow("Fondos guardados", wallCount.toString())
-                        InfoRow("Android", android.os.Build.VERSION.RELEASE + " (API " + android.os.Build.VERSION.SDK_INT + ")")
-                        InfoRow("Dispositivo", android.os.Build.MODEL)
-                        ActionRow("Guardar copia de seguridad") { onBackup() }
-                        ActionRow("Restaurar copia de seguridad") { onRestore() }
-                    }
-                }
                 }
             }
         }
+}
+
+/** Datos de la app y del equipo (categoria "Acerca de"). */
+@Composable
+private fun AboutInfo() {
+    val ctx = LocalContext.current
+    val version = remember {
+        runCatching {
+            ctx.packageManager.getPackageInfo(ctx.packageName, 0).versionName
+        }.getOrNull() ?: "?"
+    }
+    val listenerOn = remember {
+        NotificationManagerCompat.getEnabledListenerPackages(ctx)
+            .contains(ctx.packageName)
+    }
+    var fps by remember { mutableIntStateOf(0) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            var frames = 0
+            val start = withFrameNanos { it }
+            var t = start
+            while (t - start < 1_000_000_000L) {
+                t = withFrameNanos { it }
+                frames++
+            }
+            fps = frames
+        }
+    }
+    val wallCount = remember { listWalls(ctx).size }
+    InfoRow("Versión", version)
+    InfoRow("Permiso de música", if (listenerOn) "Activo" else "Falta permitir")
+    InfoRow("Fotogramas por segundo", fps.toString())
+    InfoRow("Apps instaladas", AppCache.apps.size.toString())
+    InfoRow("Fondos guardados", wallCount.toString())
+    InfoRow("Android", android.os.Build.VERSION.RELEASE + " (API " + android.os.Build.VERSION.SDK_INT + ")")
+    InfoRow("Dispositivo", android.os.Build.MODEL)
 }
