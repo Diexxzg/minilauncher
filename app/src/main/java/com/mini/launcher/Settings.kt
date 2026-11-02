@@ -266,7 +266,6 @@ fun InfoRow(label: String, value: String) {
         Text(value, color = Color(0xF2FFFFFF), fontSize = 16.sp, fontWeight = FontWeight.Normal)
     }
 }
-
 /**
  * Barra de categorias: un solo elemento enfocable. Izquierda/derecha cambia de
  * categoria, abajo entra a las opciones.
@@ -465,6 +464,12 @@ fun SettingsScreen(
                             cfg.rot
                         ) { cfg.setRot(it) }
                         SwitchRow("Transición suave", cfg.fade) { cfg.setFade(it) }
+                        ChoiceRow(
+                            "Fondo según app enfocada",
+                            listOf("Apagado", "Degradado", "Banner"),
+                            cfg.dynBg
+                        ) { cfg.setDynBg(it) }
+                        SwitchRow("Animar cambio de pantallas", cfg.screenAnim) { cfg.setScreenAnim(it) }
                         ChoiceRow("Brillo de color", GLOW_NAMES, style.glow) { onSet("glow", it) }
                         ChoiceRow(
                             "Color del brillo",
