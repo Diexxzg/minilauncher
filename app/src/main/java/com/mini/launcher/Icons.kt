@@ -186,3 +186,22 @@ fun LineIcon(kind: String, color: Color, s: Int = 24) {
         }
     }
 }
+
+
+@Composable
+fun PowerIcon(color: Color, s: Int = 22) {
+    Canvas(Modifier.size(s.dp)) {
+        val w = size.width
+        val sw = w * 0.09f
+        drawArc(
+            color = color,
+            startAngle = -50f,
+            sweepAngle = 280f,
+            useCenter = false,
+            topLeft = Offset(w * 0.16f, w * 0.18f),
+            size = Size(w * 0.68f, w * 0.68f),
+            style = Stroke(sw, cap = StrokeCap.Round)
+        )
+        drawLine(color, Offset(w * 0.5f, w * 0.1f), Offset(w * 0.5f, w * 0.48f), strokeWidth = sw, cap = StrokeCap.Round)
+    }
+}
