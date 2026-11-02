@@ -7,6 +7,8 @@ import androidx.compose.foundation.*
 import androidx.compose.foundation.gestures.BringIntoViewSpec
 import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.TextStyle
@@ -71,14 +73,14 @@ fun HomeScreen(
     onAll: () -> Unit,
     onSettings: () -> Unit,
     onWifi: () -> Unit,
-    onInputs: () -> Unit,
     cfg: Cfg,
     recents: List<AppInfo> = emptyList(),
     onMenu: (AppInfo) -> Unit = {},
     rows: List<Pair<String, List<AppInfo>>> = emptyList(),
     net: NetState = NetState(),
-    onVoice: () -> Unit = {},
-    onPower: () -> Unit = {},
+    onMore: () -> Unit = {},
+    moreBack: Int = 0,
+    onFocusApp: (AppInfo, Boolean) -> Unit = { _, _ -> },
     dockState: LazyListState? = null,
     focusTick: Int = 0
 ) {
@@ -91,6 +93,16 @@ fun HomeScreen(
     val ownState = rememberLazyListState()
     val dState = dockState ?: ownState
     var listenerOn by remember { mutableStateOf(true) }
+    // Al cerrar el panel "Mas" el foco vuelve al boton de tres puntos.
+    val moreFr = remember { FocusRequester() }
+    var seenMore by remember { mutableIntStateOf(moreBack) }
+    LaunchedEffect(moreBack) {
+        if (moreBack != seenMore) {
+            seenMore = moreBack
+            delay(150)
+            runCatching { moreFr.requestFocus() }
+        }
+    }
     LaunchedEffect(Unit) {
         while (true) {
             listenerOn = NotificationManagerCompat.getEnabledListenerPackages(ctx)
@@ -128,15 +140,13 @@ fun HomeScreen(
                 )
             }
             if (!cfg.bigClock) Clock(cfg.clock24)
-            GlassBox(onClick = onVoice, modifier = Modifier.size(44.dp), shape = CircleShape) {
-                MicIcon(Color.White)
-            }
-            GlassBox(onClick = onInputs, modifier = Modifier.size(44.dp), shape = CircleShape) {
-                InputIcon(Color.White)
-            }
             NetPill(net, onWifi)
-            GlassBox(onClick = onPower, modifier = Modifier.size(44.dp), shape = CircleShape) {
-                PowerIcon(Color.White)
+            GlassBox(
+                onClick = onMore,
+                modifier = Modifier.size(44.dp).focusRequester(moreFr),
+                shape = CircleShape
+            ) {
+                MoreIcon(Color.White)
             }
             GlassBox(onClick = onSettings, modifier = Modifier.size(44.dp), shape = CircleShape) {
                 GearIcon(Color.White)
@@ -169,7 +179,8 @@ fun HomeScreen(
                         itemsIndexed(dock, key = { _, app -> app.pkg }) { i, app ->
                             AppTile(
                                 app, if (i == 0) Modifier.autoFocusOn(focusTick) else Modifier,
-                                onLongClick = { onMenu(app) }
+                                onLongClick = { onMenu(app) },
+                                onFocusChange = { onFocusApp(app, it) }
                             ) { onLaunch(app) }
                         }
                         item(key = "all_apps") {
@@ -205,7 +216,8 @@ fun HomeScreen(
                                 items(recents, key = { it.pkg }) { app ->
                                     AppTile(
                                         app, Modifier, useSize = false, fixedScale = 0.85f, bannerStyle = true,
-                                        onLongClick = { onMenu(app) }
+                                        onLongClick = { onMenu(app) },
+                                        onFocusChange = { onFocusApp(app, it) }
                                     ) { onLaunch(app) }
                                 }
                             }
@@ -229,7 +241,8 @@ fun HomeScreen(
                             items(r.second, key = { it.pkg }) { app ->
                                 AppTile(
                                     app, Modifier, useSize = false, fixedScale = 0.8f,
-                                    onLongClick = { onMenu(app) }
+                                    onLongClick = { onMenu(app) },
+                                    onFocusChange = { onFocusApp(app, it) }
                                 ) { onLaunch(app) }
                             }
                         }
