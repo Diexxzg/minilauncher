@@ -86,6 +86,9 @@ val LocalSounds = compositionLocalOf { false }
 /** Volumen del sonido de navegacion (0..1). */
 val LocalSoundVol = compositionLocalOf { 0.3f }
 
+/** Estilo de foco de las fichas: 0 clasico, 1 aro grueso, 2 solo brillo, 3 solo escala. */
+val LocalFocusStyle = compositionLocalOf { 0 }
+
 /** Reproduce el sonido de foco a volumen bajo (si el sistema tiene los sonidos activados). */
 fun playSoftFocus(view: View, vol: Float) {
     val am = view.context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
@@ -175,14 +178,16 @@ fun GlassBox(
     val vol = LocalSoundVol.current
     val born = remember { SystemClock.elapsedRealtime() }
     val th = Themes.current
+    // Estilo de foco: solo afecta a las fichas con brillo (glow != null).
+    val fs = if (glow != null) LocalFocusStyle.current else 0
     // Sin rebote ni pulso: todo se mueve con curvas suaves y sin parpadeo.
     val sc = animateFloatAsState(
-        if (lit) 1.05f else 1f,
+        if (lit) (when (fs) { 2 -> 1f; 3 -> 1.09f; else -> 1.05f }) else 1f,
         tween(220, easing = FastOutSlowInEasing),
         label = "scale"
     )
     val lift = animateFloatAsState(
-        if (lit) 1f else 0f,
+        if (lit && fs != 2) 1f else 0f,
         tween(220, easing = FastOutSlowInEasing),
         label = "lift"
     )
@@ -193,7 +198,7 @@ fun GlassBox(
     val borderColor by animateColorAsState(
         if (lit) th.focusBorder else Color(0x26FFFFFF), tween(200), label = "border"
     )
-    val borderW by animateDpAsState(if (lit) 2.dp else 1.dp, tween(200), label = "borderW")
+    val borderW by animateDpAsState(if (lit) (if (fs == 1) 4.dp else 2.dp) else 1.dp, tween(200), label = "borderW")
     Box(
         modifier = modifier
             .zIndex(if (lit) 1f else 0f)
@@ -203,7 +208,7 @@ fun GlassBox(
                 translationY = -3.dp.toPx() * lift.value
             }
             .then(
-                if (glow != null) Modifier.softGlow(
+                if (glow != null && fs != 1 && fs != 3) Modifier.softGlow(
                     glow, glowLevel, { gl.value }, cornerDp
                 )
                 else Modifier
@@ -211,7 +216,7 @@ fun GlassBox(
             .clip(shape)
             .background(bgColor)
             .then(
-                if (glow == null) {
+                if (glow == null || (fs == 1 && lit)) {
                     Modifier.border(borderW, borderColor, shape)
                 } else {
                     Modifier
@@ -243,6 +248,7 @@ fun AppTile(
     useSize: Boolean = true,
     fixedScale: Float? = null,
     bannerStyle: Boolean = false,
+    tileStyle: Int = 0,
     onLongClick: (() -> Unit)? = null,
     onFocusChange: ((Boolean) -> Unit)? = null,
     preview: Boolean = false,
@@ -255,6 +261,9 @@ fun AppTile(
     val badges = LocalBadges.current
     val unread = badges.unread[app.pkg] ?: 0
     val isNew = app.pkg in badges.newPkgs
+    // Estilo de ficha (solo el dock lo pasa): medidas y forma.
+    val dims = tileDims(tileStyle)
+    val round = tileStyle == 3
     GlassBox(
         onClick = {
             val c = holder[0]
@@ -263,16 +272,27 @@ fun AppTile(
         },
         onLongClick = onLongClick,
         modifier = modifier
-            .size((144 * f).dp, (84 * f).dp)
+            .size((dims.first * f).dp, (dims.second * f).dp)
             .onGloballyPositioned { holder[0] = it },
-        shape = RoundedCornerShape(st.corner.dp),
+        shape = if (round) CircleShape else RoundedCornerShape(st.corner.dp),
         glow = LocalAccent.current ?: Color(app.glow),
         glowLevel = st.glow,
-        cornerDp = st.corner.dp,
+        cornerDp = if (round) (dims.second * f / 2f).dp else st.corner.dp,
         onFocusChange = onFocusChange,
         preview = preview
     ) {
-        if (app.banner) {
+        if (tileStyle >= 2) {
+            // Icono cuadrado o circulo: solo la imagen (el nombre sale en la tarjeta bajo el dock).
+            if (app.banner) {
+                Image(app.art, app.label, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+            } else {
+                Image(
+                    app.art, app.label,
+                    Modifier.fillMaxSize().padding((12 * f).dp),
+                    contentScale = ContentScale.Fit
+                )
+            }
+        } else if (app.banner) {
             Image(app.art, app.label, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
         } else if (bannerStyle) {
             // Apps sin banner: se les arma uno con el color de la app y su icono al centro.
@@ -364,7 +384,7 @@ fun Clock(h24: Boolean = false, size: TextUnit = 32.sp, ampmSize: TextUnit = 17.
 }
 
 @Composable
-fun DateText(modifier: Modifier = Modifier, size: TextUnit = 16.sp) {
+fun DateText(modifier: Modifier = Modifier, size: TextUnit = 16.sp, fmt: Int = 0) {
     var now by remember { mutableStateOf(Date()) }
     LaunchedEffect(Unit) {
         while (true) {
@@ -372,7 +392,7 @@ fun DateText(modifier: Modifier = Modifier, size: TextUnit = 16.sp) {
             delay(60_000)
         }
     }
-    val f = remember { SimpleDateFormat("EEEE, d 'de' MMMM", Locale.forLanguageTag("es-VE")) }
+    val f = remember(fmt) { SimpleDateFormat(datePattern(fmt), Locale.forLanguageTag("es-VE")) }
     Text(
         f.format(now).replaceFirstChar { it.uppercase() },
         color = Color(0xCCFFFFFF), fontSize = size,
