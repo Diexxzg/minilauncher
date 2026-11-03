@@ -171,6 +171,10 @@ fun HomeRoot(tick: Int, homeTick: Int, resumeTick: Int, appPaused: Boolean = fal
     // Actualizador (GitHub Releases): cuadro, aviso diario y vuelta del foco a Configuracion.
     val upd = remember { UpdaterState(ctx.applicationContext, prefs) }
     var updBack by remember { mutableIntStateOf(0) }
+    // Barra superior que se oculta sola: oculta, foco dentro de ella y aviso para reiniciar el conteo.
+    var barHidden by remember { mutableStateOf(false) }
+    var barFocus by remember { mutableStateOf(false) }
+    var barTick by remember { mutableIntStateOf(0) }
     var backdropApp by remember { mutableStateOf<AppInfo?>(null) }
     var prevScreen by remember { mutableStateOf("home") }
     var accentTarget by remember { mutableStateOf(Color.White) }
@@ -202,6 +206,21 @@ fun HomeRoot(tick: Int, homeTick: Int, resumeTick: Int, appPaused: Boolean = fal
 
     // Tecla Home: si ya estas en el inicio, vuelve al principio de la fila, devuelve el
     // foco a la primera ficha y sale del modo ambiente / menus.
+    // Barra superior oculta: solo con el inicio libre (sin paneles ni menus) y sin foco en la barra.
+    val barFree = screen == "home" && menuApp == null && !showMore && !showQuick &&
+        !showPower && pinAsk == null && !showSaverHint && !upd.visible
+    LaunchedEffect(cfg.hideBar, cfg.hideBarSecs, barFree, barFocus, barTick) {
+        barHidden = false
+        if (!cfg.hideBar || !barFree || barFocus) return@LaunchedEffect
+        while (true) {
+            delay(1000)
+            if (SystemClock.elapsedRealtime() - lastInput.longValue >= cfg.hideBarSecs * 1000L) {
+                barHidden = true
+                break
+            }
+        }
+    }
+
     // Limpia un APK viejo y, al volver del permiso de instalar, sigue con la instalacion.
     LaunchedEffect(Unit) { withContext(Dispatchers.IO) { upd.cleanOld() } }
     LaunchedEffect(resumeTick) { upd.onResume() }
@@ -256,8 +275,7 @@ fun HomeRoot(tick: Int, homeTick: Int, resumeTick: Int, appPaused: Boolean = fal
         walls = withContext(Dispatchers.IO) { listWalls(ctx) }
         lastInput.longValue = SystemClock.elapsedRealtime()
     }
-
-    LaunchedEffect(Unit) {
+        LaunchedEffect(Unit) {
         while (true) {
             delay(30_000)
             minute = System.currentTimeMillis() / 60_000L
@@ -350,7 +368,8 @@ fun HomeRoot(tick: Int, homeTick: Int, resumeTick: Int, appPaused: Boolean = fal
             }
         }
     }
-        BackHandler {
+
+    BackHandler {
         when {
             pinAsk != null -> pinAsk = null
             upd.visible -> {
@@ -532,9 +551,8 @@ fun HomeRoot(tick: Int, homeTick: Int, resumeTick: Int, appPaused: Boolean = fal
     }
         fun guarded(on: Boolean, then: () -> Unit) {
         if (on && cfg.pinSet) askVerify(then) else then()
-    }
-
-    fun createFlow() {
+        }
+            fun createFlow() {
         showPin("Crea un PIN de 4 dígitos") { first ->
             showPin("Repite el PIN") { second ->
                 if (second == first) {
@@ -588,7 +606,8 @@ fun HomeRoot(tick: Int, homeTick: Int, resumeTick: Int, appPaused: Boolean = fal
     }
 
     val dimColor by animateColorAsState(Color(dimLayer), tween(300), label = "dim")
-        // Desenfoque del fondo mientras hay un panel abierto (solo Android 12 o superior).
+
+    // Desenfoque del fondo mientras hay un panel abierto (solo Android 12 o superior).
     val panelOpen = screen == "settings" || screen == "edit" || screen == "inputs" ||
         menuApp != null || showPower
     val blurDp by animateDpAsState(
@@ -616,6 +635,11 @@ fun HomeRoot(tick: Int, homeTick: Int, resumeTick: Int, appPaused: Boolean = fal
             .onPreviewKeyEvent {
                 lastInput.longValue = SystemClock.elapsedRealtime()
                 val k = it.key
+                // Arriba con la barra oculta: la muestra (la tecla sigue su camino normal).
+                if (barHidden && it.type == KeyEventType.KeyDown && k == Key.DirectionUp) {
+                    barHidden = false
+                    barTick++
+                }
                 if (it.type == KeyEventType.KeyDown &&
                     (k == Key.Search || k == Key(AKey.KEYCODE_VOICE_ASSIST) || k == Key(AKey.KEYCODE_ASSIST)) &&
                     screen == "home" && pinAsk == null
@@ -675,6 +699,7 @@ fun HomeRoot(tick: Int, homeTick: Int, resumeTick: Int, appPaused: Boolean = fal
                     else -> null
                 },
                 LocalSounds provides cfg.sounds,
+                LocalFocusStyle provides (if (cfg.saver && cfg.focusStyle == 2) 1 else cfg.focusStyle),
                 LocalSoundVol provides (if (cfg.soundLevel == 2) 0.7f else 0.3f),
                 LocalBadges provides badges
             ) {
@@ -710,6 +735,9 @@ fun HomeRoot(tick: Int, homeTick: Int, resumeTick: Int, appPaused: Boolean = fal
                                             .focusProperties { canFocus = live && !showMore && !showQuick && !showSaverHint && !upd.visible }
                                     ) {
                                         HomeScreen(
+                                            tileStyle = cfg.tileStyle,
+                                            barHidden = barHidden,
+                                            onBarFocus = { barFocus = it },
                                             dock = dock,
                                             media = m,
                                             art = art,
@@ -785,7 +813,7 @@ fun HomeRoot(tick: Int, homeTick: Int, resumeTick: Int, appPaused: Boolean = fal
                                             }
                                         )
                                     }
-                                    AnimatedVisibility(
+                                                                        AnimatedVisibility(
                                         visible = s == "settings",
                                         enter = if (eAnim) {
                                             fadeIn(tween(240)) + slideInVertically(tween(280, easing = FastOutSlowInEasing)) { h -> h / 24 }
