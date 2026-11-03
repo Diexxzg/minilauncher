@@ -1,5 +1,8 @@
 # Novedades
 
+## 3.0.1
+- Atrás en Configuración se atiende antes que cualquier otra cosa para que una sola pulsación baste.
+
 ## 3.0
 - Atrás en Configuración va directo: dentro de una categoría vuelve a la lista y, desde la lista, cierra el panel con una sola pulsación.
 - Se quitó el buscador de Configuración.
