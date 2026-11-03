@@ -160,9 +160,8 @@ fun HomeRoot(tick: Int, homeTick: Int, resumeTick: Int, appPaused: Boolean = fal
     var showQuick by remember { mutableStateOf(false) }
     var quickBack by remember { mutableIntStateOf(0) }
     var appsLoaded by remember { mutableStateOf(AppCache.apps.isNotEmpty()) }
-    // Configuracion: -1 = lista de categorias; 0.. = categoria abierta. La busqueda tambien vive aqui para que Atras la borre.
+    // Configuracion: -1 = lista de categorias; 0.. = categoria abierta (vive aqui para que Atras funcione).
     var settingsCat by remember { mutableIntStateOf(-1) }
-    var settingsQuery by remember { mutableStateOf("") }
     var focusedApp by remember { mutableStateOf<AppInfo?>(null) }
     // Ultimo uso de cada app (tarjeta bajo el dock) y aviso de modo ahorro.
     var lastUsed by remember { mutableStateOf(prefs.lastUsedMap()) }
@@ -264,10 +263,7 @@ fun HomeRoot(tick: Int, homeTick: Int, resumeTick: Int, appPaused: Boolean = fal
     // Al cerrar Configuracion el inicio no se recompone: se devuelve el foco a la primera ficha.
     LaunchedEffect(screen) {
         if (screen == "home" && prevScreen == "settings") focusTick++
-        if (screen == "home") {
-            settingsCat = -1
-            settingsQuery = ""
-        }
+        if (screen == "home") settingsCat = -1
         prevScreen = screen
     }
 
@@ -280,9 +276,8 @@ fun HomeRoot(tick: Int, homeTick: Int, resumeTick: Int, appPaused: Boolean = fal
             delay(30_000)
             minute = System.currentTimeMillis() / 60_000L
         }
-    }
-
-    LaunchedEffect(tick) {
+        }
+            LaunchedEffect(tick) {
         // Un reemplazo de app dispara varios avisos seguidos: se espera un poco.
         if (tick > 0) delay(500)
         val loaded = withContext(Dispatchers.IO) { loadApps(ctx) }
@@ -392,7 +387,6 @@ fun HomeRoot(tick: Int, homeTick: Int, resumeTick: Int, appPaused: Boolean = fal
             }
             showPower -> showPower = false
             screen == "walls" || screen == "edit" || screen == "dock" -> screen = "settings"
-            screen == "settings" && settingsQuery.isNotEmpty() -> settingsQuery = ""
             screen == "settings" && settingsCat >= 0 -> settingsCat = -1
             screen == "hidden" -> screen = "all"
             else -> screen = "home"
@@ -534,8 +528,7 @@ fun HomeRoot(tick: Int, homeTick: Int, resumeTick: Int, appPaused: Boolean = fal
         pinErr = null
         pinAsk = PinAsk(title, onCode)
     }
-
-    fun askVerify(then: () -> Unit) {
+        fun askVerify(then: () -> Unit) {
         if (!cfg.pinSet) {
             then()
             return
@@ -795,13 +788,9 @@ fun HomeRoot(tick: Int, homeTick: Int, resumeTick: Int, appPaused: Boolean = fal
                                                 favs = if (p in favs) favs - p else favs + p
                                                 prefs.saveFavs(favs)
                                             },
-                                            onUp = { p ->
-                                                favs = move(favs, p, -1)
-                                                prefs.saveFavs(favs)
-                                            },
-                                            onDown = { p ->
-                                                favs = move(favs, p, 1)
-                                                prefs.saveFavs(favs)
+                                            onReorder = { l ->
+                                                favs = l
+                                                prefs.saveFavs(l)
                                             },
                                             onHide = { p ->
                                                 hidden = if (p in hidden) hidden - p else hidden + p
@@ -813,7 +802,7 @@ fun HomeRoot(tick: Int, homeTick: Int, resumeTick: Int, appPaused: Boolean = fal
                                             }
                                         )
                                     }
-                                                                        AnimatedVisibility(
+                                                                                                            AnimatedVisibility(
                                         visible = s == "settings",
                                         enter = if (eAnim) {
                                             fadeIn(tween(240)) + slideInVertically(tween(280, easing = FastOutSlowInEasing)) { h -> h / 24 }
@@ -840,8 +829,6 @@ fun HomeRoot(tick: Int, homeTick: Int, resumeTick: Int, appPaused: Boolean = fal
                                             },
                                             cat = settingsCat,
                                             onCat = { settingsCat = it },
-                                            query = settingsQuery,
-                                            onQuery = { settingsQuery = it },
                                             onProfile = { applyProfile(it) },
                                             onUpdate = { upd.open(scope) },
                                             updBack = updBack,
