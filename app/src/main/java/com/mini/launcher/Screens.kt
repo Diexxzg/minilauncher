@@ -90,7 +90,9 @@ fun HomeScreen(
     onQuick: () -> Unit = {},
     quickBack: Int = 0,
     focusedApp: AppInfo? = null,
-    lastUsed: Map<String, Long> = emptyMap()
+    lastUsed: Map<String, Long> = emptyMap(),
+    /** true mientras un panel lateral (Configuracion / Editar apps) ocupa la derecha. */
+    sidePanel: Boolean = false
 ) {
     val st = LocalDock.current
     val f = st.scalePct / 100f
@@ -146,13 +148,17 @@ fun HomeScreen(
                 if (cfg.showDate) DateText(Modifier.padding(top = 2.dp))
             }
         }
-        Row(
+        if (!sidePanel) Row(
             Modifier.align(Alignment.TopEnd).padding(32.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             if (media != null) {
-                if (cfg.showMusic && cfg.musicPos == 0) ScaledPill(media, art, cfg.musicSize)
+                if (cfg.showMusic && cfg.musicPos == 0) {
+                    Box(Modifier.focusProperties { down = dockFr }) {
+                        ScaledPill(media, art, cfg.musicSize)
+                    }
+                }
             } else if (!listenerOn) {
                 Text(
                     "Música: falta permitir el acceso a notificaciones",
@@ -178,8 +184,13 @@ fun HomeScreen(
                 GearIcon(Color.White)
             }
         }
-        if (media != null && cfg.showMusic && cfg.musicPos == 1) {
-            Box(Modifier.align(Alignment.TopCenter).padding(top = 32.dp)) {
+        if (media != null && cfg.showMusic && cfg.musicPos == 1 && !sidePanel) {
+            Box(
+                Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 32.dp)
+                    .focusProperties { down = dockFr }
+            ) {
                 ScaledPill(media, art, cfg.musicSize)
             }
         }
