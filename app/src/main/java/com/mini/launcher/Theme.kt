@@ -4,6 +4,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 
 /** Tema de color: acento de los paneles, fondo del cristal y color del foco. */
 class AppTheme(
@@ -29,7 +30,25 @@ object Themes {
 
     var current by mutableStateOf(list[0])
 
-    fun set(i: Int) {
-        current = list[i.coerceIn(0, list.lastIndex)]
+    /** custom != 0: color de acento propio (ARGB) en lugar de uno de los temas de la lista. */
+    fun set(i: Int, custom: Int = 0) {
+        current = if (custom != 0) customTheme(custom) else list[i.coerceIn(0, list.lastIndex)]
     }
+
+    /**
+     * Indice del tema a usar. Con el tema automatico: Oceano de dia (7:00 a 18:59) y
+     * Atardecer (calido) de noche; si no, el tema elegido.
+     */
+    fun pick(cfg: Cfg, hour: Int): Int =
+        if (cfg.autoTheme) (if (hour in 7..18) 1 else 3) else cfg.theme
+}
+
+/** Tema armado a partir de un solo color de acento. */
+fun customTheme(argb: Int): AppTheme {
+    val c = Color(argb)
+    return AppTheme(
+        "Propio", c, lerp(c, Color.Black, 0.25f),
+        Color(0xCC1B1D20), Color(0xCC121416),
+        c.copy(alpha = 0.33f), lerp(c, Color.White, 0.5f).copy(alpha = 0.87f)
+    )
 }
