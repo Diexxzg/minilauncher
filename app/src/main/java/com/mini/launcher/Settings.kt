@@ -65,8 +65,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.app.NotificationManagerCompat
 import androidx.compose.ui.text.style.TextOverflow
-import java.text.Normalizer
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.os.BatteryManager
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 
 private class Cat(val icon: String, val name: String, val desc: String)
 
@@ -376,32 +381,29 @@ fun GlassPanelFrame(content: @Composable () -> Unit) {
     }
 }
 
-// ---------- Buscador ----------
-
-/** Minusculas y sin acentos, para que "musica" encuentre "Música". */
-private fun norm(s: String): String =
-    Normalizer.normalize(s.lowercase(), Normalizer.Form.NFD).replace(Regex("\\p{Mn}+"), "")
+// ---------- Opciones ----------
 
 /**
- * Una opcion de Configuracion: categoria, texto buscable, seccion donde se agrupa y su fila.
+ * Una opcion de Configuracion: categoria, seccion donde se agrupa y su fila.
  * focusable = false para filas que solo muestran informacion (no reciben el foco inicial).
  * content recibe el Modifier que debe llevar la fila (aqui va el foco inicial).
  */
 private class SItem(
     val cat: Int,
     val label: String,
-    val keys: String = "",
     val sec: String = "",
     val focusable: Boolean = true,
     val content: @Composable (Modifier) -> Unit
 )
 
+/** Fila que abrio un sub-panel (fondos, apps, entradas): al volver, el foco regresa a ella. */
+private var returnKey: String? = null
 // ---------- Pantalla ----------
 
 /**
  * Configuracion en un panel a la derecha. Dos niveles: lista de categorias (cat = -1) y las
- * opciones de una categoria. cat y query viven en MainActivity para que Atras funcione:
- * primero borra la busqueda, luego vuelve a la lista y por ultimo cierra el panel.
+ * opciones de una categoria. cat vive en MainActivity para que Atras funcione: dentro de una
+ * categoria vuelve a la lista y desde la lista cierra el panel (una sola pulsacion cada vez).
  */
 @Composable
 fun SettingsScreen(
@@ -409,8 +411,6 @@ fun SettingsScreen(
     cfg: Cfg,
     cat: Int,
     onCat: (Int) -> Unit,
-    query: String,
-    onQuery: (String) -> Unit,
     onSet: (String, Int) -> Unit,
     onResetDock: () -> Unit,
     onWalls: () -> Unit,
@@ -434,93 +434,98 @@ fun SettingsScreen(
     // Ultima categoria abierta: al volver a la lista el foco regresa a ella.
     var lastCat by remember { mutableIntStateOf(if (cat >= 0) cat else 0) }
     LaunchedEffect(cat) { if (cat >= 0) lastCat = cat }
+    // Si venimos de un sub-panel, el foco vuelve a la fila que lo abrio (se lee una sola vez).
+    val retKey = remember { returnKey.also { returnKey = null } }
 
     val dateLabels = remember { dateFormatLabels() }
     val cityOpts = if (cfg.city in CITIES) CITIES else listOf(cfg.city) + CITIES
     // Perfil que coincide con los ajustes actuales (0 = personalizado).
     val profSel = profileIndex(style.scalePct, style.spacing, style.corner, style.glow, cfg)
 
-    // Todas las opciones en una sola lista: sirve para mostrar una categoria y para buscar.
+    // Todas las opciones en una sola lista; se muestra la de la categoria abierta.
     val items = buildList<SItem> {
         // ---- Apariencia ----
-        add(SItem(0, "Cambiar fondo de pantalla", "imagen video wallpaper", "Fondo") { m ->
-            ActionRow("Cambiar fondo de pantalla", m) { onWalls() }
+        add(SItem(0, "Cambiar fondo de pantalla", "Fondo") { m ->
+            ActionRow("Cambiar fondo de pantalla", m) {
+                returnKey = "Cambiar fondo de pantalla"
+                onWalls()
+            }
         })
-        add(SItem(0, "Rotación de fondos", "cambiar fondos hora", "Fondo") { m ->
+        add(SItem(0, "Rotación de fondos", "Fondo") { m ->
             ChoiceRow(
                 "Rotación de fondos",
                 listOf("Desactivada", "Cada 30 min", "Cada hora", "Según la hora"),
                 cfg.rot, m
             ) { cfg.setRot(it) }
         })
-        add(SItem(0, "Transición suave", "fundido fondo", "Fondo") { m ->
+        add(SItem(0, "Transición suave", "Fondo") { m ->
             SwitchRow("Transición suave", cfg.fade, m) { cfg.setFade(it) }
         })
-        add(SItem(0, "Pausar fondo animado", "video gif ahorrar recursos paneles", "Fondo") { m ->
+        add(SItem(0, "Pausar fondo animado", "Fondo") { m ->
             SwitchRow("Pausar fondo animado con paneles", cfg.pauseWall, m) { cfg.setPauseWall(it) }
         })
-        add(SItem(0, "Fondo según app enfocada", "degradado banner dinamico", "Fondo") { m ->
+        add(SItem(0, "Fondo según app enfocada", "Fondo") { m ->
             ChoiceRow(
                 "Fondo según app enfocada",
                 listOf("Apagado", "Degradado", "Banner"),
                 cfg.dynBg, m
             ) { cfg.setDynBg(it) }
         })
-        add(SItem(0, "Perfil de diseño", "cine compacto minimalista clasico estilo dock", "Diseño") { m ->
+        add(SItem(0, "Perfil de diseño", "Diseño") { m ->
             // Izquierda/derecha cambia de perfil; la opcion "Personalizado" solo indica el estado.
             ChoiceRow("Perfil de diseño", PROFILE_OPTIONS, profSel, m) {
                 onProfile(if (it > 0) it - 1 else 0)
             }
         })
-        add(SItem(0, "Tema de color", "colores acento", "Diseño") { m ->
+        add(SItem(0, "Tema de color", "Diseño") { m ->
             ChoiceRow("Tema de color", Themes.list.map { it.name }, cfg.theme, m) { cfg.setTheme(it) }
         })
-        add(SItem(0, "Brillo de color", "glow resplandor", "Diseño") { m ->
+        add(SItem(0, "Brillo de color", "Diseño") { m ->
             ChoiceRow("Brillo de color", GLOW_NAMES, style.glow, m) { onSet("glow", it) }
         })
-        add(SItem(0, "Color del brillo", "glow acento", "Diseño") { m ->
+        add(SItem(0, "Color del brillo", "Diseño") { m ->
             ChoiceRow(
                 "Color del brillo",
                 listOf("Color de cada app", "Color del fondo", "Color del tema"),
                 cfg.glowSrc, m
             ) { cfg.setGlowSrc(it) }
         })
-        add(SItem(0, "Estilo de foco", "foco aro grueso brillo escala resaltar seleccion", "Diseño") { m ->
+        add(SItem(0, "Estilo de foco", "Diseño") { m ->
             ChoiceRow("Estilo de foco", FOCUS_STYLES, cfg.focusStyle, m) { cfg.setFocusStyle(it) }
         })
-        add(SItem(0, "Oscurecer fondo", "brillo", "Diseño") { m ->
+        add(SItem(0, "Oscurecer fondo", "Diseño") { m ->
             SliderRow("Oscurecer fondo", cfg.dim, 0, 80, 5, "%", m) { cfg.setDim(it) }
         })
-        add(SItem(0, "Desenfoque al abrir paneles", "blur", "Diseño") { m ->
+        add(SItem(0, "Desenfoque al abrir paneles", "Diseño") { m ->
             SwitchRow("Desenfoque al abrir paneles", cfg.blur, m) { cfg.setBlur(it) }
         })
-        add(SItem(0, "Animar cambio de pantallas", "transiciones animaciones", "Diseño") { m ->
+        add(SItem(0, "Animar cambio de pantallas", "Diseño") { m ->
             SwitchRow("Animar cambio de pantallas", cfg.screenAnim, m) { cfg.setScreenAnim(it) }
         })
-        add(SItem(0, "Tamaño de la interfaz", "escala zoom", "Pantalla") { m ->
+        add(SItem(0, "Tamaño de la interfaz", "Pantalla") { m ->
             SliderRow("Tamaño de la interfaz", cfg.uiScale, 70, 130, 5, "%", m) { cfg.setUiScale(it) }
         })
-        add(SItem(0, "Margen de seguridad", "overscan bordes", "Pantalla") { m ->
+        add(SItem(0, "Margen de seguridad", "Pantalla") { m ->
             SliderRow("Margen de seguridad", cfg.overscan, 0, 60, 2, " dp", m) { cfg.setOverscan(it) }
         })
-        add(SItem(0, "Modo ahorro", "tv lenta rendimiento fps animaciones desenfoque brillo ahorrar", "Rendimiento y noche") { m ->
+        add(SItem(0, "Modo ahorro", "Rendimiento y noche") { m ->
             SwitchRow("Modo ahorro (TV modesta)", cfg.saver, m) { cfg.setSaver(it) }
         })
-        add(SItem(0, "Sugerir modo ahorro", "fps lento aviso rendimiento", "Rendimiento y noche") { m ->
+        add(SItem(0, "Sugerir modo ahorro", "Rendimiento y noche") { m ->
             SwitchRow("Sugerir modo ahorro si va lenta", cfg.saverHint, m) { cfg.setSaverHint(it) }
         })
-        add(SItem(0, "Modo noche automático", "noche brillo horario oscuro", "Rendimiento y noche") { m ->
+        add(SItem(0, "Modo noche automático", "Rendimiento y noche") { m ->
             SwitchRow("Modo noche automático", cfg.night, m) { cfg.setNight(it) }
         })
         if (cfg.night) {
-            add(SItem(0, "Noche desde", "modo noche hora inicio horario", "Rendimiento y noche") { m ->
+            add(SItem(0, "Noche desde", "Rendimiento y noche") { m ->
                 SliderRow("Noche desde las", cfg.nightFrom, 0, 23, 1, ":00", m) { cfg.setNightFrom(it) }
             })
-            add(SItem(0, "Noche hasta", "modo noche hora fin horario", "Rendimiento y noche") { m ->
+            add(SItem(0, "Noche hasta", "Rendimiento y noche") { m ->
                 SliderRow("Noche hasta las", cfg.nightTo, 0, 23, 1, ":00", m) { cfg.setNightTo(it) }
             })
         }
-        add(SItem(0, "Sonido al mover el foco", "audio clic", "Sonido") { m ->
+        add(SItem(0, "Sonido al mover el foco", "Sonido") { m ->
             ChoiceRow(
                 "Sonido al mover el foco",
                 listOf("Apagado", "Suave", "Medio"),
@@ -528,182 +533,188 @@ fun SettingsScreen(
             ) { cfg.setSoundLevel(it) }
         })
         // ---- Dock ----
-        add(SItem(1, "Tamaño general", "dock fichas escala", "Fichas") { m ->
+        add(SItem(1, "Tamaño general", "Fichas") { m ->
             SliderRow("Tamaño general", style.scalePct, 50, 180, 10, "%", m) { onSet("scale", it) }
         })
-        add(SItem(1, "Separación", "dock espacio", "Fichas") { m ->
+        add(SItem(1, "Separación", "Fichas") { m ->
             SliderRow("Separación", style.spacing, 0, 48, 2, " dp", m) { onSet("spacing", it) }
         })
-        add(SItem(1, "Redondeo", "dock esquinas", "Fichas") { m ->
+        add(SItem(1, "Redondeo", "Fichas") { m ->
             SliderRow("Redondeo", style.corner, 0, 40, 2, " dp", m) { onSet("corner", it) }
         })
-        add(SItem(1, "Margen inferior", "dock", "Fichas") { m ->
+        add(SItem(1, "Margen inferior", "Fichas") { m ->
             SliderRow("Margen inferior", style.bottom, 0, 80, 2, " dp", m) { onSet("bottom", it) }
         })
-        add(SItem(1, "Estilo de ficha", "banner 16:9 icono cuadrado circulo redondo dock fichas", "Fichas") { m ->
+        add(SItem(1, "Estilo de ficha", "Fichas") { m ->
             ChoiceRow("Estilo de ficha", TILE_STYLES, cfg.tileStyle, m) { cfg.setTileStyle(it) }
         })
-        add(SItem(1, "Tarjeta de la app enfocada", "nombre notificaciones ultimo uso texto bajo dock", "Información") { m ->
+        add(SItem(1, "Tarjeta de la app enfocada", "Información") { m ->
             SwitchRow("Tarjeta bajo el dock", cfg.focusCard, m) { cfg.setFocusCard(it) }
         })
-        add(SItem(1, "Fila extra 1", "streaming juegos filas", "Filas extra") { m ->
+        add(SItem(1, "Fila extra 1", "Filas extra") { m ->
             ChoiceRow("Fila extra 1", ROW_NAMES, cfg.row(0), m) { cfg.setRow(0, it) }
         })
-        add(SItem(1, "Fila extra 2", "streaming juegos filas", "Filas extra") { m ->
+        add(SItem(1, "Fila extra 2", "Filas extra") { m ->
             ChoiceRow("Fila extra 2", ROW_NAMES, cfg.row(1), m) { cfg.setRow(1, it) }
         })
-        add(SItem(1, "Fila extra 3", "streaming juegos filas", "Filas extra") { m ->
+        add(SItem(1, "Fila extra 3", "Filas extra") { m ->
             ChoiceRow("Fila extra 3", ROW_NAMES, cfg.row(2), m) { cfg.setRow(2, it) }
         })
-        add(SItem(1, "Asignar apps", "filas mantén ok", "Filas extra", false) {
+        add(SItem(1, "Asignar apps", "Filas extra", false) {
             InfoRow("Asignar apps", "mantén OK en la app")
         })
-        add(SItem(1, "Restablecer dock", "reiniciar valores", "Restablecer") { m ->
+        add(SItem(1, "Restablecer dock", "Restablecer") { m ->
             ActionRow("Restablecer dock", m) { onResetDock() }
         })
         // ---- Inicio ----
-        add(SItem(2, "Reloj grande", "", "Reloj y fecha") { m ->
+        add(SItem(2, "Reloj grande", "Reloj y fecha") { m ->
             SwitchRow("Reloj grande", cfg.bigClock, m) { cfg.setBigClock(it) }
         })
-        add(SItem(2, "Formato de hora", "12 24 horas reloj", "Reloj y fecha") { m ->
+        add(SItem(2, "Formato de hora", "Reloj y fecha") { m ->
             ChoiceRow("Formato de hora", listOf("12 horas", "24 horas"), if (cfg.clock24) 1 else 0, m) {
                 cfg.setClock24(it == 1)
             }
         })
-        add(SItem(2, "Mostrar fecha", "", "Reloj y fecha") { m ->
+        add(SItem(2, "Mostrar fecha", "Reloj y fecha") { m ->
             SwitchRow("Mostrar fecha", cfg.showDate, m) { cfg.setShowDate(it) }
         })
-        add(SItem(2, "Formato de fecha", "fecha dia mes año formato", "Reloj y fecha") { m ->
+        add(SItem(2, "Formato de fecha", "Reloj y fecha") { m ->
             ChoiceRow("Formato de fecha", dateLabels, cfg.dateFmt, m) { cfg.setDateFmt(it) }
         })
-        add(SItem(2, "Mostrar clima", "tiempo temperatura", "Clima") { m ->
+        add(SItem(2, "Mostrar clima", "Clima") { m ->
             SwitchRow("Mostrar clima", cfg.showWeather, m) { cfg.setShowWeather(it) }
         })
-        add(SItem(2, "Ciudad del clima", "tiempo ubicación", "Clima") { m ->
+        add(SItem(2, "Ciudad del clima", "Clima") { m ->
             ChoiceRow("Ciudad del clima", cityOpts, cityOpts.indexOf(cfg.city), m) {
                 cfg.setCity(cityOpts[it])
             }
         })
-        add(SItem(2, "Unidades", "celsius fahrenheit grados temperatura", "Clima") { m ->
+        add(SItem(2, "Unidades", "Clima") { m ->
             ChoiceRow("Unidades", listOf("°C", "°F"), if (cfg.fahrenheit) 1 else 0, m) {
                 cfg.setFahrenheit(it == 1)
             }
         })
-        add(SItem(2, "Mostrar recientes", "historial", "Contenido") { m ->
+        add(SItem(2, "Mostrar recientes", "Contenido") { m ->
             SwitchRow("Mostrar recientes", cfg.showRecents, m) { cfg.setShowRecents(it) }
         })
-        add(SItem(2, "Botón de voz", "micrófono asistente búsqueda", "Contenido") { m ->
+        add(SItem(2, "Botón de voz", "Contenido") { m ->
             ChoiceRow(
                 "Botón de voz",
                 listOf("Asistente de voz", "Buscar apps"),
                 cfg.voiceMode, m
             ) { cfg.setVoiceMode(it) }
         })
-        add(SItem(2, "Ocultar barra superior", "barra oculta automatica arriba botones", "Barra superior") { m ->
+        add(SItem(2, "Ocultar barra superior", "Barra superior") { m ->
             SwitchRow("Ocultar la barra superior sola", cfg.hideBar, m) { cfg.setHideBar(it) }
         })
         if (cfg.hideBar) {
-            add(SItem(2, "Ocultar tras", "barra superior segundos tiempo", "Barra superior") { m ->
+            add(SItem(2, "Ocultar tras", "Barra superior") { m ->
                 SliderRow("Ocultar tras", cfg.hideBarSecs, 3, 60, 3, " s", m) { cfg.setHideBarSecs(it) }
             })
         }
-                add(SItem(2, "Modo ambiente", "protector reposo", "Reposo") { m ->
+                add(SItem(2, "Modo ambiente", "Reposo") { m ->
             ChoiceRow(
                 "Modo ambiente",
                 listOf("Desactivado", "2 min", "5 min", "10 min", "20 min"),
                 cfg.ambient, m
             ) { cfg.setAmbient(it) }
         })
-        add(SItem(2, "Protección contra quemado", "ambiente reloj mover pantalla oled", "Reposo") { m ->
+        add(SItem(2, "Protección contra quemado", "Reposo") { m ->
             SwitchRow("Mover el reloj en modo ambiente", cfg.burnIn, m) { cfg.setBurnIn(it) }
         })
         // ---- Música ----
-        add(SItem(3, "Mostrar reproductor", "música", "Reproductor") { m ->
+        add(SItem(3, "Mostrar reproductor", "Reproductor") { m ->
             SwitchRow("Mostrar reproductor", cfg.showMusic, m) { cfg.setShowMusic(it) }
         })
-        add(SItem(3, "Tamaño del reproductor", "música", "Reproductor") { m ->
+        add(SItem(3, "Tamaño del reproductor", "Reproductor") { m ->
             SliderRow("Tamaño del reproductor", cfg.musicSize, 50, 120, 5, "%", m) { cfg.setMusicSize(it) }
         })
-        add(SItem(3, "Posición del reproductor", "música", "Reproductor") { m ->
+        add(SItem(3, "Posición del reproductor", "Reproductor") { m ->
             ChoiceRow(
                 "Posición del reproductor",
                 listOf("Junto al reloj", "Arriba al centro"),
                 cfg.musicPos, m
             ) { cfg.setMusicPos(it) }
         })
-        add(SItem(3, "Permitir acceso a notificaciones", "música permiso", "Permisos") { m ->
+        add(SItem(3, "Permitir acceso a notificaciones", "Permisos") { m ->
             ActionRow("Permitir acceso a notificaciones", m) {
                 tryStart(ctx, "android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS")
             }
         })
         // ---- Apps ----
-        add(SItem(4, "Editar apps", "favoritas orden tamaño ocultas", "Organizar") { m ->
-            ActionRow("Editar apps (favoritas, orden, tamaño, ocultas)", m) { onEdit() }
+        add(SItem(4, "Editar apps", "Organizar") { m ->
+            ActionRow("Editar apps (favoritas, orden, tamaño, ocultas)", m) {
+                returnKey = "Editar apps"
+                onEdit()
+            }
         })
         // ---- Sistema ----
-        add(SItem(5, "Wi-Fi", "red internet", "Conexiones") { m ->
+        add(SItem(5, "Wi-Fi", "Conexiones") { m ->
             ActionRow("Wi-Fi", m) { onOpen("wifi") }
         })
-        add(SItem(5, "Bluetooth", "control audífonos", "Conexiones") { m ->
+        add(SItem(5, "Bluetooth", "Conexiones") { m ->
             ActionRow("Bluetooth", m) { onOpen("bt") }
         })
-        add(SItem(5, "Entradas (HDMI)", "fuentes", "Conexiones") { m ->
-            ActionRow("Entradas (HDMI)", m) { onInputs() }
+        add(SItem(5, "Entradas (HDMI)", "Conexiones") { m ->
+            ActionRow("Entradas (HDMI)", m) {
+                returnKey = "Entradas (HDMI)"
+                onInputs()
+            }
         })
-        add(SItem(5, "Permitir nombre de red y Bluetooth", "permiso ubicación", "Conexiones") { m ->
+        add(SItem(5, "Permitir nombre de red y Bluetooth", "Conexiones") { m ->
             ActionRow("Permitir nombre de red y Bluetooth", m) { onNetPerm() }
         })
-        add(SItem(5, "Todos los ajustes de Android", "sistema", "Sistema") { m ->
+        add(SItem(5, "Todos los ajustes de Android", "Sistema") { m ->
             ActionRow("Todos los ajustes de Android", m) { onOpen("all") }
         })
-        add(SItem(5, "Menú de energía (accesibilidad)", "apagar reiniciar", "Sistema") { m ->
+        add(SItem(5, "Menú de energía (accesibilidad)", "Sistema") { m ->
             ActionRow("Menú de energía (accesibilidad)", m) { onOpen("access") }
         })
-        add(SItem(5, "Protector de pantalla del sistema", "dream", "Sistema") { m ->
+        add(SItem(5, "Protector de pantalla del sistema", "Sistema") { m ->
             ActionRow("Protector de pantalla del sistema", m) { onOpen("dream") }
         })
-        add(SItem(5, "Establecer como inicio predeterminado", "launcher home", "Sistema") { m ->
+        add(SItem(5, "Establecer como inicio predeterminado", "Sistema") { m ->
             ActionRow("Establecer como inicio predeterminado", m) { onSetHome() }
         })
         // ---- Seguridad ----
         if (!cfg.pinSet) {
-            add(SItem(6, "Estado del PIN", "", "Código PIN", false) { InfoRow("Estado", "Sin PIN") })
-            add(SItem(6, "Crear PIN de 4 dígitos", "contraseña bloqueo", "Código PIN") { m ->
+            add(SItem(6, "Estado del PIN", "Código PIN", false) { InfoRow("Estado", "Sin PIN") })
+            add(SItem(6, "Crear PIN de 4 dígitos", "Código PIN") { m ->
                 ActionRow("Crear PIN de 4 dígitos", m) { onPin("create") }
             })
         } else {
-            add(SItem(6, "Estado del PIN", "", "Código PIN", false) { InfoRow("Estado", "PIN activo") })
-            add(SItem(6, "Cambiar PIN", "contraseña", "Código PIN") { m ->
+            add(SItem(6, "Estado del PIN", "Código PIN", false) { InfoRow("Estado", "PIN activo") })
+            add(SItem(6, "Cambiar PIN", "Código PIN") { m ->
                 ActionRow("Cambiar PIN", m) { onPin("change") }
             })
-            add(SItem(6, "Quitar PIN", "contraseña", "Código PIN") { m ->
+            add(SItem(6, "Quitar PIN", "Código PIN") { m ->
                 ActionRow("Quitar PIN", m) { onPin("remove") }
             })
-            add(SItem(6, "Proteger ajustes", "bloqueo pin", "Protección") { m ->
+            add(SItem(6, "Proteger ajustes", "Protección") { m ->
                 SwitchRow("Proteger ajustes", cfg.lockSettings, m) { cfg.setLockSettings(it) }
             })
-            add(SItem(6, "Proteger apps ocultas", "bloqueo pin", "Protección") { m ->
+            add(SItem(6, "Proteger apps ocultas", "Protección") { m ->
                 SwitchRow("Proteger apps ocultas", cfg.lockHidden, m) { cfg.setLockHidden(it) }
             })
         }
         // ---- Acerca de ----
-        add(SItem(7, "Guardar copia de seguridad", "backup respaldo", "Copias de seguridad") { m ->
+        add(SItem(7, "Guardar copia de seguridad", "Copias de seguridad") { m ->
             ActionRow("Guardar copia de seguridad", m) { onBackup() }
         })
-        add(SItem(7, "Restaurar copia de seguridad", "backup respaldo", "Copias de seguridad") { m ->
+        add(SItem(7, "Restaurar copia de seguridad", "Copias de seguridad") { m ->
             ActionRow("Restaurar copia de seguridad", m) { onRestore() }
         })
-        add(SItem(7, "Guardar copia en…", "backup respaldo elegir carpeta usb ubicación", "Copias de seguridad") { m ->
+        add(SItem(7, "Guardar copia en…", "Copias de seguridad") { m ->
             ActionRow("Guardar copia en… (elegir dónde)", m) { onBackupSave() }
         })
-        add(SItem(7, "Compartir copia de seguridad", "backup respaldo enviar archivo", "Copias de seguridad") { m ->
+        add(SItem(7, "Compartir copia de seguridad", "Copias de seguridad") { m ->
             ActionRow("Compartir copia de seguridad", m) { onBackupShare() }
         })
-        add(SItem(7, "Restaurar desde un archivo…", "backup respaldo elegir archivo importar", "Copias de seguridad") { m ->
+        add(SItem(7, "Restaurar desde un archivo…", "Copias de seguridad") { m ->
             ActionRow("Restaurar desde un archivo…", m) { onRestorePick() }
         })
         // Actualizaciones desde GitHub Releases.
-        add(SItem(7, "Buscar actualizaciones", "actualizar version nueva update descargar instalar", "Actualizaciones") { m ->
+        add(SItem(7, "Buscar actualizaciones", "Actualizaciones") { m ->
             val fr = remember { FocusRequester() }
             LaunchedEffect(updBack) {
                 if (updBack > 0) {
@@ -713,38 +724,22 @@ fun SettingsScreen(
             }
             ActionRow("Buscar actualizaciones", m.focusRequester(fr)) { onUpdate() }
         })
-        add(SItem(7, "Avisar de actualizaciones", "actualizar aviso diario version nueva", "Actualizaciones") { m ->
+        add(SItem(7, "Avisar de actualizaciones", "Actualizaciones") { m ->
             SwitchRow("Avisar si hay versión nueva (1 vez al día)", cfg.updateCheck, m) { cfg.setUpdateCheck(it) }
         })
     }
 
-    val q = norm(query.trim())
-    val searching = q.isNotEmpty()
-    val words = q.split(" ").filter { it.isNotEmpty() }
-    val shown = if (searching) {
-        items.filter { si ->
-            val hay = norm(si.label + " " + si.keys + " " + si.sec + " " + CATS[si.cat].name)
-            words.all { w -> hay.contains(w) }
-        }
-    } else if (cat >= 0) {
-        items.filter { it.cat == cat }
-    } else {
-        emptyList()
-    }
-    val inCat = cat in 0..CATS.lastIndex && !searching
-    val title = when {
-        searching -> "Resultados"
-        inCat -> CATS[cat].name
-        else -> "¿Qué quieres cambiar?"
-    }
+    val shown = if (cat >= 0) items.filter { it.cat == cat } else emptyList()
+    val inCat = cat in 0..CATS.lastIndex
+    val title = if (inCat) CATS[cat].name else "¿Qué quieres cambiar?"
     val subtitle = when {
-        searching -> if (shown.size == 1) "1 opción" else shown.size.toString() + " opciones"
         inCat && cat <= 1 -> "Los cambios se ven en vivo a la izquierda"
         inCat -> CATS[cat].desc
-        else -> "Elige una categoría o busca una opción"
+        else -> "Elige una categoría"
     }
-    val scroll = remember(cat, searching) { androidx.compose.foundation.ScrollState(0) }
-    val firstFocus = shown.firstOrNull { it.focusable }
+    val scroll = remember(cat) { androidx.compose.foundation.ScrollState(0) }
+    val focusItem = (if (retKey != null) shown.firstOrNull { it.focusable && it.label == retKey } else null)
+        ?: shown.firstOrNull { it.focusable }
 
     GlassPanelFrame {
         Column(
@@ -776,13 +771,6 @@ fun SettingsScreen(
                 modifier = Modifier.padding(start = 6.dp, top = 2.dp)
             )
             Spacer(Modifier.height(12.dp))
-            SearchField(
-                value = query,
-                onChange = onQuery,
-                modifier = Modifier.fillMaxWidth().height(42.dp),
-                placeholder = "Buscar en configuración…"
-            )
-            Spacer(Modifier.height(10.dp))
             Box(Modifier.fillMaxWidth().height(1.dp).background(Color(0x22FFFFFF)))
             Spacer(Modifier.height(4.dp))
             Column(
@@ -792,30 +780,27 @@ fun SettingsScreen(
                     .verticalScroll(scroll),
                 verticalArrangement = Arrangement.spacedBy(2.dp)
             ) {
-                if (!searching && cat < 0) {
+                if (cat < 0) {
                     CATS.forEachIndexed { i, c ->
                         CategoryRow(
                             c.icon, c.name, c.desc,
                             if (i == lastCat) Modifier.autoFocus() else Modifier
                         ) { onCat(i) }
                     }
+                } else if (cat == 7) {
+                    AboutPage(
+                        cfg = cfg,
+                        updItems = shown.filter { it.sec == "Actualizaciones" },
+                        bakItems = shown.filter { it.sec == "Copias de seguridad" }
+                    )
                 } else {
-                    if (cat == 7 && !searching) {
-                        SectionLabel("Esta TV")
-                        AboutInfo()
-                    }
-                    if (searching && shown.isEmpty()) {
-                        InfoRow("Sin resultados", "")
-                    }
                     var lastGroup = ""
                     for (si in shown) {
-                        val group = if (searching) CATS[si.cat].name else si.sec
+                        val group = si.sec
                         if (group.isNotEmpty() && group != lastGroup) SectionLabel(group)
                         lastGroup = group
                         key(si.cat to si.label) {
-                            si.content(
-                                if (!searching && si === firstFocus) Modifier.autoFocus() else Modifier
-                            )
+                            si.content(if (si === focusItem) Modifier.autoFocus() else Modifier)
                         }
                     }
                 }
@@ -823,20 +808,183 @@ fun SettingsScreen(
         }
     }
 }
+// ---------- Acerca de ----------
 
-/** Datos de la app y del equipo (categoria "Acerca de"). */
+/** Datos que cambian con el tiempo o que se leen del sistema (se refrescan cada pocos segundos). */
+private class AboutSnap(
+    val res: String,
+    val dpi: Int,
+    val hz: Int,
+    val storage: String,
+    val ram: String,
+    val temp: String?,
+    val net: List<Pair<String, String>>
+)
+
+private fun fmtBytes(b: Long): String {
+    val gb = b / 1073741824.0
+    return if (gb >= 1.0) {
+        String.format(java.util.Locale.forLanguageTag("es-VE"), "%.1f GB", gb)
+    } else {
+        (b / 1048576L).toString() + " MB"
+    }
+}
+
+/** Temperatura del equipo si la TV la deja leer (zona termica o bateria); si no, null. */
+private fun readTemp(ctx: Context): String? {
+    for (i in 0..9) {
+        val f = java.io.File("/sys/class/thermal/thermal_zone" + i + "/temp")
+        val raw = runCatching { f.readText().trim().toDoubleOrNull() }.getOrNull() ?: continue
+        val c = if (raw > 1000.0) raw / 1000.0 else raw
+        if (c in 15.0..120.0) return Math.round(c).toString() + " °C"
+    }
+    try {
+        val bi = ctx.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+        val t = bi?.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, 0) ?: 0
+        val present = bi?.getBooleanExtra(BatteryManager.EXTRA_PRESENT, false) ?: false
+        if (present && t > 0) return Math.round(t / 10.0).toString() + " °C"
+    } catch (e: Exception) {
+    }
+    return null
+}
+
+/** Primera direccion IPv4 de la TV (sin permisos). */
+private fun localIp(): String? {
+    try {
+        val ifs = java.net.NetworkInterface.getNetworkInterfaces() ?: return null
+        for (ni in java.util.Collections.list(ifs)) {
+            if (!ni.isUp || ni.isLoopback) continue
+            for (a in java.util.Collections.list(ni.inetAddresses)) {
+                if (!a.isLoopbackAddress && a is java.net.Inet4Address) return a.hostAddress
+            }
+        }
+    } catch (e: Exception) {
+    }
+    return null
+}
+
+@Suppress("DEPRECATION")
+private fun readAboutSnap(ctx: Context): AboutSnap {
+    var res = "?"
+    var dpi = 0
+    var hz = 0
+    try {
+        val wm = ctx.getSystemService(Context.WINDOW_SERVICE) as android.view.WindowManager
+        val dm = android.util.DisplayMetrics()
+        wm.defaultDisplay.getRealMetrics(dm)
+        res = dm.widthPixels.toString() + " × " + dm.heightPixels.toString()
+        dpi = dm.densityDpi
+        hz = Math.round(wm.defaultDisplay.refreshRate)
+    } catch (e: Exception) {
+    }
+    var storage = "No disponible"
+    try {
+        val st = android.os.StatFs(android.os.Environment.getDataDirectory().path)
+        val total = st.blockCountLong * st.blockSizeLong
+        val free = st.availableBlocksLong * st.blockSizeLong
+        storage = fmtBytes(free) + " libres de " + fmtBytes(total)
+    } catch (e: Exception) {
+    }
+    var ram = "No disponible"
+    try {
+        val am = ctx.getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
+        val mi = android.app.ActivityManager.MemoryInfo()
+        am.getMemoryInfo(mi)
+        ram = fmtBytes(mi.availMem) + " libres de " + fmtBytes(mi.totalMem)
+    } catch (e: Exception) {
+    }
+    val ns = readNet(ctx)
+    val net = ArrayList<Pair<String, String>>()
+    val kindName = when (ns.kind) {
+        1 -> "Wi-Fi"
+        2 -> "Ethernet"
+        3 -> "Otra"
+        else -> "Sin conexión"
+    }
+    val inetName = when {
+        ns.kind == 0 -> "—"
+        ns.online -> "Disponible"
+        else -> "Sin salida a internet"
+    }
+    net.add(Pair("Conexión", kindName))
+    net.add(Pair("Internet", inetName))
+    if (ns.kind == 1) {
+        net.add(Pair("Red Wi-Fi", ns.ssid ?: "No visible (falta el permiso de ubicación)"))
+    }
+    net.add(Pair("Dirección IP", localIp() ?: "—"))
+    val btName = if (ns.bt) {
+        if (ns.btCount > 0) "Activado · " + ns.btCount.toString() + " conectado(s)" else "Activado"
+    } else {
+        "Apagado"
+    }
+    net.add(Pair("Bluetooth", btName))
+    return AboutSnap(res, dpi, hz, storage, ram, readTemp(ctx), net)
+}
+
+/**
+ * Tarjeta de solo lectura. Es una sola parada de foco: con las flechas se salta de tarjeta en
+ * tarjeta y el panel se desplaza solo, asi se puede leer todo sin que el foco se pierda.
+ */
 @Composable
-private fun AboutInfo() {
+private fun InfoCard(lines: List<Pair<String, String>>, modifier: Modifier = Modifier) {
+    var focused by remember { mutableStateOf(false) }
+    val shape = RoundedCornerShape(14.dp)
+    Column(
+        modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .background(if (focused) Color(0x2BFFFFFF) else Color(0x0DFFFFFF))
+            .then(if (focused) Modifier.border(1.dp, Color(0x66FFFFFF), shape) else Modifier)
+            .onFocusChanged { focused = it.isFocused }
+            .focusable()
+            .padding(horizontal = 18.dp, vertical = 8.dp)
+    ) {
+        for (line in lines) {
+            Row(
+                Modifier.fillMaxWidth().padding(vertical = 5.dp),
+                verticalAlignment = Alignment.Top
+            ) {
+                Text(
+                    line.first, color = Color(0xA6FFFFFF), fontSize = 17.sp,
+                    modifier = Modifier.weight(0.42f).padding(end = 10.dp)
+                )
+                Text(
+                    line.second, color = Color.White, fontSize = 18.sp,
+                    textAlign = TextAlign.End, modifier = Modifier.weight(0.58f)
+                )
+            }
+        }
+    }
+}
+
+/** Linea fina que separa la informacion de las opciones. */
+@Composable
+private fun OptionsDivider() {
+    Spacer(Modifier.height(6.dp))
+    Box(Modifier.fillMaxWidth().padding(horizontal = 10.dp).height(1.dp).background(Color(0x1FFFFFFF)))
+    Spacer(Modifier.height(4.dp))
+}
+
+/**
+ * Categoria "Acerca de", por secciones. La informacion va en tarjetas de solo lectura y las
+ * opciones (actualizaciones y copias de seguridad) en filas aparte debajo de su seccion.
+ */
+@Suppress("DEPRECATION")
+@Composable
+private fun AboutPage(cfg: Cfg, updItems: List<SItem>, bakItems: List<SItem>) {
     val ctx = LocalContext.current
     val version = remember {
-        runCatching {
-            ctx.packageManager.getPackageInfo(ctx.packageName, 0).versionName
-        }.getOrNull() ?: "?"
+        runCatching { ctx.packageManager.getPackageInfo(ctx.packageName, 0).versionName }.getOrNull() ?: "?"
+    }
+    val code = remember {
+        runCatching { ctx.packageManager.getPackageInfo(ctx.packageName, 0).versionCode.toString() }
+            .getOrNull() ?: "?"
     }
     val listenerOn = remember {
-        NotificationManagerCompat.getEnabledListenerPackages(ctx)
-            .contains(ctx.packageName)
+        NotificationManagerCompat.getEnabledListenerPackages(ctx).contains(ctx.packageName)
     }
+    val wallCount = remember { listWalls(ctx).size }
+
     var fps by remember { mutableIntStateOf(0) }
     LaunchedEffect(Unit) {
         while (true) {
@@ -850,12 +998,60 @@ private fun AboutInfo() {
             fps = frames
         }
     }
-    val wallCount = remember { listWalls(ctx).size }
-    InfoRow("Versión", version)
-    InfoRow("Permiso de música", if (listenerOn) "Activo" else "Falta permitir")
-    InfoRow("Fotogramas por segundo", fps.toString())
-    InfoRow("Apps instaladas", AppCache.apps.size.toString())
-    InfoRow("Fondos guardados", wallCount.toString())
-    InfoRow("Android", android.os.Build.VERSION.RELEASE + " (API " + android.os.Build.VERSION.SDK_INT + ")")
-    InfoRow("Dispositivo", android.os.Build.MODEL)
+
+    var snap by remember { mutableStateOf(readAboutSnap(ctx)) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(4000)
+            snap = withContext(Dispatchers.IO) { readAboutSnap(ctx) }
+        }
+    }
+
+    SectionLabel("Versión y actualizaciones")
+    InfoCard(
+        listOf("Versión" to version, "Código de versión" to code),
+        Modifier.autoFocus()
+    )
+    OptionsDivider()
+    for (si in updItems) key(si.label) { si.content(Modifier) }
+
+    SectionLabel("Equipo")
+    InfoCard(
+        listOf(
+            "Dispositivo" to android.os.Build.MODEL,
+            "Fabricante" to android.os.Build.MANUFACTURER.replaceFirstChar { it.uppercase() },
+            "Android" to android.os.Build.VERSION.RELEASE + " (API " + android.os.Build.VERSION.SDK_INT + ")",
+            "Procesador" to (android.os.Build.SUPPORTED_ABIS.firstOrNull() ?: "?") + " · " +
+                Runtime.getRuntime().availableProcessors() + " núcleos",
+            "Apps instaladas" to AppCache.apps.size.toString(),
+            "Fondos guardados" to wallCount.toString(),
+            "Permiso de música" to if (listenerOn) "Activo" else "Falta permitir",
+            "Fotogramas por segundo" to fps.toString()
+        )
+    )
+
+    SectionLabel("Pantalla")
+    InfoCard(
+        listOf(
+            "Resolución" to snap.res,
+            "Densidad" to snap.dpi.toString() + " dpi",
+            "Frecuencia" to snap.hz.toString() + " Hz",
+            "Tamaño de la interfaz" to cfg.uiScale.toString() + " %",
+            "Margen de seguridad" to cfg.overscan.toString() + " dp"
+        )
+    )
+
+    SectionLabel("Almacenamiento y memoria")
+    val mem = ArrayList<Pair<String, String>>()
+    mem.add("Almacenamiento" to snap.storage)
+    mem.add("Memoria (RAM)" to snap.ram)
+    val temp = snap.temp
+    if (temp != null) mem.add("Temperatura" to temp)
+    InfoCard(mem)
+
+    SectionLabel("Red")
+    InfoCard(snap.net)
+
+    SectionLabel("Copias de seguridad")
+    for (si in bakItems) key(si.label) { si.content(Modifier) }
 }
