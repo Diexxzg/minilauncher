@@ -46,6 +46,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import android.content.Context
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import android.content.Intent
 import android.media.tv.TvContract
 import android.media.tv.TvInputManager
@@ -555,9 +557,26 @@ fun openInput(ctx: Context, id: String) {
     }
 }
 
+/** Iconos que se pueden poner a una entrada (el primero es "sin icono"). */
+val INPUT_ICONS = listOf("Sin icono", "📺", "🎮", "💻", "📀", "🔌", "🎬", "🎵")
+
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun InputsPanel(items: List<InputItem>, onPick: (String) -> Unit, onClose: () -> Unit) {
+fun InputsPanel(
+    items: List<InputItem>,
+    onPick: (String) -> Unit,
+    onClose: () -> Unit,
+    /** Con prefs, mantener OK permite renombrar, poner icono y ocultar (mejora 29). */
+    prefs: Prefs? = null
+) {
     val shape = RoundedCornerShape(28.dp)
+    var names by remember { mutableStateOf(prefs?.inputNames() ?: emptyMap()) }
+    var hiddenIds by remember { mutableStateOf(prefs?.hiddenInputs() ?: emptySet()) }
+    var showHidden by remember { mutableStateOf(false) }
+    var editing by remember { mutableStateOf<InputItem?>(null) }
+    var renaming by remember { mutableStateOf<InputItem?>(null) }
+    val shown = items.filter { it.id !in hiddenIds || showHidden }
+    val hiddenCount = items.count { it.id in hiddenIds }
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.CenterEnd) {
         Column(
             Modifier
@@ -578,11 +597,82 @@ fun InputsPanel(items: List<InputItem>, onPick: (String) -> Unit, onClose: () ->
                 )
                 PanelItem("Cerrar", Modifier.autoFocus()) { onClose() }
             } else {
-                items.forEachIndexed { i, it ->
-                    PanelItem(it.label, if (i == 0) Modifier.autoFocus() else Modifier) { onPick(it.id) }
+                if (prefs != null) {
+                    Text(
+                        "Mantén OK sobre una entrada para renombrarla, ponerle icono u ocultarla.",
+                        color = Color(0xCCFFFFFF), fontSize = 12.sp
+                    )
+                }
+                if (shown.isEmpty()) {
+                    Text("Todas las entradas están ocultas.", color = Color(0xCCFFFFFF), fontSize = 14.sp)
+                }
+                shown.forEachIndexed { i, it ->
+                    val icon = names["icon:" + it.id].orEmpty()
+                    val label = (if (icon.isNotEmpty()) icon + " " else "") +
+                        (names[it.id] ?: it.label) + (if (it.id in hiddenIds) " (oculta)" else "")
+                    GlassBox(
+                        onClick = { onPick(it.id) },
+                        modifier = (if (i == 0) Modifier.autoFocus() else Modifier).fillMaxWidth(),
+                        onLongClick = if (prefs != null) ({ editing = it }) else null
+                    ) {
+                        Text(label, color = Color.White, fontSize = 16.sp, modifier = Modifier.padding(16.dp).fillMaxWidth())
+                    }
+                }
+                if (hiddenCount > 0) {
+                    PanelItem(if (showHidden) "Ocultar de nuevo las ocultas" else "Mostrar ocultas ($hiddenCount)") {
+                        showHidden = !showHidden
+                    }
                 }
                 PanelItem("Cerrar") { onClose() }
             }
         }
+    }
+    val ed = editing
+    if (ed != null && prefs != null) {
+        val shape2 = RoundedCornerShape(26.dp)
+        Dialog(onDismissRequest = { editing = null }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+            Column(
+                Modifier
+                    .width(460.dp)
+                    .clip(shape2)
+                    .background(Color(0xF0101624))
+                    .border(1.dp, Color(0x33FFFFFF), shape2)
+                    .padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(names[ed.id] ?: ed.label, color = Color.White, fontSize = 20.sp)
+                ActionRow("Cambiar nombre", Modifier.autoFocus()) {
+                    renaming = ed
+                    editing = null
+                }
+                val cur = INPUT_ICONS.indexOf(names["icon:" + ed.id] ?: "").coerceAtLeast(0)
+                ChoiceRow("Icono", INPUT_ICONS, cur) { n ->
+                    prefs.setInputName("icon:" + ed.id, if (n == 0) "" else INPUT_ICONS[n])
+                    names = prefs.inputNames()
+                }
+                val isHid = ed.id in hiddenIds
+                ActionRow(if (isHid) "Mostrar esta entrada" else "Ocultar esta entrada") {
+                    hiddenIds = if (isHid) hiddenIds - ed.id else hiddenIds + ed.id
+                    prefs.saveHiddenInputs(hiddenIds)
+                    editing = null
+                }
+                ActionRow("Cerrar") { editing = null }
+            }
+        }
+    }
+    val rn = renaming
+    if (rn != null && prefs != null) {
+        TextEditDialog(
+            title = "Nombre de la entrada",
+            initial = names[rn.id] ?: rn.label,
+            hint = "Déjalo vacío para volver al nombre original.",
+            maxLen = 30,
+            onSave = { v ->
+                prefs.setInputName(rn.id, if (v == rn.label) "" else v)
+                names = prefs.inputNames()
+                renaming = null
+            },
+            onClose = { renaming = null }
+        )
     }
 }
