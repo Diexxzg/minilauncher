@@ -3,20 +3,97 @@ on:
   workflow_dispatch:
   push:
     branches: [ main ]
+
+# contents: write permite crear el Release y guardar la llave cifrada la primera vez.
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 17
+
+      # Lee la version de app/build.gradle.kts (versionName "2.6" -> etiqueta v2.6).
+      - name: Leer version
+        id: ver
+        run: |
+          VN=$(grep -E '^\s*versionName' app/build.gradle.kts | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
+          if [ -z "$VN" ]; then echo "::error::No se encontro versionName en app/build.gradle.kts"; exit 1; fi
+          echo "name=$VN" >> "$GITHUB_OUTPUT"
+          echo "tag=v$VN" >> "$GITHUB_OUTPUT"
+
+      # Llave de firma propia. Con el secreto KEYSTORE_PASSPHRASE:
+      #  - si ya existe keystore.enc en el repo, se descifra;
+      #  - si no existe, se genera UNA vez, se cifra y se guarda en el repo.
+      # La misma llave firma todas las versiones, y asi Android acepta las actualizaciones.
+      - name: Llave de firma
+        env:
+          PASS: ${{ secrets.KEYSTORE_PASSPHRASE }}
+        run: |
+          if [ -z "$PASS" ]; then
+            echo "::warning::Falta el secreto KEYSTORE_PASSPHRASE: se firma con llave de debug y NO se publicara Release."
+            exit 0
+          fi
+          if [ -f keystore.enc ]; then
+            openssl enc -d -aes-256-cbc -pbkdf2 -iter 600000 -pass env:PASS \
+              -in keystore.enc -out "$RUNNER_TEMP/release.p12" \
+              || { echo "::error::La frase KEYSTORE_PASSPHRASE no descifra keystore.enc"; exit 1; }
+          else
+            keytool -genkeypair -storetype PKCS12 -keystore "$RUNNER_TEMP/release.p12" \
+              -storepass:env PASS -keypass:env PASS -alias onepiece \
+              -keyalg RSA -keysize 4096 -validity 36500 -dname "CN=One Piece Launcher"
+            openssl enc -aes-256-cbc -pbkdf2 -iter 600000 -pass env:PASS \
+              -in "$RUNNER_TEMP/release.p12" -out keystore.enc
+            git config user.name "github-actions"
+            git config user.email "github-actions@users.noreply.github.com"
+            git add keystore.enc
+            git commit -m "Llave de firma cifrada (se genera una sola vez)"
+            git push
+          fi
+          echo "KEYSTORE_FILE=$RUNNER_TEMP/release.p12" >> "$GITHUB_ENV"
+          echo "SIGNED=true" >> "$GITHUB_ENV"
+
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: 8.7
-      - run: gradle assembleRelease --no-daemon
+
+      - name: Compilar
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSPHRASE }}
+          KEY_ALIAS: ${{ secrets.KEYSTORE_PASSPHRASE != '' && 'onepiece' || '' }}
+          KEY_PASSWORD: ${{ secrets.KEYSTORE_PASSPHRASE }}
+        run: gradle assembleRelease --no-daemon
+
       - uses: actions/upload-artifact@v4
         with:
           name: launcher-apk
           path: app/build/outputs/apk/release/app-release.apk
+
+      # Publica el Release solo si esta version (etiqueta) todavia no existe y el APK va firmado
+      # con la llave propia. Las novedades salen de la seccion "## <version>" de CHANGELOG.md.
+      - name: Publicar Release
+        if: env.SIGNED == 'true'
+        env:
+          VN: ${{ steps.ver.outputs.name }}
+          TAG: ${{ steps.ver.outputs.tag }}
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "::notice::Ya existe el Release $TAG. Sube versionName/versionCode para publicar uno nuevo."
+            exit 0
+          fi
+          if [ -f CHANGELOG.md ]; then
+            awk -v h="## $VN" 'index($0,h)==1 && (length($0)==length(h) || substr($0,length(h)+1,1)==" ") {f=1; next} /^## /{f=0} f' CHANGELOG.md > notes.md
+          fi
+          if [ ! -s notes.md ]; then echo "Nueva versión $VN" > notes.md; fi
+          cp app/build/outputs/apk/release/app-release.apk "One-Piece-$TAG.apk"
+          gh release create "$TAG" "One-Piece-$TAG.apk" \
+            --title "One Piece $VN" --notes-file notes.md --target "$GITHUB_SHA" --latest
