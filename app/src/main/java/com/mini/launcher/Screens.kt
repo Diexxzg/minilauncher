@@ -2,7 +2,9 @@ package com.mini.launcher
 
 import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.*
 import androidx.compose.foundation.gestures.BringIntoViewSpec
 import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
@@ -92,7 +94,12 @@ fun HomeScreen(
     focusedApp: AppInfo? = null,
     lastUsed: Map<String, Long> = emptyMap(),
     /** true mientras un panel lateral (Configuracion / Editar apps) ocupa la derecha. */
-    sidePanel: Boolean = false
+    sidePanel: Boolean = false,
+    /** Estilo de las fichas del dock (ver TILE_STYLES). */
+    tileStyle: Int = 0,
+    /** Barra superior oculta (opcional): se apaga el brillo y no recibe foco. */
+    barHidden: Boolean = false,
+    onBarFocus: (Boolean) -> Unit = {}
 ) {
     val st = LocalDock.current
     val f = st.scalePct / 100f
@@ -132,6 +139,9 @@ fun HomeScreen(
             delay(3000)
         }
     }
+    // Barra superior que se oculta: se desvanece y deja de recibir foco (el reloj se queda).
+    val barA by animateFloatAsState(if (barHidden) 0f else 1f, tween(250), label = "barAlpha")
+    val barMod = Modifier.graphicsLayer { alpha = barA }.focusProperties { canFocus = !barHidden }
     // Alto maximo de las filas para que nunca tapen la barra superior.
     val maxH = (conf.screenHeightDp / us * 0.64f).dp
     Box(Modifier.fillMaxSize()) {
@@ -139,37 +149,41 @@ fun HomeScreen(
             if (cfg.bigClock) {
                 // Reloj grande, con la fecha y el clima debajo.
                 Clock(cfg.clock24, size = 68.sp, ampmSize = 24.sp)
-                if (cfg.showDate) DateText(Modifier.padding(top = 2.dp), size = 20.sp)
+                if (cfg.showDate) DateText(Modifier.padding(top = 2.dp), size = 20.sp, fmt = cfg.dateFmt)
                 if (cfg.showWeather) {
                     WeatherText(cfg.city, cfg.fahrenheit, Modifier.padding(top = 4.dp), size = 18.sp)
                 }
             } else {
                 if (cfg.showWeather) WeatherText(cfg.city, cfg.fahrenheit)
-                if (cfg.showDate) DateText(Modifier.padding(top = 2.dp))
+                if (cfg.showDate) DateText(Modifier.padding(top = 2.dp), fmt = cfg.dateFmt)
             }
         }
         if (!sidePanel) Row(
-            Modifier.align(Alignment.TopEnd).padding(32.dp),
+            Modifier
+                .align(Alignment.TopEnd)
+                .padding(32.dp)
+                .onFocusChanged { onBarFocus(it.hasFocus) },
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             if (media != null) {
                 if (cfg.showMusic && cfg.musicPos == 0) {
-                    Box(Modifier.focusProperties { down = dockFr }) {
+                    Box(Modifier.focusProperties { down = dockFr }.then(barMod)) {
                         ScaledPill(media, art, cfg.musicSize)
                     }
                 }
             } else if (!listenerOn) {
                 Text(
                     "Música: falta permitir el acceso a notificaciones",
-                    color = Color(0xB3FFFFFF), fontSize = 14.sp
+                    color = Color(0xB3FFFFFF), fontSize = 14.sp,
+                    modifier = barMod
                 )
             }
             if (!cfg.bigClock) Clock(cfg.clock24)
-            NetPill(net, onWifi, Modifier.focusProperties { down = dockFr })
+            NetPill(net, onWifi, Modifier.focusProperties { down = dockFr }.then(barMod))
             GlassBox(
                 onClick = onMore,
-                modifier = Modifier.size(44.dp).focusRequester(moreFr).focusProperties { down = dockFr },
+                modifier = Modifier.size(44.dp).focusRequester(moreFr).focusProperties { down = dockFr }.then(barMod),
                 shape = CircleShape
             ) {
                 MoreIcon(Color.White)
@@ -178,7 +192,7 @@ fun HomeScreen(
             GlassBox(
                 onClick = onSettings,
                 onLongClick = onQuick,
-                modifier = Modifier.size(44.dp).focusRequester(gearFr).focusProperties { down = dockFr },
+                modifier = Modifier.size(44.dp).focusRequester(gearFr).focusProperties { down = dockFr }.then(barMod),
                 shape = CircleShape
             ) {
                 GearIcon(Color.White)
@@ -190,6 +204,7 @@ fun HomeScreen(
                     .align(Alignment.TopCenter)
                     .padding(top = 32.dp)
                     .focusProperties { down = dockFr }
+                    .then(barMod)
             ) {
                 ScaledPill(media, art, cfg.musicSize)
             }
@@ -230,6 +245,7 @@ fun HomeScreen(
                                 app, if (i == 0) Modifier.autoFocusOn(focusTick, dockFr) else Modifier,
                                 onLongClick = { onMenu(app) },
                                 onFocusChange = { onFocusApp(app, it) },
+                                tileStyle = tileStyle,
                                 preview = previewDock && i == 0
                             ) { onLaunch(app) }
                         }
@@ -241,13 +257,16 @@ fun HomeScreen(
                             GlassBox(
                                 onClick = onAll,
                                 modifier = (if (dock.isEmpty()) Modifier.autoFocusOn(focusTick, dockFr) else Modifier)
-                                    .size((144 * f).dp, (84 * f).dp),
-                                shape = RoundedCornerShape(st.corner.dp),
+                                    .size((tileDims(tileStyle).first * f).dp, (tileDims(tileStyle).second * f).dp),
+                                shape = if (tileStyle == 3) CircleShape else RoundedCornerShape(st.corner.dp),
                                 glow = accent ?: Color.White,
                                 glowLevel = st.glow,
-                                cornerDp = st.corner.dp
+                                cornerDp = if (tileStyle == 3) (tileDims(tileStyle).second * f / 2f).dp else st.corner.dp
                             ) {
-                                Text("Todas las apps", color = Color.White, fontSize = 14.sp)
+                                Text(
+                                    if (tileStyle >= 2) "Todas" else "Todas las apps",
+                                    color = Color.White, fontSize = 14.sp
+                                )
                             }
                         }
                     }
