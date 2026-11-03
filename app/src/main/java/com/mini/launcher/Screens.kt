@@ -99,7 +99,12 @@ fun HomeScreen(
     tileStyle: Int = 0,
     /** Barra superior oculta (opcional): se apaga el brillo y no recibe foco. */
     barHidden: Boolean = false,
-    onBarFocus: (Boolean) -> Unit = {}
+    onBarFocus: (Boolean) -> Unit = {},
+    /** Carpetas del dock (nombre y apps) y su apertura (mejora 17). */
+    groups: List<Pair<String, List<AppInfo>>> = emptyList(),
+    onFolder: (String) -> Unit = {},
+    /** Editar la nota rapida junto al reloj (mejora 14). */
+    onEditNote: () -> Unit = {}
 ) {
     val st = LocalDock.current
     val f = st.scalePct / 100f
@@ -144,6 +149,10 @@ fun HomeScreen(
     val barMod = Modifier.graphicsLayer { alpha = barA }.focusProperties { canFocus = !barHidden }
     // Alto maximo de las filas para que nunca tapen la barra superior.
     val maxH = (conf.screenHeightDp / us * 0.64f).dp
+    // Fila "Continuar" (mejora 12): sin la ultima app abierta y con las usadas hoy primero.
+    val cont = remember(recents, lastUsed, cfg.continueRow) {
+        if (cfg.continueRow) continueList(recents, lastUsed) else recents
+    }
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.align(Alignment.TopStart).padding(32.dp)) {
             if (cfg.bigClock) {
@@ -157,6 +166,7 @@ fun HomeScreen(
                 if (cfg.showWeather) WeatherText(cfg.city, cfg.fahrenheit)
                 if (cfg.showDate) DateText(Modifier.padding(top = 2.dp), fmt = cfg.dateFmt)
             }
+            ClockCards(cfg, onEditNote, Modifier.padding(top = 10.dp))
         }
         if (!sidePanel) Row(
             Modifier
@@ -249,6 +259,9 @@ fun HomeScreen(
                                 preview = previewDock && i == 0
                             ) { onLaunch(app) }
                         }
+                        items(groups, key = { "folder_" + it.first }) { g ->
+                            FolderTile(g.first, g.second, f, tileStyle) { onFolder(g.first) }
+                        }
                         if (loading && dock.isEmpty()) {
                             // Esqueletos mientras se leen las apps instaladas.
                             items(5, key = { "skeleton$it" }) { SkeletonTile(f, st.corner) }
@@ -272,11 +285,11 @@ fun HomeScreen(
                     }
                 }
             }
-            if (cfg.showRecents && recents.isNotEmpty()) {
+            if ((cfg.showRecents || cfg.continueRow) && cont.isNotEmpty()) {
                 item(key = "recents") {
                     Column {
                         Text(
-                            "Recientes", color = Color(0xCCFFFFFF), fontSize = 16.sp,
+                            if (cfg.continueRow) "Continuar" else "Recientes", color = Color(0xCCFFFFFF), fontSize = 16.sp,
                             fontWeight = FontWeight.Medium,
                             modifier = Modifier.padding(start = 32.dp)
                         )
@@ -286,12 +299,26 @@ fun HomeScreen(
                                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                                 contentPadding = PaddingValues(start = 28.dp, end = 28.dp, top = 14.dp, bottom = 4.dp)
                             ) {
-                                items(recents, key = { it.pkg }) { app ->
-                                    AppTile(
-                                        app, Modifier, useSize = false, fixedScale = 0.85f, bannerStyle = true,
-                                        onLongClick = { onMenu(app) },
-                                        onFocusChange = { onFocusApp(app, it) }
-                                    ) { onLaunch(app) }
+                                items(cont, key = { it.pkg }) { app ->
+                                    Box {
+                                        AppTile(
+                                            app, Modifier, useSize = false, fixedScale = 0.85f, bannerStyle = true,
+                                            onLongClick = { onMenu(app) },
+                                            onFocusChange = { onFocusApp(app, it) }
+                                        ) { onLaunch(app) }
+                                        if (cfg.continueRow && usedToday(lastUsed[app.pkg])) {
+                                            Text(
+                                                "HOY", color = Color(0xFF062B1B), fontSize = 10.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                modifier = Modifier
+                                                    .align(Alignment.BottomStart)
+                                                    .padding(6.dp)
+                                                    .clip(RoundedCornerShape(8.dp))
+                                                    .background(Color(0xCC3DD68C))
+                                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                                            )
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -378,9 +405,14 @@ fun AllApps(
     onHidden: (() -> Unit)? = null,
     title: String? = null,
     loading: Boolean = false,
+    /** Busqueda unica (mejora 15): busquedas recientes, texto del celular y boton de voz. */
+    recentSearches: List<String> = emptyList(),
+    onSearched: (String) -> Unit = {},
+    externalQuery: String = "",
+    onVoice: (() -> Unit)? = null,
     onLaunch: (AppInfo) -> Unit
 ) {
-    var query by remember { mutableStateOf("") }
+    var query by remember(externalQuery) { mutableStateOf(externalQuery) }
     var cat by remember { mutableIntStateOf(0) }
     val pm = LocalContext.current.packageManager
     // Categoria de cada app (Juegos, Streaming, Musica, Herramientas, Otras).
@@ -414,11 +446,28 @@ fun AllApps(
             horizontalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             SearchField(query, { query = it }, Modifier.weight(1f), focusIt = focusSearch)
+            if (onVoice != null) {
+                SmallBtn("Voz") { onVoice() }
+            }
             if (onHidden != null) {
                 SmallBtn("Ocultas") { onHidden() }
             }
             Box(Modifier.width(320.dp)) {
                 ChoiceRow("Orden", listOf("A-Z", "Más usadas", "Recientes"), sort) { onSort(it) }
+            }
+        }
+        if (query.isEmpty() && recentSearches.isNotEmpty()) {
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 4.dp)
+            ) {
+                item(key = "rsTitle") {
+                    Text(
+                        "Búsquedas recientes:", color = Color(0xB3FFFFFF), fontSize = 14.sp,
+                        modifier = Modifier.padding(end = 4.dp, top = 8.dp)
+                    )
+                }
+                items(recentSearches, key = { "rs$it" }) { t -> CatChip(t, false) { query = t } }
             }
         }
         if (shownCats.size > 1) {
@@ -469,7 +518,10 @@ fun AllApps(
                         if (!focusSearch && query.isEmpty() && app.pkg == firstPkg) Modifier.autoFocus() else Modifier,
                         useSize = false,
                         onLongClick = { onMenu(app) }
-                    ) { onLaunch(app) }
+                    ) {
+                        if (query.isNotBlank()) onSearched(query.trim())
+                        onLaunch(app)
+                    }
                     Text(
                         app.label, color = Color.White, fontSize = 14.sp, maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -493,4 +545,20 @@ fun CatChip(label: String, selected: Boolean, onClick: () -> Unit) {
             modifier = Modifier.padding(horizontal = 16.dp)
         )
     }
+}
+
+/** true si el instante (ms) cae en el dia de hoy. */
+fun usedToday(t: Long?): Boolean {
+    if (t == null) return false
+    val a = java.util.Calendar.getInstance()
+    val b = java.util.Calendar.getInstance().apply { timeInMillis = t }
+    return a.get(java.util.Calendar.YEAR) == b.get(java.util.Calendar.YEAR) &&
+        a.get(java.util.Calendar.DAY_OF_YEAR) == b.get(java.util.Calendar.DAY_OF_YEAR)
+}
+
+/** Fila "Continuar": quita la ultima app abierta y pone primero las usadas hoy (mismo orden dentro de cada grupo). */
+fun continueList(recents: List<AppInfo>, lastUsed: Map<String, Long>): List<AppInfo> {
+    val rest = recents.drop(1)
+    val today = rest.filter { usedToday(lastUsed[it.pkg]) }
+    return today + rest.filter { it !in today }
 }
