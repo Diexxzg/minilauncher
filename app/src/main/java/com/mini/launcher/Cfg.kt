@@ -50,6 +50,7 @@ class Cfg(private val p: Prefs) {
     private var _nightFrom by mutableStateOf(p.getInt("nightFrom", 22).coerceIn(0, 23))
     private var _nightTo by mutableStateOf(p.getInt("nightTo", 7).coerceIn(0, 23))
     private var _burnIn by mutableStateOf(p.getInt("burnIn", 1) == 1)
+    private var _updateCheck by mutableStateOf(p.getInt("updateCheck", 1) == 1)
     private val _rows = mutableStateListOf(
         p.getInt("row0", 0), p.getInt("row1", 0), p.getInt("row2", 0)
     )
@@ -102,6 +103,9 @@ class Cfg(private val p: Prefs) {
     val nightTo: Int get() = _nightTo
     /** Mueve lentamente el reloj del modo ambiente. */
     val burnIn: Boolean get() = _burnIn
+
+    /** Avisar una vez al dia, al abrir el inicio, si hay una version nueva en GitHub. */
+    val updateCheck: Boolean get() = _updateCheck
 
     /** true si la hora (0..23) cae dentro del horario nocturno; admite cruzar la medianoche. */
     fun nightActive(hour: Int): Boolean = when {
@@ -290,6 +294,11 @@ class Cfg(private val p: Prefs) {
     fun setNightTo(v: Int) {
         _nightTo = v.coerceIn(0, 23)
         p.putInt("nightTo", _nightTo)
+    }
+
+    fun setUpdateCheck(v: Boolean) {
+        _updateCheck = v
+        p.putInt("updateCheck", if (v) 1 else 0)
     }
 
     fun setBurnIn(v: Boolean) {
