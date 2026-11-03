@@ -8,6 +8,8 @@ import androidx.compose.foundation.gestures.BringIntoViewSpec
 import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.foundation.layout.*
@@ -113,50 +115,9 @@ fun GhostBtn(text: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
     }
 }
 
-// ---------- Editar apps ----------
+// ---------- Editar apps (panel lateral derecho) ----------
 
 private val EDIT_ACC: Color get() = Themes.current.acc
-
-/** Boton compacto de ancho fijo: asi todas las filas quedan alineadas en columnas. */
-@Composable
-private fun EditChip(
-    text: String,
-    modifier: Modifier = Modifier,
-    wide: Boolean = false,
-    active: Boolean = false,
-    enabled: Boolean = true,
-    dim: Boolean = false,
-    onClick: () -> Unit
-) {
-    var focused by remember { mutableStateOf(false) }
-    val shape = RoundedCornerShape(10.dp)
-    val bg = when {
-        focused -> EDIT_ACC.copy(alpha = 0.30f)
-        active -> EDIT_ACC.copy(alpha = 0.18f)
-        else -> Color(0x14FFFFFF)
-    }
-    val base = modifier
-        .width(if (wide) 76.dp else 36.dp)
-        .height(34.dp)
-        .alpha(if (!enabled) 0.18f else if (dim) 0.4f else 1f)
-        .clip(shape)
-        .background(bg)
-        .then(if (focused) Modifier.border(1.dp, EDIT_ACC, shape) else Modifier)
-    val full = if (enabled) {
-        base.onFocusChanged { focused = it.isFocused }.clickable(onClick = onClick)
-    } else {
-        base
-    }
-    Box(full, contentAlignment = Alignment.Center) {
-        Text(
-            text,
-            color = if (active || focused) Color.White else Color(0xCCFFFFFF),
-            fontSize = 14.sp,
-            fontWeight = FontWeight.Medium,
-            maxLines = 1
-        )
-    }
-}
 
 @Composable
 private fun EditSectionLabel(text: String, count: Int, modifier: Modifier = Modifier) {
@@ -175,24 +136,29 @@ private fun EditSectionLabel(text: String, count: Int, modifier: Modifier = Modi
     }
 }
 
+/**
+ * Una app de la lista. OK despliega sus opciones debajo (favorita, orden, tamano, ocultar);
+ * OK otra vez, o "Listo", las recoge y el foco vuelve a la fila.
+ */
 @Composable
 private fun AppEditRow(
     app: AppInfo,
     isFav: Boolean,
     isHidden: Boolean,
     pct: Int,
+    expanded: Boolean,
     canUp: Boolean,
     canDown: Boolean,
     focusFirst: Boolean,
     modifier: Modifier = Modifier,
+    onToggle: () -> Unit,
     onFav: () -> Unit,
     onUp: () -> Unit,
     onDown: () -> Unit,
     onHide: () -> Unit,
     onSize: (Int) -> Unit
 ) {
-    var within by remember { mutableStateOf(false) }
-    val shape = RoundedCornerShape(14.dp)
+    val headFr = remember { FocusRequester() }
     val sub = buildString {
         if (isFav) append("★ Favorita  ·  ")
         append(if (isHidden) "Oculta" else "Visible")
@@ -200,56 +166,66 @@ private fun AppEditRow(
         append(pct)
         append("%")
     }
-    Row(
-        modifier
-            .fillMaxWidth()
-            .clip(shape)
-            .background(if (within) Color(0x1FFFFFFF) else Color(0x0DFFFFFF))
-            .then(if (within) Modifier.border(1.dp, Color(0x33FFFFFF), shape) else Modifier)
-            .onFocusChanged { within = it.hasFocus }
-            .padding(horizontal = 10.dp, vertical = 7.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp)
-    ) {
-        Box(
-            Modifier
-                .width(52.dp)
-                .height(32.dp)
-                .clip(RoundedCornerShape(8.dp))
-                .background(Color(0x14FFFFFF)),
-            contentAlignment = Alignment.Center
-        ) {
-            Image(
-                app.art, null, Modifier.fillMaxSize(),
-                contentScale = if (app.banner) ContentScale.Crop else ContentScale.Fit
+    Column(modifier.fillMaxWidth()) {
+        FocusRow(
+            modifier = (if (focusFirst) Modifier.autoFocus() else Modifier).focusRequester(headFr),
+            onClick = onToggle
+        ) { focused ->
+            Box(
+                Modifier
+                    .width(56.dp)
+                    .height(34.dp)
+                    .clip(RoundedCornerShape(9.dp))
+                    .background(Color(0x14FFFFFF)),
+                contentAlignment = Alignment.Center
+            ) {
+                Image(
+                    app.art, null, Modifier.fillMaxSize(),
+                    contentScale = if (app.banner) ContentScale.Crop else ContentScale.Fit
+                )
+            }
+            Column(Modifier.weight(1f).padding(start = 12.dp, end = 6.dp)) {
+                Text(
+                    app.label,
+                    color = if (isHidden) Color(0x80FFFFFF) else Color(0xF2FFFFFF),
+                    fontSize = 17.sp, maxLines = 1, overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    sub, color = Color(0x80FFFFFF), fontSize = 12.sp, maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            Text(
+                if (expanded) "⌃" else "›",
+                color = if (focused || expanded) EDIT_ACC else Color(0xAAFFFFFF),
+                fontSize = 20.sp
             )
         }
-        Column(Modifier.weight(1f).padding(start = 4.dp)) {
-            Text(
-                app.label,
-                color = if (isHidden) Color(0x80FFFFFF) else Color(0xF2FFFFFF),
-                fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis
-            )
-            Text(
-                sub, color = Color(0x80FFFFFF), fontSize = 12.sp, maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+        if (expanded) {
+            val box = RoundedCornerShape(14.dp)
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(start = 14.dp, end = 4.dp, top = 2.dp, bottom = 6.dp)
+                    .clip(box)
+                    .background(Color(0x0DFFFFFF))
+                    .padding(vertical = 4.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
+                // Izquierda/derecha no deben alternar sin querer: solo cambia si el valor es distinto.
+                SwitchRow("Favorita", isFav) { want -> if (want != isFav) onFav() }
+                if (isFav) {
+                    ActionRow("Mover antes en el dock  ▲") { if (canUp) onUp() }
+                    ActionRow("Mover después en el dock  ▼") { if (canDown) onDown() }
+                }
+                SliderRow("Tamaño de la ficha", pct, 50, 200, 10, "%") { onSize(it) }
+                SwitchRow("Ocultar app", isHidden) { want -> if (want != isHidden) onHide() }
+                ActionRow("Listo") {
+                    onToggle()
+                    runCatching { headFr.requestFocus() }
+                }
+            }
         }
-        EditChip(
-            if (isFav) "★" else "☆",
-            modifier = if (focusFirst) Modifier.autoFocus() else Modifier,
-            active = isFav,
-            onClick = onFav
-        )
-        EditChip("▲", enabled = isFav, dim = !canUp, onClick = onUp)
-        EditChip("▼", enabled = isFav, dim = !canDown, onClick = onDown)
-        EditChip("−", onClick = { onSize((pct - 10).coerceIn(50, 200)) })
-        Text(
-            pct.toString() + "%", color = Color(0xE6FFFFFF), fontSize = 14.sp,
-            textAlign = TextAlign.Center, modifier = Modifier.width(46.dp)
-        )
-        EditChip("+", onClick = { onSize((pct + 10).coerceIn(50, 200)) })
-        EditChip(if (isHidden) "Mostrar" else "Ocultar", wide = true, active = isHidden, onClick = onHide)
     }
 }
 
@@ -272,6 +248,8 @@ fun EditApps(
     val firstPkg = remember { (favApps.firstOrNull() ?: otherApps.firstOrNull())?.pkg }
     val listState = rememberLazyListState()
     var movedPkg by remember { mutableStateOf<String?>(null) }
+    // App con las opciones desplegadas (solo una a la vez).
+    var openPkg by remember { mutableStateOf<String?>(null) }
     val orderKey = favApps.map { it.pkg }
 
     // Despues de mover o marcar favorita, la fila se queda a la vista.
@@ -292,7 +270,7 @@ fun EditApps(
         if (idx <= first || idx >= last) listState.animateScrollToItem((idx - 2).coerceAtLeast(0))
     }
 
-    GlassPanelFrame(0.66f, 0.82f, 560f, 920f, false) {
+    GlassPanelFrame {
         Column(Modifier.fillMaxSize().padding(start = 18.dp, end = 18.dp, top = 16.dp, bottom = 12.dp)) {
             Row(Modifier.padding(start = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                 GearIcon(Color(0x99FFFFFF), 14)
@@ -301,32 +279,33 @@ fun EditApps(
                     "CONFIGURACIÓN", color = Color(0x99FFFFFF), fontSize = 13.sp,
                     letterSpacing = 1.sp, fontWeight = FontWeight.Normal
                 )
-            }
-            Row(
-                Modifier.fillMaxWidth().padding(start = 6.dp, top = 2.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
                 Text(
-                    "Editar apps", color = Color.White, fontSize = 28.sp,
-                    fontWeight = FontWeight.Normal, modifier = Modifier.weight(1f)
-                )
-                Text(
-                    favApps.size.toString() + " favoritas  ·  " +
-                        apps.count { it.pkg in hidden }.toString() + " ocultas",
-                    color = EDIT_ACC, fontSize = 13.sp, fontWeight = FontWeight.Medium
+                    "   ›   APPS", color = EDIT_ACC, fontSize = 13.sp,
+                    letterSpacing = 1.sp, fontWeight = FontWeight.Normal, maxLines = 1
                 )
             }
             Text(
-                "Las favoritas salen primero y en este orden en la barra de abajo.",
-                color = Color(0x99FFFFFF), fontSize = 13.sp,
+                "Editar apps", color = Color.White, fontSize = 28.sp,
+                fontWeight = FontWeight.Normal, maxLines = 1,
                 modifier = Modifier.padding(start = 6.dp, top = 2.dp)
+            )
+            Text(
+                favApps.size.toString() + " favoritas  ·  " +
+                    apps.count { it.pkg in hidden }.toString() + " ocultas",
+                color = EDIT_ACC, fontSize = 13.sp, fontWeight = FontWeight.Medium,
+                modifier = Modifier.padding(start = 6.dp, top = 2.dp)
+            )
+            Text(
+                "Las favoritas salen primero y en este orden en el dock. Pulsa OK en una app para editarla.",
+                color = Color(0x80FFFFFF), fontSize = 12.sp,
+                modifier = Modifier.padding(start = 6.dp, top = 4.dp, end = 6.dp)
             )
             Spacer(Modifier.height(10.dp))
             Box(Modifier.fillMaxWidth().height(1.dp).background(Color(0x22FFFFFF)))
             LazyColumn(
                 state = listState,
                 modifier = Modifier.weight(1f).fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
                 contentPadding = PaddingValues(top = 2.dp, bottom = 8.dp)
             ) {
                 if (favApps.isNotEmpty()) {
@@ -339,10 +318,12 @@ fun EditApps(
                             isFav = true,
                             isHidden = app.pkg in hidden,
                             pct = sizes[app.pkg] ?: 100,
+                            expanded = openPkg == app.pkg,
                             canUp = i > 0,
                             canDown = i < favApps.lastIndex,
                             focusFirst = app.pkg == firstPkg,
                             modifier = Modifier.animateItem(),
+                            onToggle = { openPkg = if (openPkg == app.pkg) null else app.pkg },
                             onFav = { movedPkg = app.pkg; onFav(app.pkg) },
                             onUp = { movedPkg = app.pkg; onUp(app.pkg) },
                             onDown = { movedPkg = app.pkg; onDown(app.pkg) },
@@ -360,10 +341,12 @@ fun EditApps(
                         isFav = false,
                         isHidden = app.pkg in hidden,
                         pct = sizes[app.pkg] ?: 100,
+                        expanded = openPkg == app.pkg,
                         canUp = false,
                         canDown = false,
                         focusFirst = app.pkg == firstPkg,
                         modifier = Modifier.animateItem(),
+                        onToggle = { openPkg = if (openPkg == app.pkg) null else app.pkg },
                         onFav = { movedPkg = app.pkg; onFav(app.pkg) },
                         onUp = {},
                         onDown = {},
