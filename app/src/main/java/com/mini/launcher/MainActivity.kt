@@ -45,6 +45,7 @@ import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.nativeKeyEvent
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.geometry.CornerRadius
@@ -68,6 +69,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+
+/** TEMPORAL: muestra un aviso en cada Atras dentro de Configuracion. Ponlo en false cuando termines de probar. */
+private const val DEBUG_BACK = true
 
 class MainActivity : ComponentActivity() {
     // tick: solo cambia al instalar/desinstalar/actualizar apps (recarga la lista).
@@ -364,7 +368,8 @@ fun HomeRoot(tick: Int, homeTick: Int, resumeTick: Int, appPaused: Boolean = fal
         }
     }
 
-    BackHandler {
+    // Un solo lugar para "Atras": lo usan la tecla (antes de que llegue a nada mas) y BackHandler.
+    fun goBack() {
         when {
             pinAsk != null -> pinAsk = null
             upd.visible -> {
@@ -392,6 +397,8 @@ fun HomeRoot(tick: Int, homeTick: Int, resumeTick: Int, appPaused: Boolean = fal
             else -> screen = "home"
         }
     }
+
+    BackHandler { goBack() }
         val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
         if (uri != null) {
             scope.launch {
@@ -628,6 +635,15 @@ fun HomeRoot(tick: Int, homeTick: Int, resumeTick: Int, appPaused: Boolean = fal
             .onPreviewKeyEvent {
                 lastInput.longValue = SystemClock.elapsedRealtime()
                 val k = it.key
+                // Atras en Configuracion se atiende aqui, antes que cualquier otra cosa: una
+                // pulsacion = un nivel. Se ignoran las repeticiones al mantener la tecla.
+                if (k == Key.Back && screen == "settings") {
+                    if (it.type == KeyEventType.KeyDown && it.nativeKeyEvent.repeatCount == 0) {
+                        if (DEBUG_BACK) toast(ctx, "Atrás · categoría " + settingsCat.toString())
+                        goBack()
+                    }
+                    return@onPreviewKeyEvent true
+                }
                 // Arriba con la barra oculta: la muestra (la tecla sigue su camino normal).
                 if (barHidden && it.type == KeyEventType.KeyDown && k == Key.DirectionUp) {
                     barHidden = false
