@@ -78,10 +78,11 @@ jobs:
           name: launcher-apk
           path: app/build/outputs/apk/release/app-release.apk
 
-      # Publica el Release solo si esta version (etiqueta) todavia no existe y el APK va firmado
-      # con la llave propia. Las novedades salen de la seccion "## <version>" de CHANGELOG.md.
+      # Publica el Release SOLO al pulsar "Run workflow" (asi puedes subir todos los archivos
+      # con calma y publicar al final). Solo si esta version (etiqueta) todavia no existe y el
+      # APK va firmado con la llave propia. Las novedades salen de "## <version>" en CHANGELOG.md.
       - name: Publicar Release
-        if: env.SIGNED == 'true'
+        if: env.SIGNED == 'true' && github.event_name == 'workflow_dispatch'
         env:
           VN: ${{ steps.ver.outputs.name }}
           TAG: ${{ steps.ver.outputs.tag }}
