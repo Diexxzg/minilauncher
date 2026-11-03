@@ -89,6 +89,20 @@ val LocalSoundVol = compositionLocalOf { 0.3f }
 /** Estilo de foco de las fichas: 0 clasico, 1 aro grueso, 2 solo brillo, 3 solo escala. */
 val LocalFocusStyle = compositionLocalOf { 0 }
 
+/** Accesibilidad (33): aro de foco grueso y alto contraste. */
+val LocalThickFocus = compositionLocalOf { false }
+val LocalHighContrast = compositionLocalOf { false }
+
+/** Sonido corto al abrir (true) o cerrar (false) un panel (26). Usa los sonidos del sistema. */
+fun playPanelSound(view: View, vol: Float, open: Boolean) {
+    val am = view.context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+    if (am != null) {
+        am.playSoundEffect(
+            if (open) AudioManager.FX_KEYPRESS_STANDARD else AudioManager.FX_KEYPRESS_RETURN, vol
+        )
+    }
+}
+
 /** Reproduce el sonido de foco a volumen bajo (si el sistema tiene los sonidos activados). */
 fun playSoftFocus(view: View, vol: Float) {
     val am = view.context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
@@ -179,7 +193,9 @@ fun GlassBox(
     val born = remember { SystemClock.elapsedRealtime() }
     val th = Themes.current
     // Estilo de foco: solo afecta a las fichas con brillo (glow != null).
-    val fs = if (glow != null) LocalFocusStyle.current else 0
+    val thick = LocalThickFocus.current
+    val hc = LocalHighContrast.current
+    val fs = if (glow != null) (if (thick) 1 else LocalFocusStyle.current) else 0
     // Sin rebote ni pulso: todo se mueve con curvas suaves y sin parpadeo.
     val sc = animateFloatAsState(
         if (lit) (when (fs) { 2 -> 1f; 3 -> 1.09f; else -> 1.05f }) else 1f,
@@ -193,12 +209,14 @@ fun GlassBox(
     )
     val gl = animateFloatAsState(if (lit) 1f else 0f, tween(260), label = "glow")
     val bgColor by animateColorAsState(
-        if (lit) th.focusBg else Color(0x66121416), tween(200), label = "bg"
+        if (hc) (if (lit) Color(0xFF2A2A2A) else Color(0xE6000000))
+        else if (lit) th.focusBg else Color(0x66121416), tween(200), label = "bg"
     )
     val borderColor by animateColorAsState(
-        if (lit) th.focusBorder else Color(0x26FFFFFF), tween(200), label = "border"
+        if (hc) (if (lit) Color.White else Color(0xAAFFFFFF))
+        else if (lit) th.focusBorder else Color(0x26FFFFFF), tween(200), label = "border"
     )
-    val borderW by animateDpAsState(if (lit) (if (fs == 1) 4.dp else 2.dp) else 1.dp, tween(200), label = "borderW")
+    val borderW by animateDpAsState(if (lit) (if (fs == 1 || thick) 4.dp else 2.dp) else if (hc) 2.dp else 1.dp, tween(200), label = "borderW")
     Box(
         modifier = modifier
             .zIndex(if (lit) 1f else 0f)
