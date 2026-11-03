@@ -24,6 +24,18 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -110,11 +122,21 @@ fun AppMenu(
     onUninstall: () -> Unit,
     rowNames: List<String?> = emptyList(),
     inRow: List<Boolean> = emptyList(),
-    onRow: (Int) -> Unit = {}
+    onRow: (Int) -> Unit = {},
+    // Mejora 16: nombre propio, color de brillo e icono propio (valores por defecto: sin cambios).
+    customName: String = "",
+    onRename: (String) -> Unit = {},
+    glowIndex: Int = 0,
+    onGlow: (Int) -> Unit = {},
+    hasIcon: Boolean = false,
+    onIcon: (() -> Unit)? = null,
+    onIconReset: () -> Unit = {}
 ) {
     val shape = RoundedCornerShape(26.dp)
+    var renaming by remember { mutableStateOf(false) }
+    var draft by remember { mutableStateOf(customName.ifEmpty { app.label }) }
     Dialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = { if (renaming) renaming = false else onDismiss() },
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
         Column(
@@ -140,6 +162,41 @@ fun AppMenu(
                     overflow = TextOverflow.Ellipsis
                 )
             }
+            if (renaming) {
+                // Editor de nombre: con el control escribes con el teclado de la TV; Atrás vuelve al menú.
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color(0x22FFFFFF))
+                        .border(1.dp, Color(0x66FFFFFF), RoundedCornerShape(12.dp))
+                        .padding(horizontal = 16.dp, vertical = 14.dp)
+                ) {
+                    BasicTextField(
+                        value = draft,
+                        onValueChange = { if (it.length <= 40) draft = it },
+                        singleLine = true,
+                        textStyle = TextStyle(color = Color.White, fontSize = 18.sp),
+                        cursorBrush = SolidColor(Color.White),
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                        keyboardActions = KeyboardActions(onDone = {
+                            onRename(draft)
+                            renaming = false
+                        }),
+                        modifier = Modifier.fillMaxWidth().autoFocus()
+                    )
+                }
+                ActionRow("Guardar nombre") {
+                    onRename(draft)
+                    renaming = false
+                }
+                ActionRow("Volver al nombre original") {
+                    onRename("")
+                    draft = app.label
+                    renaming = false
+                }
+                ActionRow("Cancelar") { renaming = false }
+            } else {
             ActionRow(
                 if (isFav) "Quitar de favoritas" else "Agregar a favoritas",
                 Modifier.autoFocus()
@@ -157,8 +214,18 @@ fun AppMenu(
             }
             SliderRow("Tamaño", size, 50, 200, 10, "%") { onSize(it) }
             ActionRow(if (isHidden) "Mostrar en el inicio" else "Ocultar") { onHide() }
+            ActionRow("Cambiar nombre") {
+                draft = customName.ifEmpty { app.label }
+                renaming = true
+            }
+            ChoiceRow("Color de brillo", GLOW_PRESETS.map { it.first }, glowIndex) { onGlow(it) }
+            if (onIcon != null) {
+                ActionRow(if (hasIcon) "Cambiar icono propio" else "Elegir icono propio") { onIcon() }
+                if (hasIcon) ActionRow("Quitar icono propio") { onIconReset() }
+            }
             ActionRow("Información de la app") { onInfo() }
             ActionRow("Desinstalar") { onUninstall() }
+            }
         }
     }
 }
