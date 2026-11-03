@@ -168,6 +168,9 @@ fun HomeRoot(tick: Int, homeTick: Int, resumeTick: Int, appPaused: Boolean = fal
     var lastUsed by remember { mutableStateOf(prefs.lastUsedMap()) }
     var showSaverHint by remember { mutableStateOf(false) }
     var saverSkip by remember { mutableStateOf(false) }
+    // Actualizador (GitHub Releases): cuadro, aviso diario y vuelta del foco a Configuracion.
+    val upd = remember { UpdaterState(ctx.applicationContext, prefs) }
+    var updBack by remember { mutableIntStateOf(0) }
     var backdropApp by remember { mutableStateOf<AppInfo?>(null) }
     var prevScreen by remember { mutableStateOf("home") }
     var accentTarget by remember { mutableStateOf(Color.White) }
@@ -199,6 +202,26 @@ fun HomeRoot(tick: Int, homeTick: Int, resumeTick: Int, appPaused: Boolean = fal
 
     // Tecla Home: si ya estas en el inicio, vuelve al principio de la fila, devuelve el
     // foco a la primera ficha y sale del modo ambiente / menus.
+    // Limpia un APK viejo y, al volver del permiso de instalar, sigue con la instalacion.
+    LaunchedEffect(Unit) { withContext(Dispatchers.IO) { upd.cleanOld() } }
+    LaunchedEffect(resumeTick) { upd.onResume() }
+
+    // Aviso diario: una consulta al dia, unos segundos despues de abrir el inicio. Si en ese
+    // momento hay un panel o menu abierto no se muestra nada (queda para "Buscar actualizaciones").
+    LaunchedEffect(appsLoaded, screen) {
+        if (screen == "home" && appsLoaded && cfg.updateCheck && upd.dueToday()) {
+            delay(12_000)
+            if (screen == "home" && !upd.visible) {
+                val found = upd.check(false)
+                if (found && screen == "home" && menuApp == null && !showMore && !showQuick &&
+                    !showPower && pinAsk == null && !showSaverHint
+                ) {
+                    upd.visible = true
+                }
+            }
+        }
+    }
+
     LaunchedEffect(homeTick) {
         screen = "home"
         menuApp = null
@@ -327,10 +350,14 @@ fun HomeRoot(tick: Int, homeTick: Int, resumeTick: Int, appPaused: Boolean = fal
             }
         }
     }
-
-    BackHandler {
+        BackHandler {
         when {
             pinAsk != null -> pinAsk = null
+            upd.visible -> {
+                upd.dismiss()
+                focusTick++
+                updBack++
+            }
             showSaverHint -> {
                 showSaverHint = false
                 saverSkip = true
@@ -561,8 +588,7 @@ fun HomeRoot(tick: Int, homeTick: Int, resumeTick: Int, appPaused: Boolean = fal
     }
 
     val dimColor by animateColorAsState(Color(dimLayer), tween(300), label = "dim")
-
-    // Desenfoque del fondo mientras hay un panel abierto (solo Android 12 o superior).
+        // Desenfoque del fondo mientras hay un panel abierto (solo Android 12 o superior).
     val panelOpen = screen == "settings" || screen == "edit" || screen == "inputs" ||
         menuApp != null || showPower
     val blurDp by animateDpAsState(
@@ -578,7 +604,7 @@ fun HomeRoot(tick: Int, homeTick: Int, resumeTick: Int, appPaused: Boolean = fal
     }
     // Si el control va muy lento varias veces seguidas, se sugiere el modo ahorro.
         SlowWatch(
-        active = screen == "home" && !cfg.saver && cfg.saverHint && !saverSkip && !showSaverHint &&
+        active = screen == "home" && !cfg.saver && cfg.saverHint && !saverSkip && !showSaverHint && !upd.visible &&
             menuApp == null && !showMore && !showQuick && !showPower && pinAsk == null,
         lastInputMs = { lastInput.longValue },
         onSlow = { showSaverHint = true }
@@ -681,7 +707,7 @@ fun HomeRoot(tick: Int, homeTick: Int, resumeTick: Int, appPaused: Boolean = fal
                                         Modifier
                                             .fillMaxSize()
                                             .padding(end = sideInset)
-                                            .focusProperties { canFocus = live && !showMore && !showQuick && !showSaverHint }
+                                            .focusProperties { canFocus = live && !showMore && !showQuick && !showSaverHint && !upd.visible }
                                     ) {
                                         HomeScreen(
                                             dock = dock,
@@ -789,6 +815,9 @@ fun HomeRoot(tick: Int, homeTick: Int, resumeTick: Int, appPaused: Boolean = fal
                                             query = settingsQuery,
                                             onQuery = { settingsQuery = it },
                                             onProfile = { applyProfile(it) },
+                                            onUpdate = { upd.open(scope) },
+                                            updBack = updBack,
+                                            blocked = upd.visible,
                                             onBackupSave = {
                                                 try {
                                                     backupSaver.launch(backupName())
@@ -1017,6 +1046,17 @@ fun HomeRoot(tick: Int, homeTick: Int, resumeTick: Int, appPaused: Boolean = fal
                                 showSaverHint = false
                                 saverSkip = true
                                 focusTick++
+                            }
+                        )
+                    }
+                    if (upd.visible) {
+                        UpdateDialog(
+                            st = upd,
+                            scope = scope,
+                            onClose = {
+                                upd.dismiss()
+                                focusTick++
+                                updBack++
                             }
                         )
                     }
