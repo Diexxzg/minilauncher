@@ -25,7 +25,7 @@ class AmbientDream : DreamService() {
     private var dateView: TextView? = null
     private var step = 0
     private var alive = false
-    private val df = SimpleDateFormat("EEEE, d 'de' MMMM", Locale.forLanguageTag("es-VE"))
+    private var df = SimpleDateFormat("EEEE, d 'de' MMMM", Locale.forLanguageTag("es-VE"))
 
     private val ticker = object : Runnable {
         override fun run() {
@@ -44,6 +44,7 @@ class AmbientDream : DreamService() {
         isInteractive = false
         isFullscreen = true
         val p = Prefs(this)
+        df = SimpleDateFormat(datePattern(p.getInt("dateFmt", 0).coerceIn(0, 4)), Locale.forLanguageTag("es-VE"))
         val h24 = p.getInt("clock24", 0) == 1
 
         val root = FrameLayout(this)
