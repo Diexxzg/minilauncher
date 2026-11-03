@@ -61,17 +61,20 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.app.NotificationManagerCompat
+import androidx.compose.ui.text.style.TextOverflow
 import java.text.Normalizer
 
+private class Cat(val icon: String, val name: String, val desc: String)
+
 private val CATS = listOf(
-    "palette" to "Apariencia",
-    "folder" to "Dock",
-    "home" to "Inicio",
-    "music" to "Música",
-    "device" to "Apps",
-    "globe" to "Sistema",
-    "lock" to "Seguridad",
-    "info" to "Acerca de"
+    Cat("palette", "Apariencia", "Fondo, tema, brillo y rendimiento"),
+    Cat("folder", "Dock", "Fichas, filas y tarjeta de la app"),
+    Cat("home", "Inicio", "Reloj, clima y modo ambiente"),
+    Cat("music", "Música", "Reproductor y permisos"),
+    Cat("device", "Apps", "Favoritas, orden y ocultas"),
+    Cat("globe", "Sistema", "Red, entradas y ajustes de Android"),
+    Cat("lock", "Seguridad", "PIN y protección"),
+    Cat("info", "Acerca de", "Versión, equipo y copias de seguridad")
 )
 
 private val CITIES = listOf(
@@ -81,12 +84,17 @@ private val CITIES = listOf(
 
 private val GLOW_NAMES = listOf("Apagado", "Suave", "Medio", "Fuerte", "Máximo")
 
+
 // ---------- Estilo (cristal oscuro) ----------
-// Para cambiar el tamaño del panel: PANEL_W = ancho (fraccion de pantalla), PANEL_H = alto.
-private const val PANEL_W = 0.34f
-private const val PANEL_H = 0.62f
 // Escala interna del contenido del panel (menor = mas pequeño).
 private const val PANEL_SCALE = 0.84f
+
+/**
+ * Ancho (dp) del panel lateral derecho para un ancho disponible dado.
+ * Lo usan el panel y el inicio (que se hace mas angosto) para no taparse entre si.
+ */
+fun sidePanelWidth(availDp: Float): Float =
+    (availDp * 0.40f).coerceIn(400f, 560f).coerceAtMost(availDp * 0.62f)
 
 private val ACC: Color get() = Themes.current.acc
 private val ACC_DIM: Color get() = Themes.current.accDim
@@ -268,90 +276,58 @@ fun InfoRow(label: String, value: String) {
         Text(value, color = Color(0xF2FFFFFF), fontSize = 16.sp, fontWeight = FontWeight.Normal)
     }
 }
-/**
- * Barra de categorias: un solo elemento enfocable. Izquierda/derecha cambia de
- * categoria, abajo entra a las opciones.
- */
+// ---------- Etiqueta de seccion ----------
+
+/** Titulo pequeno que agrupa opciones dentro de una categoria. */
 @Composable
-fun CategoryBar(selected: Int, modifier: Modifier = Modifier, onSelect: (Int) -> Unit) {
-    var focused by remember { mutableStateOf(false) }
-    Column(
-        modifier
-            .fillMaxWidth()
-            .onKeyEvent { e ->
-                if (e.type == KeyEventType.KeyDown) {
-                    when (e.key) {
-                        Key.DirectionLeft -> {
-                            if (selected > 0) onSelect(selected - 1)
-                            true
-                        }
-                        Key.DirectionRight -> {
-                            if (selected < CATS.lastIndex) onSelect(selected + 1)
-                            true
-                        }
-                        else -> false
-                    }
-                } else {
-                    false
-                }
-            }
-            .onFocusChanged { focused = it.isFocused }
-            .focusable()
-    ) {
-        Row(Modifier.fillMaxWidth()) {
-            CATS.forEachIndexed { i, c ->
-                val sel = i == selected
-                Box(
-                    Modifier
-                        .weight(1f)
-                        .height(46.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(if (sel && focused) Color(0x2EFFFFFF) else Color.Transparent)
-                        .pointerInput(i) { detectTapGestures { onSelect(i) } },
-                    contentAlignment = Alignment.Center
-                ) {
-                    LineIcon(c.first, if (sel) ACC else TAB_IDLE, 24)
-                    if (sel) {
-                        Box(
-                            Modifier
-                                .align(Alignment.BottomCenter)
-                                .width(34.dp)
-                                .height(2.dp)
-                                .clip(RoundedCornerShape(1.dp))
-                                .background(ACC)
-                        )
-                    }
-                }
-            }
-        }
+private fun SectionLabel(text: String) {
+    Text(
+        text.uppercase(),
+        color = Color(0x80FFFFFF), fontSize = 11.sp, letterSpacing = 1.2.sp,
+        modifier = Modifier.padding(start = 10.dp, top = 14.dp, bottom = 4.dp)
+    )
+}
+
+/** Fila de la lista de categorias: icono, nombre y una descripcion corta. */
+@Composable
+private fun CategoryRow(
+    icon: String,
+    title: String,
+    desc: String,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    FocusRow(modifier = modifier, onClick = onClick) { focused ->
         Box(
             Modifier
-                .fillMaxWidth()
-                .height(if (focused) 2.dp else 1.dp)
-                .background(
-                    Brush.horizontalGradient(
-                        listOf(Color.Transparent, ACC.copy(alpha = if (focused) 0.9f else 0.55f), Color.Transparent)
-                    )
-                )
-        )
+                .size(38.dp)
+                .clip(RoundedCornerShape(11.dp))
+                .background(if (focused) ACC.copy(alpha = 0.22f) else Color(0x14FFFFFF)),
+            contentAlignment = Alignment.Center
+        ) {
+            LineIcon(icon, if (focused) ACC else TAB_IDLE, 22)
+        }
+        Spacer(Modifier.width(14.dp))
+        Column(Modifier.weight(1f)) {
+            Text(title, color = Color(0xF2FFFFFF), fontSize = 18.sp)
+            Text(
+                desc, color = Color(0x80FFFFFF), fontSize = 12.sp,
+                maxLines = 1, overflow = TextOverflow.Ellipsis
+            )
+        }
+        Text("›", color = if (focused) ACC else Color(0xAAFFFFFF), fontSize = 22.sp)
     }
 }
+
 // ---------- Marco de cristal (compartido por Configuracion y Editar apps) ----------
 
 /**
- * Panel de cristal centrado. Si avoidDock es true se coloca entre la barra superior y
- * el dock para no taparlo. El contenido se dibuja a PANEL_SCALE para verse mas compacto.
+ * Panel de cristal pegado al lado derecho, de arriba a abajo. El inicio se hace mas angosto
+ * (ver sidePanelWidth) para que el panel nunca quede encima de las apps.
+ * El contenido se dibuja a PANEL_SCALE para verse mas compacto.
  */
 @Composable
-fun GlassPanelFrame(
-    wFrac: Float,
-    hFrac: Float,
-    minW: Float,
-    maxW: Float,
-    avoidDock: Boolean,
-    content: @Composable () -> Unit
-) {
-    val st = LocalDock.current
+fun GlassPanelFrame(content: @Composable () -> Unit) {
     val conf = LocalConfiguration.current
     val dens = androidx.compose.ui.platform.LocalDensity.current
     val us = LocalUiScale.current
@@ -359,26 +335,20 @@ fun GlassPanelFrame(
     var shown by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { shown = true }
     val p by animateFloatAsState(if (shown) 1f else 0f, tween(300), label = "panelIn")
-    val wDp = conf.screenWidthDp.toFloat() / us - 2f * ov
-    val hDp = conf.screenHeightDp.toFloat() / us - 2f * ov
-    val topRes = if (avoidDock) 88f else 36f
-    val botRes = if (avoidDock) 84f * st.scalePct / 100f + 72f + st.bottom + 24f else 36f
-    val avail = (hDp - topRes - botRes).coerceAtLeast(240f)
-    val pw = (wDp * wFrac).coerceIn(minW, maxOf(minW, maxW))
-    val ph = (hDp * hFrac).coerceIn(240f, avail)
-    val top = topRes + (avail - ph) / 2f
+    val availW = conf.screenWidthDp.toFloat() / us - 2f * ov
+    val pw = sidePanelWidth(availW)
     val shape = RoundedCornerShape(22.dp)
     val panelBg = Brush.verticalGradient(listOf(Themes.current.panelTop, Themes.current.panelBottom))
     val panelBorder = Brush.verticalGradient(listOf(Color(0x55FFFFFF), Color(0x1AFFFFFF)))
     Box(Modifier.fillMaxSize()) {
         Box(
             Modifier
-                .align(Alignment.TopCenter)
-                .padding(top = top.dp)
+                .align(Alignment.CenterEnd)
+                .padding(top = 8.dp, bottom = 8.dp, end = 6.dp)
                 .width(pw.dp)
-                .height(ph.dp)
+                .fillMaxHeight()
                 .graphicsLayer {
-                    translationY = (1f - p) * 24.dp.toPx()
+                    translationX = (1f - p) * 56.dp.toPx()
                     alpha = p
                 }
                 .clip(shape)
@@ -402,26 +372,42 @@ fun GlassPanelFrame(
         }
     }
 }
+
 // ---------- Buscador ----------
 
 /** Minusculas y sin acentos, para que "musica" encuentre "Música". */
 private fun norm(s: String): String =
     Normalizer.normalize(s.lowercase(), Normalizer.Form.NFD).replace(Regex("\\p{Mn}+"), "")
 
-/** Una opcion de Configuracion: categoria, texto buscable y su fila. */
+/**
+ * Una opcion de Configuracion: categoria, texto buscable, seccion donde se agrupa y su fila.
+ * focusable = false para filas que solo muestran informacion (no reciben el foco inicial).
+ * content recibe el Modifier que debe llevar la fila (aqui va el foco inicial).
+ */
 private class SItem(
     val cat: Int,
     val label: String,
     val keys: String = "",
-    val content: @Composable () -> Unit
+    val sec: String = "",
+    val focusable: Boolean = true,
+    val content: @Composable (Modifier) -> Unit
 )
 
 // ---------- Pantalla ----------
 
+/**
+ * Configuracion en un panel a la derecha. Dos niveles: lista de categorias (cat = -1) y las
+ * opciones de una categoria. cat y query viven en MainActivity para que Atras funcione:
+ * primero borra la busqueda, luego vuelve a la lista y por ultimo cierra el panel.
+ */
 @Composable
 fun SettingsScreen(
     style: DockStyle,
     cfg: Cfg,
+    cat: Int,
+    onCat: (Int) -> Unit,
+    query: String,
+    onQuery: (String) -> Unit,
     onSet: (String, Int) -> Unit,
     onResetDock: () -> Unit,
     onWalls: () -> Unit,
@@ -436,14 +422,12 @@ fun SettingsScreen(
     onProfile: (Int) -> Unit = {},
     onBackupSave: () -> Unit = {},
     onBackupShare: () -> Unit = {},
-    onRestorePick: () -> Unit = {},
-    onCategory: (Int) -> Unit = {}
+    onRestorePick: () -> Unit = {}
 ) {
     val ctx = LocalContext.current
-    var cat by remember { mutableIntStateOf(0) }
-    var query by remember { mutableStateOf("") }
-    // Avisa de la categoria abierta: en Apariencia y Dock el inicio se ve en vivo detras del panel.
-    LaunchedEffect(cat) { onCategory(cat) }
+    // Ultima categoria abierta: al volver a la lista el foco regresa a ella.
+    var lastCat by remember { mutableIntStateOf(if (cat >= 0) cat else 0) }
+    LaunchedEffect(cat) { if (cat >= 0) lastCat = cat }
 
     val cityOpts = if (cfg.city in CITIES) CITIES else listOf(cfg.city) + CITIES
     // Perfil que coincide con los ajustes actuales (0 = personalizado).
@@ -452,237 +436,247 @@ fun SettingsScreen(
     // Todas las opciones en una sola lista: sirve para mostrar una categoria y para buscar.
     val items = buildList<SItem> {
         // ---- Apariencia ----
-        add(SItem(0, "Cambiar fondo de pantalla", "imagen video wallpaper") {
-            ActionRow("Cambiar fondo de pantalla") { onWalls() }
+        add(SItem(0, "Cambiar fondo de pantalla", "imagen video wallpaper", "Fondo") { m ->
+            ActionRow("Cambiar fondo de pantalla", m) { onWalls() }
         })
-        add(SItem(0, "Perfil de diseño", "cine compacto minimalista clasico estilo dock") {
-            // Izquierda/derecha cambia de perfil; la opcion "Personalizado" solo indica el estado.
-            ChoiceRow("Perfil de diseño", PROFILE_OPTIONS, profSel) {
-                onProfile(if (it > 0) it - 1 else 0)
-            }
-        })
-        add(SItem(0, "Tema de color", "colores acento") {
-            ChoiceRow("Tema de color", Themes.list.map { it.name }, cfg.theme) { cfg.setTheme(it) }
-        })
-        add(SItem(0, "Desenfoque al abrir paneles", "blur") {
-            SwitchRow("Desenfoque al abrir paneles", cfg.blur) { cfg.setBlur(it) }
-        })
-        add(SItem(0, "Oscurecer fondo", "brillo") {
-            SliderRow("Oscurecer fondo", cfg.dim, 0, 80, 5, "%") { cfg.setDim(it) }
-        })
-        add(SItem(0, "Rotación de fondos", "cambiar fondos hora") {
+        add(SItem(0, "Rotación de fondos", "cambiar fondos hora", "Fondo") { m ->
             ChoiceRow(
                 "Rotación de fondos",
                 listOf("Desactivada", "Cada 30 min", "Cada hora", "Según la hora"),
-                cfg.rot
+                cfg.rot, m
             ) { cfg.setRot(it) }
         })
-        add(SItem(0, "Transición suave", "fundido fondo") {
-            SwitchRow("Transición suave", cfg.fade) { cfg.setFade(it) }
+        add(SItem(0, "Transición suave", "fundido fondo", "Fondo") { m ->
+            SwitchRow("Transición suave", cfg.fade, m) { cfg.setFade(it) }
         })
-        add(SItem(0, "Pausar fondo animado", "video gif ahorrar recursos paneles") {
-            SwitchRow("Pausar fondo animado con paneles", cfg.pauseWall) { cfg.setPauseWall(it) }
+        add(SItem(0, "Pausar fondo animado", "video gif ahorrar recursos paneles", "Fondo") { m ->
+            SwitchRow("Pausar fondo animado con paneles", cfg.pauseWall, m) { cfg.setPauseWall(it) }
         })
-        add(SItem(0, "Fondo según app enfocada", "degradado banner dinamico") {
+        add(SItem(0, "Fondo según app enfocada", "degradado banner dinamico", "Fondo") { m ->
             ChoiceRow(
                 "Fondo según app enfocada",
                 listOf("Apagado", "Degradado", "Banner"),
-                cfg.dynBg
+                cfg.dynBg, m
             ) { cfg.setDynBg(it) }
         })
-        add(SItem(0, "Animar cambio de pantallas", "transiciones animaciones") {
-            SwitchRow("Animar cambio de pantallas", cfg.screenAnim) { cfg.setScreenAnim(it) }
+        add(SItem(0, "Perfil de diseño", "cine compacto minimalista clasico estilo dock", "Diseño") { m ->
+            // Izquierda/derecha cambia de perfil; la opcion "Personalizado" solo indica el estado.
+            ChoiceRow("Perfil de diseño", PROFILE_OPTIONS, profSel, m) {
+                onProfile(if (it > 0) it - 1 else 0)
+            }
         })
-        add(SItem(0, "Brillo de color", "glow resplandor") {
-            ChoiceRow("Brillo de color", GLOW_NAMES, style.glow) { onSet("glow", it) }
+        add(SItem(0, "Tema de color", "colores acento", "Diseño") { m ->
+            ChoiceRow("Tema de color", Themes.list.map { it.name }, cfg.theme, m) { cfg.setTheme(it) }
         })
-        add(SItem(0, "Color del brillo", "glow acento") {
+        add(SItem(0, "Brillo de color", "glow resplandor", "Diseño") { m ->
+            ChoiceRow("Brillo de color", GLOW_NAMES, style.glow, m) { onSet("glow", it) }
+        })
+        add(SItem(0, "Color del brillo", "glow acento", "Diseño") { m ->
             ChoiceRow(
                 "Color del brillo",
                 listOf("Color de cada app", "Color del fondo", "Color del tema"),
-                cfg.glowSrc
+                cfg.glowSrc, m
             ) { cfg.setGlowSrc(it) }
         })
-        add(SItem(0, "Tamaño de la interfaz", "escala zoom") {
-            SliderRow("Tamaño de la interfaz", cfg.uiScale, 70, 130, 5, "%") { cfg.setUiScale(it) }
+        add(SItem(0, "Oscurecer fondo", "brillo", "Diseño") { m ->
+            SliderRow("Oscurecer fondo", cfg.dim, 0, 80, 5, "%", m) { cfg.setDim(it) }
         })
-        add(SItem(0, "Margen de seguridad", "overscan bordes") {
-            SliderRow("Margen de seguridad", cfg.overscan, 0, 60, 2, " dp") { cfg.setOverscan(it) }
+        add(SItem(0, "Desenfoque al abrir paneles", "blur", "Diseño") { m ->
+            SwitchRow("Desenfoque al abrir paneles", cfg.blur, m) { cfg.setBlur(it) }
         })
-        add(SItem(0, "Modo ahorro", "tv lenta rendimiento fps animaciones desenfoque brillo ahorrar") {
-            SwitchRow("Modo ahorro (TV modesta)", cfg.saver) { cfg.setSaver(it) }
+        add(SItem(0, "Animar cambio de pantallas", "transiciones animaciones", "Diseño") { m ->
+            SwitchRow("Animar cambio de pantallas", cfg.screenAnim, m) { cfg.setScreenAnim(it) }
         })
-        add(SItem(0, "Sugerir modo ahorro", "fps lento aviso rendimiento") {
-            SwitchRow("Sugerir modo ahorro si va lenta", cfg.saverHint) { cfg.setSaverHint(it) }
+        add(SItem(0, "Tamaño de la interfaz", "escala zoom", "Pantalla") { m ->
+            SliderRow("Tamaño de la interfaz", cfg.uiScale, 70, 130, 5, "%", m) { cfg.setUiScale(it) }
         })
-        add(SItem(0, "Modo noche automático", "noche brillo horario oscuro") {
-            SwitchRow("Modo noche automático", cfg.night) { cfg.setNight(it) }
+        add(SItem(0, "Margen de seguridad", "overscan bordes", "Pantalla") { m ->
+            SliderRow("Margen de seguridad", cfg.overscan, 0, 60, 2, " dp", m) { cfg.setOverscan(it) }
+        })
+        add(SItem(0, "Modo ahorro", "tv lenta rendimiento fps animaciones desenfoque brillo ahorrar", "Rendimiento y noche") { m ->
+            SwitchRow("Modo ahorro (TV modesta)", cfg.saver, m) { cfg.setSaver(it) }
+        })
+        add(SItem(0, "Sugerir modo ahorro", "fps lento aviso rendimiento", "Rendimiento y noche") { m ->
+            SwitchRow("Sugerir modo ahorro si va lenta", cfg.saverHint, m) { cfg.setSaverHint(it) }
+        })
+        add(SItem(0, "Modo noche automático", "noche brillo horario oscuro", "Rendimiento y noche") { m ->
+            SwitchRow("Modo noche automático", cfg.night, m) { cfg.setNight(it) }
         })
         if (cfg.night) {
-            add(SItem(0, "Noche desde", "modo noche hora inicio horario") {
-                SliderRow("Noche desde las", cfg.nightFrom, 0, 23, 1, ":00") { cfg.setNightFrom(it) }
+            add(SItem(0, "Noche desde", "modo noche hora inicio horario", "Rendimiento y noche") { m ->
+                SliderRow("Noche desde las", cfg.nightFrom, 0, 23, 1, ":00", m) { cfg.setNightFrom(it) }
             })
-            add(SItem(0, "Noche hasta", "modo noche hora fin horario") {
-                SliderRow("Noche hasta las", cfg.nightTo, 0, 23, 1, ":00") { cfg.setNightTo(it) }
+            add(SItem(0, "Noche hasta", "modo noche hora fin horario", "Rendimiento y noche") { m ->
+                SliderRow("Noche hasta las", cfg.nightTo, 0, 23, 1, ":00", m) { cfg.setNightTo(it) }
             })
         }
-        add(SItem(0, "Sonido al mover el foco", "audio clic") {
+        add(SItem(0, "Sonido al mover el foco", "audio clic", "Sonido") { m ->
             ChoiceRow(
                 "Sonido al mover el foco",
                 listOf("Apagado", "Suave", "Medio"),
-                cfg.soundLevel
+                cfg.soundLevel, m
             ) { cfg.setSoundLevel(it) }
         })
         // ---- Dock ----
-        add(SItem(1, "Tamaño general", "dock fichas escala") {
-            SliderRow("Tamaño general", style.scalePct, 50, 180, 10, "%") { onSet("scale", it) }
+        add(SItem(1, "Tamaño general", "dock fichas escala", "Fichas") { m ->
+            SliderRow("Tamaño general", style.scalePct, 50, 180, 10, "%", m) { onSet("scale", it) }
         })
-        add(SItem(1, "Separación", "dock espacio") {
-            SliderRow("Separación", style.spacing, 0, 48, 2, " dp") { onSet("spacing", it) }
+        add(SItem(1, "Separación", "dock espacio", "Fichas") { m ->
+            SliderRow("Separación", style.spacing, 0, 48, 2, " dp", m) { onSet("spacing", it) }
         })
-        add(SItem(1, "Redondeo", "dock esquinas") {
-            SliderRow("Redondeo", style.corner, 0, 40, 2, " dp") { onSet("corner", it) }
+        add(SItem(1, "Redondeo", "dock esquinas", "Fichas") { m ->
+            SliderRow("Redondeo", style.corner, 0, 40, 2, " dp", m) { onSet("corner", it) }
         })
-        add(SItem(1, "Margen inferior", "dock") {
-            SliderRow("Margen inferior", style.bottom, 0, 80, 2, " dp") { onSet("bottom", it) }
+        add(SItem(1, "Margen inferior", "dock", "Fichas") { m ->
+            SliderRow("Margen inferior", style.bottom, 0, 80, 2, " dp", m) { onSet("bottom", it) }
         })
-        add(SItem(1, "Tarjeta de la app enfocada", "nombre notificaciones ultimo uso texto bajo dock") {
-            SwitchRow("Tarjeta bajo el dock", cfg.focusCard) { cfg.setFocusCard(it) }
+        add(SItem(1, "Tarjeta de la app enfocada", "nombre notificaciones ultimo uso texto bajo dock", "Información") { m ->
+            SwitchRow("Tarjeta bajo el dock", cfg.focusCard, m) { cfg.setFocusCard(it) }
         })
-        add(SItem(1, "Fila extra 1", "streaming juegos filas") {
-            ChoiceRow("Fila extra 1", ROW_NAMES, cfg.row(0)) { cfg.setRow(0, it) }
+        add(SItem(1, "Fila extra 1", "streaming juegos filas", "Filas extra") { m ->
+            ChoiceRow("Fila extra 1", ROW_NAMES, cfg.row(0), m) { cfg.setRow(0, it) }
         })
-        add(SItem(1, "Fila extra 2", "streaming juegos filas") {
-            ChoiceRow("Fila extra 2", ROW_NAMES, cfg.row(1)) { cfg.setRow(1, it) }
+        add(SItem(1, "Fila extra 2", "streaming juegos filas", "Filas extra") { m ->
+            ChoiceRow("Fila extra 2", ROW_NAMES, cfg.row(1), m) { cfg.setRow(1, it) }
         })
-        add(SItem(1, "Fila extra 3", "streaming juegos filas") {
-            ChoiceRow("Fila extra 3", ROW_NAMES, cfg.row(2)) { cfg.setRow(2, it) }
+        add(SItem(1, "Fila extra 3", "streaming juegos filas", "Filas extra") { m ->
+            ChoiceRow("Fila extra 3", ROW_NAMES, cfg.row(2), m) { cfg.setRow(2, it) }
         })
-        add(SItem(1, "Asignar apps", "filas mantén ok") {
+        add(SItem(1, "Asignar apps", "filas mantén ok", "Filas extra", false) {
             InfoRow("Asignar apps", "mantén OK en la app")
         })
-        add(SItem(1, "Restablecer dock", "reiniciar valores") {
-            ActionRow("Restablecer dock") { onResetDock() }
+        add(SItem(1, "Restablecer dock", "reiniciar valores", "Restablecer") { m ->
+            ActionRow("Restablecer dock", m) { onResetDock() }
         })
         // ---- Inicio ----
-        add(SItem(2, "Reloj grande") {
-            SwitchRow("Reloj grande", cfg.bigClock) { cfg.setBigClock(it) }
+        add(SItem(2, "Reloj grande", "", "Reloj y fecha") { m ->
+            SwitchRow("Reloj grande", cfg.bigClock, m) { cfg.setBigClock(it) }
         })
-        add(SItem(2, "Formato de hora", "12 24 horas reloj") {
-            ChoiceRow("Formato de hora", listOf("12 horas", "24 horas"), if (cfg.clock24) 1 else 0) {
+        add(SItem(2, "Formato de hora", "12 24 horas reloj", "Reloj y fecha") { m ->
+            ChoiceRow("Formato de hora", listOf("12 horas", "24 horas"), if (cfg.clock24) 1 else 0, m) {
                 cfg.setClock24(it == 1)
             }
         })
-        add(SItem(2, "Mostrar fecha") {
-            SwitchRow("Mostrar fecha", cfg.showDate) { cfg.setShowDate(it) }
+        add(SItem(2, "Mostrar fecha", "", "Reloj y fecha") { m ->
+            SwitchRow("Mostrar fecha", cfg.showDate, m) { cfg.setShowDate(it) }
         })
-        add(SItem(2, "Mostrar clima", "tiempo temperatura") {
-            SwitchRow("Mostrar clima", cfg.showWeather) { cfg.setShowWeather(it) }
+        add(SItem(2, "Mostrar clima", "tiempo temperatura", "Clima") { m ->
+            SwitchRow("Mostrar clima", cfg.showWeather, m) { cfg.setShowWeather(it) }
         })
-        add(SItem(2, "Ciudad del clima", "tiempo ubicación") {
-            ChoiceRow("Ciudad del clima", cityOpts, cityOpts.indexOf(cfg.city)) {
+        add(SItem(2, "Ciudad del clima", "tiempo ubicación", "Clima") { m ->
+            ChoiceRow("Ciudad del clima", cityOpts, cityOpts.indexOf(cfg.city), m) {
                 cfg.setCity(cityOpts[it])
             }
         })
-        add(SItem(2, "Unidades", "celsius fahrenheit grados temperatura") {
-            ChoiceRow("Unidades", listOf("°C", "°F"), if (cfg.fahrenheit) 1 else 0) {
+        add(SItem(2, "Unidades", "celsius fahrenheit grados temperatura", "Clima") { m ->
+            ChoiceRow("Unidades", listOf("°C", "°F"), if (cfg.fahrenheit) 1 else 0, m) {
                 cfg.setFahrenheit(it == 1)
             }
         })
-        add(SItem(2, "Mostrar recientes", "historial") {
-            SwitchRow("Mostrar recientes", cfg.showRecents) { cfg.setShowRecents(it) }
+        add(SItem(2, "Mostrar recientes", "historial", "Contenido") { m ->
+            SwitchRow("Mostrar recientes", cfg.showRecents, m) { cfg.setShowRecents(it) }
         })
-        add(SItem(2, "Botón de voz", "micrófono asistente búsqueda") {
+        add(SItem(2, "Botón de voz", "micrófono asistente búsqueda", "Contenido") { m ->
             ChoiceRow(
                 "Botón de voz",
                 listOf("Asistente de voz", "Buscar apps"),
-                cfg.voiceMode
+                cfg.voiceMode, m
             ) { cfg.setVoiceMode(it) }
         })
-        add(SItem(2, "Modo ambiente", "protector reposo") {
+        add(SItem(2, "Modo ambiente", "protector reposo", "Reposo") { m ->
             ChoiceRow(
                 "Modo ambiente",
                 listOf("Desactivado", "2 min", "5 min", "10 min", "20 min"),
-                cfg.ambient
+                cfg.ambient, m
             ) { cfg.setAmbient(it) }
         })
-        add(SItem(2, "Protección contra quemado", "ambiente reloj mover pantalla oled") {
-            SwitchRow("Mover el reloj en modo ambiente", cfg.burnIn) { cfg.setBurnIn(it) }
+        add(SItem(2, "Protección contra quemado", "ambiente reloj mover pantalla oled", "Reposo") { m ->
+            SwitchRow("Mover el reloj en modo ambiente", cfg.burnIn, m) { cfg.setBurnIn(it) }
         })
         // ---- Música ----
-        add(SItem(3, "Mostrar reproductor", "música") {
-            SwitchRow("Mostrar reproductor", cfg.showMusic) { cfg.setShowMusic(it) }
+        add(SItem(3, "Mostrar reproductor", "música", "Reproductor") { m ->
+            SwitchRow("Mostrar reproductor", cfg.showMusic, m) { cfg.setShowMusic(it) }
         })
-        add(SItem(3, "Tamaño del reproductor", "música") {
-            SliderRow("Tamaño del reproductor", cfg.musicSize, 50, 120, 5, "%") { cfg.setMusicSize(it) }
+        add(SItem(3, "Tamaño del reproductor", "música", "Reproductor") { m ->
+            SliderRow("Tamaño del reproductor", cfg.musicSize, 50, 120, 5, "%", m) { cfg.setMusicSize(it) }
         })
-        add(SItem(3, "Posición del reproductor", "música") {
+        add(SItem(3, "Posición del reproductor", "música", "Reproductor") { m ->
             ChoiceRow(
                 "Posición del reproductor",
                 listOf("Junto al reloj", "Arriba al centro"),
-                cfg.musicPos
+                cfg.musicPos, m
             ) { cfg.setMusicPos(it) }
         })
-        add(SItem(3, "Permitir acceso a notificaciones", "música permiso") {
-            ActionRow("Permitir acceso a notificaciones") {
+        add(SItem(3, "Permitir acceso a notificaciones", "música permiso", "Permisos") { m ->
+            ActionRow("Permitir acceso a notificaciones", m) {
                 tryStart(ctx, "android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS")
             }
         })
         // ---- Apps ----
-        add(SItem(4, "Editar apps", "favoritas orden tamaño ocultas") {
-            ActionRow("Editar apps (favoritas, orden, tamaño, ocultas)") { onEdit() }
+        add(SItem(4, "Editar apps", "favoritas orden tamaño ocultas", "Organizar") { m ->
+            ActionRow("Editar apps (favoritas, orden, tamaño, ocultas)", m) { onEdit() }
         })
         // ---- Sistema ----
-        add(SItem(5, "Wi-Fi", "red internet") { ActionRow("Wi-Fi") { onOpen("wifi") } })
-        add(SItem(5, "Entradas (HDMI)", "fuentes") { ActionRow("Entradas (HDMI)") { onInputs() } })
-        add(SItem(5, "Todos los ajustes de Android", "sistema") {
-            ActionRow("Todos los ajustes de Android") { onOpen("all") }
+        add(SItem(5, "Wi-Fi", "red internet", "Conexiones") { m ->
+            ActionRow("Wi-Fi", m) { onOpen("wifi") }
         })
-        add(SItem(5, "Bluetooth", "control audífonos") { ActionRow("Bluetooth") { onOpen("bt") } })
-        add(SItem(5, "Permitir nombre de red y Bluetooth", "permiso ubicación") {
-            ActionRow("Permitir nombre de red y Bluetooth") { onNetPerm() }
+        add(SItem(5, "Bluetooth", "control audífonos", "Conexiones") { m ->
+            ActionRow("Bluetooth", m) { onOpen("bt") }
         })
-        add(SItem(5, "Menú de energía (accesibilidad)", "apagar reiniciar") {
-            ActionRow("Menú de energía (accesibilidad)") { onOpen("access") }
+        add(SItem(5, "Entradas (HDMI)", "fuentes", "Conexiones") { m ->
+            ActionRow("Entradas (HDMI)", m) { onInputs() }
         })
-        add(SItem(5, "Protector de pantalla del sistema", "dream") {
-            ActionRow("Protector de pantalla del sistema") { onOpen("dream") }
+        add(SItem(5, "Permitir nombre de red y Bluetooth", "permiso ubicación", "Conexiones") { m ->
+            ActionRow("Permitir nombre de red y Bluetooth", m) { onNetPerm() }
         })
-        add(SItem(5, "Establecer como inicio predeterminado", "launcher home") {
-            ActionRow("Establecer como inicio predeterminado") { onSetHome() }
+        add(SItem(5, "Todos los ajustes de Android", "sistema", "Sistema") { m ->
+            ActionRow("Todos los ajustes de Android", m) { onOpen("all") }
+        })
+        add(SItem(5, "Menú de energía (accesibilidad)", "apagar reiniciar", "Sistema") { m ->
+            ActionRow("Menú de energía (accesibilidad)", m) { onOpen("access") }
+        })
+        add(SItem(5, "Protector de pantalla del sistema", "dream", "Sistema") { m ->
+            ActionRow("Protector de pantalla del sistema", m) { onOpen("dream") }
+        })
+        add(SItem(5, "Establecer como inicio predeterminado", "launcher home", "Sistema") { m ->
+            ActionRow("Establecer como inicio predeterminado", m) { onSetHome() }
         })
         // ---- Seguridad ----
         if (!cfg.pinSet) {
-            add(SItem(6, "Crear PIN de 4 dígitos", "contraseña bloqueo") {
-                ActionRow("Crear PIN de 4 dígitos") { onPin("create") }
+            add(SItem(6, "Estado del PIN", "", "Código PIN", false) { InfoRow("Estado", "Sin PIN") })
+            add(SItem(6, "Crear PIN de 4 dígitos", "contraseña bloqueo", "Código PIN") { m ->
+                ActionRow("Crear PIN de 4 dígitos", m) { onPin("create") }
             })
-            add(SItem(6, "Estado del PIN") { InfoRow("Estado", "Sin PIN") })
         } else {
-            add(SItem(6, "Cambiar PIN", "contraseña") { ActionRow("Cambiar PIN") { onPin("change") } })
-            add(SItem(6, "Quitar PIN", "contraseña") { ActionRow("Quitar PIN") { onPin("remove") } })
-            add(SItem(6, "Proteger ajustes", "bloqueo pin") {
-                SwitchRow("Proteger ajustes", cfg.lockSettings) { cfg.setLockSettings(it) }
+            add(SItem(6, "Estado del PIN", "", "Código PIN", false) { InfoRow("Estado", "PIN activo") })
+            add(SItem(6, "Cambiar PIN", "contraseña", "Código PIN") { m ->
+                ActionRow("Cambiar PIN", m) { onPin("change") }
             })
-            add(SItem(6, "Proteger apps ocultas", "bloqueo pin") {
-                SwitchRow("Proteger apps ocultas", cfg.lockHidden) { cfg.setLockHidden(it) }
+            add(SItem(6, "Quitar PIN", "contraseña", "Código PIN") { m ->
+                ActionRow("Quitar PIN", m) { onPin("remove") }
             })
-            add(SItem(6, "Estado del PIN") { InfoRow("Estado", "PIN activo") })
+            add(SItem(6, "Proteger ajustes", "bloqueo pin", "Protección") { m ->
+                SwitchRow("Proteger ajustes", cfg.lockSettings, m) { cfg.setLockSettings(it) }
+            })
+            add(SItem(6, "Proteger apps ocultas", "bloqueo pin", "Protección") { m ->
+                SwitchRow("Proteger apps ocultas", cfg.lockHidden, m) { cfg.setLockHidden(it) }
+            })
         }
         // ---- Acerca de ----
-        add(SItem(7, "Guardar copia de seguridad", "backup respaldo") {
-            ActionRow("Guardar copia de seguridad") { onBackup() }
+        add(SItem(7, "Guardar copia de seguridad", "backup respaldo", "Copias de seguridad") { m ->
+            ActionRow("Guardar copia de seguridad", m) { onBackup() }
         })
-        add(SItem(7, "Restaurar copia de seguridad", "backup respaldo") {
-            ActionRow("Restaurar copia de seguridad") { onRestore() }
+        add(SItem(7, "Restaurar copia de seguridad", "backup respaldo", "Copias de seguridad") { m ->
+            ActionRow("Restaurar copia de seguridad", m) { onRestore() }
         })
-        add(SItem(7, "Guardar copia en…", "backup respaldo elegir carpeta usb ubicación") {
-            ActionRow("Guardar copia en… (elegir dónde)") { onBackupSave() }
+        add(SItem(7, "Guardar copia en…", "backup respaldo elegir carpeta usb ubicación", "Copias de seguridad") { m ->
+            ActionRow("Guardar copia en… (elegir dónde)", m) { onBackupSave() }
         })
-        add(SItem(7, "Compartir copia de seguridad", "backup respaldo enviar archivo") {
-            ActionRow("Compartir copia de seguridad") { onBackupShare() }
+        add(SItem(7, "Compartir copia de seguridad", "backup respaldo enviar archivo", "Copias de seguridad") { m ->
+            ActionRow("Compartir copia de seguridad", m) { onBackupShare() }
         })
-        add(SItem(7, "Restaurar desde un archivo…", "backup respaldo elegir archivo importar") {
-            ActionRow("Restaurar desde un archivo…") { onRestorePick() }
+        add(SItem(7, "Restaurar desde un archivo…", "backup respaldo elegir archivo importar", "Copias de seguridad") { m ->
+            ActionRow("Restaurar desde un archivo…", m) { onRestorePick() }
         })
     }
 
@@ -691,81 +685,100 @@ fun SettingsScreen(
     val words = q.split(" ").filter { it.isNotEmpty() }
     val shown = if (searching) {
         items.filter { si ->
-            val hay = norm(si.label + " " + si.keys + " " + CATS[si.cat].second)
+            val hay = norm(si.label + " " + si.keys + " " + si.sec + " " + CATS[si.cat].name)
             words.all { w -> hay.contains(w) }
         }
-    } else {
+    } else if (cat >= 0) {
         items.filter { it.cat == cat }
+    } else {
+        emptyList()
     }
+    val inCat = cat in 0..CATS.lastIndex && !searching
+    val title = when {
+        searching -> "Resultados"
+        inCat -> CATS[cat].name
+        else -> "¿Qué quieres cambiar?"
+    }
+    val subtitle = when {
+        searching -> if (shown.size == 1) "1 opción" else shown.size.toString() + " opciones"
+        inCat && cat <= 1 -> "Los cambios se ven en vivo a la izquierda"
+        inCat -> CATS[cat].desc
+        else -> "Elige una categoría o busca una opción"
+    }
+    val scroll = remember(cat, searching) { androidx.compose.foundation.ScrollState(0) }
+    val firstFocus = shown.firstOrNull { it.focusable }
 
-    GlassPanelFrame(PANEL_W, PANEL_H, 360f, 500f, true) {
-            Column(Modifier.fillMaxSize().padding(start = 18.dp, end = 18.dp, top = 12.dp, bottom = 14.dp)) {
-                CategoryBar(cat, Modifier.autoFocus()) {
-                    cat = it
-                    query = ""
-                }
-                Spacer(Modifier.height(10.dp))
-                SearchField(
-                    value = query,
-                    onChange = { query = it },
-                    modifier = Modifier.fillMaxWidth().height(42.dp),
-                    placeholder = "Buscar en configuración…"
-                )
-                Spacer(Modifier.height(10.dp))
-                Row(
-                    Modifier.padding(start = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    GearIcon(Color(0x99FFFFFF), 14)
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        "CONFIGURACIÓN",
-                        color = Color(0x99FFFFFF), fontSize = 13.sp, letterSpacing = 1.sp,
-                        fontWeight = FontWeight.Normal
-                    )
-                }
+    GlassPanelFrame {
+        Column(Modifier.fillMaxSize().padding(start = 18.dp, end = 18.dp, top = 16.dp, bottom = 14.dp)) {
+            Row(Modifier.padding(start = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                GearIcon(Color(0x99FFFFFF), 14)
+                Spacer(Modifier.width(8.dp))
                 Text(
-                    if (searching) "Resultados" else CATS[cat].second,
-                    color = Color.White, fontSize = 28.sp,
-                    fontWeight = FontWeight.Normal,
-                    modifier = Modifier.padding(start = 6.dp, top = 2.dp)
+                    "CONFIGURACIÓN", color = Color(0x99FFFFFF), fontSize = 13.sp,
+                    letterSpacing = 1.sp, fontWeight = FontWeight.Normal
                 )
-                if (!searching && cat <= 1) {
+                if (inCat) {
                     Text(
-                        "Los cambios se ven en vivo detrás del panel",
-                        color = Color(0x80FFFFFF), fontSize = 12.sp,
-                        modifier = Modifier.padding(start = 6.dp, top = 2.dp)
+                        "   ›   " + CATS[cat].name.uppercase(), color = ACC, fontSize = 13.sp,
+                        letterSpacing = 1.sp, fontWeight = FontWeight.Normal, maxLines = 1
                     )
                 }
-                Spacer(Modifier.height(10.dp))
-                Box(Modifier.fillMaxWidth().height(1.dp).background(Color(0x22FFFFFF)))
-                Spacer(Modifier.height(8.dp))
-                Column(
-                    Modifier
-                        .weight(1f)
-                        .fillMaxWidth()
-                        .verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    if (cat == 7 && !searching) AboutInfo()
+            }
+            Text(
+                title, color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.Normal,
+                maxLines = 1, modifier = Modifier.padding(start = 6.dp, top = 2.dp)
+            )
+            Text(
+                subtitle, color = Color(0x80FFFFFF), fontSize = 13.sp,
+                modifier = Modifier.padding(start = 6.dp, top = 2.dp)
+            )
+            Spacer(Modifier.height(12.dp))
+            SearchField(
+                value = query,
+                onChange = onQuery,
+                modifier = Modifier.fillMaxWidth().height(42.dp),
+                placeholder = "Buscar en configuración…"
+            )
+            Spacer(Modifier.height(10.dp))
+            Box(Modifier.fillMaxWidth().height(1.dp).background(Color(0x22FFFFFF)))
+            Spacer(Modifier.height(4.dp))
+            Column(
+                Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .verticalScroll(scroll),
+                verticalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
+                if (!searching && cat < 0) {
+                    CATS.forEachIndexed { i, c ->
+                        CategoryRow(
+                            c.icon, c.name, c.desc,
+                            if (i == lastCat) Modifier.autoFocus() else Modifier
+                        ) { onCat(i) }
+                    }
+                } else {
+                    if (cat == 7 && !searching) {
+                        SectionLabel("Esta TV")
+                        AboutInfo()
+                    }
                     if (searching && shown.isEmpty()) {
                         InfoRow("Sin resultados", "")
                     }
-                    var lastCat = -1
+                    var lastGroup = ""
                     for (si in shown) {
-                        if (searching && si.cat != lastCat) {
-                            lastCat = si.cat
-                            Text(
-                                CATS[si.cat].second.uppercase(),
-                                color = Color(0x80FFFFFF), fontSize = 11.sp, letterSpacing = 1.sp,
-                                modifier = Modifier.padding(start = 8.dp, top = 6.dp)
+                        val group = if (searching) CATS[si.cat].name else si.sec
+                        if (group.isNotEmpty() && group != lastGroup) SectionLabel(group)
+                        lastGroup = group
+                        key(si.cat to si.label) {
+                            si.content(
+                                if (!searching && si === firstFocus) Modifier.autoFocus() else Modifier
                             )
                         }
-                        key(si.cat to si.label) { si.content() }
                     }
                 }
             }
         }
+    }
 }
 
 /** Datos de la app y del equipo (categoria "Acerca de"). */
