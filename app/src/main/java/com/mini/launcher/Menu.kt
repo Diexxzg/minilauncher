@@ -130,7 +130,11 @@ fun AppMenu(
     onGlow: (Int) -> Unit = {},
     hasIcon: Boolean = false,
     onIcon: (() -> Unit)? = null,
-    onIconReset: () -> Unit = {}
+    onIconReset: () -> Unit = {},
+    // Mejora 17: carpetas del dock (nombres, si la app esta en cada una, y alternar).
+    folderNames: List<String> = emptyList(),
+    inFolder: List<Boolean> = emptyList(),
+    onFolder: (Int) -> Unit = {}
 ) {
     val shape = RoundedCornerShape(26.dp)
     var renaming by remember { mutableStateOf(false) }
@@ -211,6 +215,10 @@ fun AppMenu(
                     val on = inRow.getOrElse(i) { false }
                     SwitchRow("En la fila " + rn, on) { v -> if (v != on) onRow(i) }
                 }
+            }
+            for (i in folderNames.indices) {
+                val on = inFolder.getOrElse(i) { false }
+                SwitchRow("En la carpeta " + folderNames[i], on) { v -> if (v != on) onFolder(i) }
             }
             SliderRow("Tamaño", size, 50, 200, 10, "%") { onSize(it) }
             ActionRow(if (isHidden) "Mostrar en el inicio" else "Ocultar") { onHide() }
