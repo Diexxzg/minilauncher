@@ -51,6 +51,12 @@ class Cfg(private val p: Prefs) {
     private var _nightTo by mutableStateOf(p.getInt("nightTo", 7).coerceIn(0, 23))
     private var _burnIn by mutableStateOf(p.getInt("burnIn", 1) == 1)
     private var _updateCheck by mutableStateOf(p.getInt("updateCheck", 1) == 1)
+    // Paquete 2: estilos de ficha y de foco, formato de fecha y barra superior que se oculta.
+    private var _tileStyle by mutableStateOf(p.getInt("tileStyle", 0).coerceIn(0, 3))
+    private var _focusStyle by mutableStateOf(p.getInt("focusStyle", 0).coerceIn(0, 3))
+    private var _dateFmt by mutableStateOf(p.getInt("dateFmt", 0).coerceIn(0, 4))
+    private var _hideBar by mutableStateOf(p.getInt("hideBar", 0) == 1)
+    private var _hideBarSecs by mutableStateOf(p.getInt("hideBarSecs", 12).coerceIn(3, 60))
     private val _rows = mutableStateListOf(
         p.getInt("row0", 0), p.getInt("row1", 0), p.getInt("row2", 0)
     )
@@ -106,6 +112,16 @@ class Cfg(private val p: Prefs) {
 
     /** Avisar una vez al dia, al abrir el inicio, si hay una version nueva en GitHub. */
     val updateCheck: Boolean get() = _updateCheck
+
+    /** Estilo de las fichas del dock: 0 banner, 1 banner 16:9, 2 icono cuadrado, 3 circulo. */
+    val tileStyle: Int get() = _tileStyle
+    /** Foco de las fichas: 0 clasico, 1 aro grueso, 2 solo brillo, 3 solo escala. */
+    val focusStyle: Int get() = _focusStyle
+    /** Formato de la fecha (ver datePattern en Look.kt). */
+    val dateFmt: Int get() = _dateFmt
+    /** Oculta la barra superior tras unos segundos sin pulsar nada; Arriba la muestra. */
+    val hideBar: Boolean get() = _hideBar
+    val hideBarSecs: Int get() = _hideBarSecs
 
     /** true si la hora (0..23) cae dentro del horario nocturno; admite cruzar la medianoche. */
     fun nightActive(hour: Int): Boolean = when {
@@ -299,6 +315,31 @@ class Cfg(private val p: Prefs) {
     fun setUpdateCheck(v: Boolean) {
         _updateCheck = v
         p.putInt("updateCheck", if (v) 1 else 0)
+    }
+
+    fun setTileStyle(v: Int) {
+        _tileStyle = v.coerceIn(0, 3)
+        p.putInt("tileStyle", _tileStyle)
+    }
+
+    fun setFocusStyle(v: Int) {
+        _focusStyle = v.coerceIn(0, 3)
+        p.putInt("focusStyle", _focusStyle)
+    }
+
+    fun setDateFmt(v: Int) {
+        _dateFmt = v.coerceIn(0, 4)
+        p.putInt("dateFmt", _dateFmt)
+    }
+
+    fun setHideBar(v: Boolean) {
+        _hideBar = v
+        p.putInt("hideBar", if (v) 1 else 0)
+    }
+
+    fun setHideBarSecs(v: Int) {
+        _hideBarSecs = v.coerceIn(3, 60)
+        p.putInt("hideBarSecs", _hideBarSecs)
     }
 
     fun setBurnIn(v: Boolean) {
