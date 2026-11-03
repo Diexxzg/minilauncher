@@ -40,6 +40,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -63,6 +66,7 @@ import androidx.compose.ui.unit.sp
 import androidx.core.app.NotificationManagerCompat
 import androidx.compose.ui.text.style.TextOverflow
 import java.text.Normalizer
+import kotlinx.coroutines.delay
 
 private class Cat(val icon: String, val name: String, val desc: String)
 
@@ -277,7 +281,6 @@ fun InfoRow(label: String, value: String) {
     }
 }
 // ---------- Etiqueta de seccion ----------
-
 /** Titulo pequeno que agrupa opciones dentro de una categoria. */
 @Composable
 private fun SectionLabel(text: String) {
@@ -422,7 +425,10 @@ fun SettingsScreen(
     onProfile: (Int) -> Unit = {},
     onBackupSave: () -> Unit = {},
     onBackupShare: () -> Unit = {},
-    onRestorePick: () -> Unit = {}
+    onRestorePick: () -> Unit = {},
+    onUpdate: () -> Unit = {},
+    updBack: Int = 0,
+    blocked: Boolean = false
 ) {
     val ctx = LocalContext.current
     // Ultima categoria abierta: al volver a la lista el foco regresa a ella.
@@ -432,8 +438,7 @@ fun SettingsScreen(
     val cityOpts = if (cfg.city in CITIES) CITIES else listOf(cfg.city) + CITIES
     // Perfil que coincide con los ajustes actuales (0 = personalizado).
     val profSel = profileIndex(style.scalePct, style.spacing, style.corner, style.glow, cfg)
-
-    // Todas las opciones en una sola lista: sirve para mostrar una categoria y para buscar.
+        // Todas las opciones en una sola lista: sirve para mostrar una categoria y para buscar.
     val items = buildList<SItem> {
         // ---- Apariencia ----
         add(SItem(0, "Cambiar fondo de pantalla", "imagen video wallpaper", "Fondo") { m ->
@@ -678,6 +683,20 @@ fun SettingsScreen(
         add(SItem(7, "Restaurar desde un archivo…", "backup respaldo elegir archivo importar", "Copias de seguridad") { m ->
             ActionRow("Restaurar desde un archivo…", m) { onRestorePick() }
         })
+        // Actualizaciones desde GitHub Releases.
+        add(SItem(7, "Buscar actualizaciones", "actualizar version nueva update descargar instalar", "Actualizaciones") { m ->
+            val fr = remember { FocusRequester() }
+            LaunchedEffect(updBack) {
+                if (updBack > 0) {
+                    delay(200)
+                    runCatching { fr.requestFocus() }
+                }
+            }
+            ActionRow("Buscar actualizaciones", m.focusRequester(fr)) { onUpdate() }
+        })
+        add(SItem(7, "Avisar de actualizaciones", "actualizar aviso diario version nueva", "Actualizaciones") { m ->
+            SwitchRow("Avisar si hay versión nueva (1 vez al día)", cfg.updateCheck, m) { cfg.setUpdateCheck(it) }
+        })
     }
 
     val q = norm(query.trim())
@@ -709,7 +728,12 @@ fun SettingsScreen(
     val firstFocus = shown.firstOrNull { it.focusable }
 
     GlassPanelFrame {
-        Column(Modifier.fillMaxSize().padding(start = 18.dp, end = 18.dp, top = 16.dp, bottom = 14.dp)) {
+        Column(
+            Modifier
+                .fillMaxSize()
+                .focusProperties { canFocus = !blocked }
+                .padding(start = 18.dp, end = 18.dp, top = 16.dp, bottom = 14.dp)
+        ) {
             Row(Modifier.padding(start = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                 GearIcon(Color(0x99FFFFFF), 14)
                 Spacer(Modifier.width(8.dp))
