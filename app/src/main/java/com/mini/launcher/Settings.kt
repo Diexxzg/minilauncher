@@ -435,10 +435,12 @@ fun SettingsScreen(
     var lastCat by remember { mutableIntStateOf(if (cat >= 0) cat else 0) }
     LaunchedEffect(cat) { if (cat >= 0) lastCat = cat }
 
+    val dateLabels = remember { dateFormatLabels() }
     val cityOpts = if (cfg.city in CITIES) CITIES else listOf(cfg.city) + CITIES
     // Perfil que coincide con los ajustes actuales (0 = personalizado).
     val profSel = profileIndex(style.scalePct, style.spacing, style.corner, style.glow, cfg)
-        // Todas las opciones en una sola lista: sirve para mostrar una categoria y para buscar.
+
+    // Todas las opciones en una sola lista: sirve para mostrar una categoria y para buscar.
     val items = buildList<SItem> {
         // ---- Apariencia ----
         add(SItem(0, "Cambiar fondo de pantalla", "imagen video wallpaper", "Fondo") { m ->
@@ -482,6 +484,9 @@ fun SettingsScreen(
                 listOf("Color de cada app", "Color del fondo", "Color del tema"),
                 cfg.glowSrc, m
             ) { cfg.setGlowSrc(it) }
+        })
+        add(SItem(0, "Estilo de foco", "foco aro grueso brillo escala resaltar seleccion", "Diseño") { m ->
+            ChoiceRow("Estilo de foco", FOCUS_STYLES, cfg.focusStyle, m) { cfg.setFocusStyle(it) }
         })
         add(SItem(0, "Oscurecer fondo", "brillo", "Diseño") { m ->
             SliderRow("Oscurecer fondo", cfg.dim, 0, 80, 5, "%", m) { cfg.setDim(it) }
@@ -535,6 +540,9 @@ fun SettingsScreen(
         add(SItem(1, "Margen inferior", "dock", "Fichas") { m ->
             SliderRow("Margen inferior", style.bottom, 0, 80, 2, " dp", m) { onSet("bottom", it) }
         })
+        add(SItem(1, "Estilo de ficha", "banner 16:9 icono cuadrado circulo redondo dock fichas", "Fichas") { m ->
+            ChoiceRow("Estilo de ficha", TILE_STYLES, cfg.tileStyle, m) { cfg.setTileStyle(it) }
+        })
         add(SItem(1, "Tarjeta de la app enfocada", "nombre notificaciones ultimo uso texto bajo dock", "Información") { m ->
             SwitchRow("Tarjeta bajo el dock", cfg.focusCard, m) { cfg.setFocusCard(it) }
         })
@@ -565,6 +573,9 @@ fun SettingsScreen(
         add(SItem(2, "Mostrar fecha", "", "Reloj y fecha") { m ->
             SwitchRow("Mostrar fecha", cfg.showDate, m) { cfg.setShowDate(it) }
         })
+        add(SItem(2, "Formato de fecha", "fecha dia mes año formato", "Reloj y fecha") { m ->
+            ChoiceRow("Formato de fecha", dateLabels, cfg.dateFmt, m) { cfg.setDateFmt(it) }
+        })
         add(SItem(2, "Mostrar clima", "tiempo temperatura", "Clima") { m ->
             SwitchRow("Mostrar clima", cfg.showWeather, m) { cfg.setShowWeather(it) }
         })
@@ -588,7 +599,15 @@ fun SettingsScreen(
                 cfg.voiceMode, m
             ) { cfg.setVoiceMode(it) }
         })
-        add(SItem(2, "Modo ambiente", "protector reposo", "Reposo") { m ->
+        add(SItem(2, "Ocultar barra superior", "barra oculta automatica arriba botones", "Barra superior") { m ->
+            SwitchRow("Ocultar la barra superior sola", cfg.hideBar, m) { cfg.setHideBar(it) }
+        })
+        if (cfg.hideBar) {
+            add(SItem(2, "Ocultar tras", "barra superior segundos tiempo", "Barra superior") { m ->
+                SliderRow("Ocultar tras", cfg.hideBarSecs, 3, 60, 3, " s", m) { cfg.setHideBarSecs(it) }
+            })
+        }
+                add(SItem(2, "Modo ambiente", "protector reposo", "Reposo") { m ->
             ChoiceRow(
                 "Modo ambiente",
                 listOf("Desactivado", "2 min", "5 min", "10 min", "20 min"),
