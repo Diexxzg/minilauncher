@@ -10,6 +10,12 @@ val ROW_NAMES = listOf(
     "Desactivada", "Streaming", "Juegos", "Herramientas", "Música", "Familia", "Deportes", "Noticias"
 )
 
+/** Acciones de los botones de color (indice = codigo guardado). */
+val COLOR_ACTIONS = listOf(
+    "Ninguno", "Todas las apps", "Ajustes", "Entradas", "Búsqueda",
+    "Menú de energía", "Editar apps", "Modo ambiente", "Pantalla negra"
+)
+
 /** Ajustes de inicio, fondo y musica (se guardan en Prefs). */
 class Cfg(private val p: Prefs) {
     private var _clock24 by mutableStateOf(p.getInt("clock24", 0) == 1)
@@ -57,6 +63,37 @@ class Cfg(private val p: Prefs) {
     private var _dateFmt by mutableStateOf(p.getInt("dateFmt", 0).coerceIn(0, 4))
     private var _hideBar by mutableStateOf(p.getInt("hideBar", 0) == 1)
     private var _hideBarSecs by mutableStateOf(p.getInt("hideBarSecs", 12).coerceIn(3, 60))
+    // Mejoras 12 a 39.
+    private var _continueRow by mutableStateOf(p.getInt("continueRow", 1) == 1)
+    private var _cardEvent by mutableStateOf(p.getInt("cardEvent", 0) == 1)
+    private var _cardNote by mutableStateOf(p.getInt("cardNote", 0) == 1)
+    private var _cardCountdown by mutableStateOf(p.getInt("cardCountdown", 0) == 1)
+    private var _newAppAlert by mutableStateOf(p.getInt("newAppAlert", 1) == 1)
+    private var _wallShow by mutableStateOf(p.getInt("wallShow", 0) == 1)
+    private var _autoTheme by mutableStateOf(p.getInt("autoTheme", 0) == 1)
+    private var _weatherFx by mutableStateOf(p.getInt("weatherFx", 0) == 1)
+    private var _forecast by mutableStateOf(p.getInt("forecast", 0) == 1)
+    private var _autoLoc by mutableStateOf(p.getInt("autoLoc", 0) == 1)
+    private var _panelSounds by mutableStateOf(p.getInt("panelSounds", 0) == 1)
+    private var _openAnim by mutableStateOf(p.getInt("openAnim", 1) == 1)
+    private var _bigText by mutableStateOf(p.getInt("bigText", 0) == 1)
+    private var _highContrast by mutableStateOf(p.getInt("highContrast", 0) == 1)
+    private var _thickFocus by mutableStateOf(p.getInt("thickFocus", 0) == 1)
+    private var _kids by mutableStateOf(p.getInt("kids", 0) == 1)
+    private var _bootEnabled by mutableStateOf(p.getInt("bootEnabled", 0) == 1)
+    private var _wizardDone by mutableStateOf(p.getInt("wizardDone", 0) == 1)
+    private var _keyRed by mutableStateOf(p.getInt("keyRed", 1).coerceIn(0, 8))
+    private var _keyGreen by mutableStateOf(p.getInt("keyGreen", 2).coerceIn(0, 8))
+    private var _keyYellow by mutableStateOf(p.getInt("keyYellow", 4).coerceIn(0, 8))
+    private var _keyBlue by mutableStateOf(p.getInt("keyBlue", 3).coerceIn(0, 8))
+    private var _wallShowMins by mutableStateOf(p.getInt("wallShowMins", 5).coerceIn(1, 120))
+    private var _accentCustom by mutableStateOf(p.getInt("accentCustom", 0))
+    private var _sleepAction by mutableStateOf(p.getInt("sleepAction", 0).coerceIn(0, 1))
+    private var _lastVersion by mutableStateOf(p.getInt("lastVersion", 0))
+    private var _noteText by mutableStateOf(p.getStr("noteText", ""))
+    private var _countdownDate by mutableStateOf(p.getStr("countdownDate", ""))
+    private var _countdownLabel by mutableStateOf(p.getStr("countdownLabel", ""))
+    private var _bootApp by mutableStateOf(p.getStr("bootApp", ""))
     private val _rows = mutableStateListOf(
         p.getInt("row0", 0), p.getInt("row1", 0), p.getInt("row2", 0)
     )
@@ -122,6 +159,41 @@ class Cfg(private val p: Prefs) {
     /** Oculta la barra superior tras unos segundos sin pulsar nada; Arriba la muestra. */
     val hideBar: Boolean get() = _hideBar
     val hideBarSecs: Int get() = _hideBarSecs
+
+    // Mejoras 12 a 39 (lectura).
+    val continueRow: Boolean get() = _continueRow
+    val cardEvent: Boolean get() = _cardEvent
+    val cardNote: Boolean get() = _cardNote
+    val cardCountdown: Boolean get() = _cardCountdown
+    val newAppAlert: Boolean get() = _newAppAlert
+    val wallShow: Boolean get() = _wallShow
+    val autoTheme: Boolean get() = _autoTheme
+    val weatherFx: Boolean get() = _weatherFx
+    val forecast: Boolean get() = _forecast
+    val autoLoc: Boolean get() = _autoLoc
+    val panelSounds: Boolean get() = _panelSounds
+    val openAnim: Boolean get() = _openAnim
+    val bigText: Boolean get() = _bigText
+    val highContrast: Boolean get() = _highContrast
+    val thickFocus: Boolean get() = _thickFocus
+    val kids: Boolean get() = _kids
+    val bootEnabled: Boolean get() = _bootEnabled
+    val wizardDone: Boolean get() = _wizardDone
+    val keyRed: Int get() = _keyRed
+    val keyGreen: Int get() = _keyGreen
+    val keyYellow: Int get() = _keyYellow
+    val keyBlue: Int get() = _keyBlue
+    val wallShowMins: Int get() = _wallShowMins
+    val accentCustom: Int get() = _accentCustom
+    val sleepAction: Int get() = _sleepAction
+    val lastVersion: Int get() = _lastVersion
+    val noteText: String get() = _noteText
+    val countdownDate: String get() = _countdownDate
+    val countdownLabel: String get() = _countdownLabel
+    val bootApp: String get() = _bootApp
+
+    /** Texto del boton de color segun su codigo (ver COLOR_ACTIONS). */
+    fun colorAction(i: Int): Int = when (i) { 0 -> _keyRed; 1 -> _keyGreen; 2 -> _keyYellow; else -> _keyBlue }
 
     /** true si la hora (0..23) cae dentro del horario nocturno; admite cruzar la medianoche. */
     fun nightActive(hour: Int): Boolean = when {
@@ -345,5 +417,156 @@ class Cfg(private val p: Prefs) {
     fun setBurnIn(v: Boolean) {
         _burnIn = v
         p.putInt("burnIn", if (v) 1 else 0)
+    }
+    // Mejoras 12 a 39 (escritura).
+
+    fun setContinueRow(v: Boolean) {
+        _continueRow = v
+        p.putInt("continueRow", if (v) 1 else 0)
+    }
+
+    fun setCardEvent(v: Boolean) {
+        _cardEvent = v
+        p.putInt("cardEvent", if (v) 1 else 0)
+    }
+
+    fun setCardNote(v: Boolean) {
+        _cardNote = v
+        p.putInt("cardNote", if (v) 1 else 0)
+    }
+
+    fun setCardCountdown(v: Boolean) {
+        _cardCountdown = v
+        p.putInt("cardCountdown", if (v) 1 else 0)
+    }
+
+    fun setNewAppAlert(v: Boolean) {
+        _newAppAlert = v
+        p.putInt("newAppAlert", if (v) 1 else 0)
+    }
+
+    fun setWallShow(v: Boolean) {
+        _wallShow = v
+        p.putInt("wallShow", if (v) 1 else 0)
+    }
+
+    fun setAutoTheme(v: Boolean) {
+        _autoTheme = v
+        p.putInt("autoTheme", if (v) 1 else 0)
+    }
+
+    fun setWeatherFx(v: Boolean) {
+        _weatherFx = v
+        p.putInt("weatherFx", if (v) 1 else 0)
+    }
+
+    fun setForecast(v: Boolean) {
+        _forecast = v
+        p.putInt("forecast", if (v) 1 else 0)
+    }
+
+    fun setAutoLoc(v: Boolean) {
+        _autoLoc = v
+        p.putInt("autoLoc", if (v) 1 else 0)
+    }
+
+    fun setPanelSounds(v: Boolean) {
+        _panelSounds = v
+        p.putInt("panelSounds", if (v) 1 else 0)
+    }
+
+    fun setOpenAnim(v: Boolean) {
+        _openAnim = v
+        p.putInt("openAnim", if (v) 1 else 0)
+    }
+
+    fun setBigText(v: Boolean) {
+        _bigText = v
+        p.putInt("bigText", if (v) 1 else 0)
+    }
+
+    fun setHighContrast(v: Boolean) {
+        _highContrast = v
+        p.putInt("highContrast", if (v) 1 else 0)
+    }
+
+    fun setThickFocus(v: Boolean) {
+        _thickFocus = v
+        p.putInt("thickFocus", if (v) 1 else 0)
+    }
+
+    fun setKids(v: Boolean) {
+        _kids = v
+        p.putInt("kids", if (v) 1 else 0)
+    }
+
+    fun setBootEnabled(v: Boolean) {
+        _bootEnabled = v
+        p.putInt("bootEnabled", if (v) 1 else 0)
+    }
+
+    fun setWizardDone(v: Boolean) {
+        _wizardDone = v
+        p.putInt("wizardDone", if (v) 1 else 0)
+    }
+
+    fun setKeyRed(v: Int) {
+        _keyRed = v.coerceIn(0, 8)
+        p.putInt("keyRed", _keyRed)
+    }
+
+    fun setKeyGreen(v: Int) {
+        _keyGreen = v.coerceIn(0, 8)
+        p.putInt("keyGreen", _keyGreen)
+    }
+
+    fun setKeyYellow(v: Int) {
+        _keyYellow = v.coerceIn(0, 8)
+        p.putInt("keyYellow", _keyYellow)
+    }
+
+    fun setKeyBlue(v: Int) {
+        _keyBlue = v.coerceIn(0, 8)
+        p.putInt("keyBlue", _keyBlue)
+    }
+
+    fun setWallShowMins(v: Int) {
+        _wallShowMins = v.coerceIn(1, 120)
+        p.putInt("wallShowMins", _wallShowMins)
+    }
+
+    fun setAccentCustom(v: Int) {
+        _accentCustom = v
+        p.putInt("accentCustom", _accentCustom)
+    }
+
+    fun setSleepAction(v: Int) {
+        _sleepAction = v.coerceIn(0, 1)
+        p.putInt("sleepAction", _sleepAction)
+    }
+
+    fun setLastVersion(v: Int) {
+        _lastVersion = v
+        p.putInt("lastVersion", _lastVersion)
+    }
+
+    fun setNoteText(v: String) {
+        _noteText = v
+        p.putStr("noteText", v)
+    }
+
+    fun setCountdownDate(v: String) {
+        _countdownDate = v
+        p.putStr("countdownDate", v)
+    }
+
+    fun setCountdownLabel(v: String) {
+        _countdownLabel = v
+        p.putStr("countdownLabel", v)
+    }
+
+    fun setBootApp(v: String) {
+        _bootApp = v
+        p.putStr("bootApp", v)
     }
 }
