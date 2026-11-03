@@ -122,6 +122,97 @@ class Prefs(ctx: Context) {
     fun saveRowApps(i: Int, l: List<String>) {
         sp.edit().putString("rowApps$i", l.joinToString(",")).apply()
     }
+    // ---- Mejoras 16, 17, 29, 32, 34: datos extra guardados como JSON de texto ----
+    private fun jsonMap(k: String): Map<String, String> {
+        val out = LinkedHashMap<String, String>()
+        try {
+            val o = JSONObject(sp.getString(k, "") ?: "")
+            val it = o.keys()
+            while (it.hasNext()) {
+                val key = it.next()
+                out[key] = o.optString(key)
+            }
+        } catch (e: Exception) {
+        }
+        return out
+    }
+    private fun saveJsonMap(k: String, m: Map<String, String>) {
+        val o = JSONObject()
+        for ((a, b) in m) o.put(a, b)
+        sp.edit().putString(k, o.toString()).apply()
+    }
+    /** Nombres propios de apps (16). */
+    fun names(): Map<String, String> = jsonMap("appNames")
+    fun setName(pkg: String, v: String) {
+        val m = LinkedHashMap(names())
+        if (v.isBlank()) m.remove(pkg) else m[pkg] = v.trim()
+        saveJsonMap("appNames", m)
+    }
+    /** Color de brillo propio por app, como numero ARGB en texto (16). */
+    fun glows(): Map<String, String> = jsonMap("appGlows")
+    fun setGlow(pkg: String, argb: Int?) {
+        val m = LinkedHashMap(glows())
+        if (argb == null) m.remove(pkg) else m[pkg] = argb.toString()
+        saveJsonMap("appGlows", m)
+    }
+    /** Nombre propio de entradas HDMI y entradas ocultas (29). */
+    fun inputNames(): Map<String, String> = jsonMap("inputNames")
+    fun setInputName(id: String, v: String) {
+        val m = LinkedHashMap(inputNames())
+        if (v.isBlank()) m.remove(id) else m[id] = v.trim()
+        saveJsonMap("inputNames", m)
+    }
+    fun hiddenInputs(): Set<String> = (sp.getString("inputHidden", "") ?: "").split("\u0001").filter { it.isNotEmpty() }.toSet()
+    fun saveHiddenInputs(s: Set<String>) {
+        sp.edit().putString("inputHidden", s.joinToString("\u0001")).apply()
+    }
+    /** Carpetas del dock (17): nombre -> paquetes separados por coma. */
+    fun groups(): Map<String, List<String>> =
+        jsonMap("dockGroups").mapValues { e -> e.value.split(",").filter { it.isNotEmpty() } }
+    fun saveGroups(g: Map<String, List<String>>) =
+        saveJsonMap("dockGroups", g.mapValues { it.value.joinToString(",") })
+    /** Apps permitidas en el perfil para ninos (34). */
+    fun kidsApps(): Set<String> = (sp.getString("kidsApps", "") ?: "").split(",").filter { it.isNotEmpty() }.toSet()
+    fun saveKidsApps(s: Set<String>) {
+        sp.edit().putString("kidsApps", s.joinToString(",")).apply()
+    }
+    /** Aperturas por dia (32): "paquete:aaaammdd:n", se guardan los ultimos 14 dias. */
+    private fun dayKey(offset: Int = 0): String {
+        val c = java.util.Calendar.getInstance()
+        c.add(java.util.Calendar.DAY_OF_YEAR, -offset)
+        return java.text.SimpleDateFormat("yyyyMMdd", java.util.Locale.US).format(c.time)
+    }
+    private fun dayMap(): MutableMap<String, Int> {
+        val out = LinkedHashMap<String, Int>()
+        for (part in (sp.getString("usageDays", "") ?: "").split(",")) {
+            val p = part.split(":")
+            if (p.size == 3) {
+                val n = p[2].toIntOrNull()
+                if (n != null) out[p[0] + ":" + p[1]] = n
+            }
+        }
+        return out
+    }
+    fun bumpDay(pkg: String) {
+        val m = dayMap()
+        val old = dayKey(14)
+        m.keys.removeAll { it.substringAfter(":") < old }
+        val k = pkg + ":" + dayKey()
+        m[k] = (m[k] ?: 0) + 1
+        sp.edit().putString("usageDays", m.entries.joinToString(",") { it.key + ":" + it.value }).apply()
+    }
+    /** Aperturas de los ultimos 7 dias por app. */
+    fun weekUsage(): Map<String, Int> {
+        val from = dayKey(6)
+        val out = HashMap<String, Int>()
+        for ((k, n) in dayMap()) {
+            if (k.substringAfter(":") >= from) {
+                val pkg = k.substringBefore(":")
+                out[pkg] = (out[pkg] ?: 0) + n
+            }
+        }
+        return out
+    }
     // Apps ya vistas: las que no estan aqui se marcan como "NUEVA".
     fun hasSeen(): Boolean = sp.contains("seen")
     fun seen(): Set<String> =
