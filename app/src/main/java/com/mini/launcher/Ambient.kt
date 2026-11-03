@@ -81,7 +81,7 @@ fun AmbientScreen(cfg: Cfg, media: MediaInfo?, onExit: () -> Unit) {
         SimpleDateFormat(if (cfg.clock24) "HH:mm" else "h:mm", Locale.getDefault())
     }
     val af = remember { SimpleDateFormat("a", Locale.getDefault()) }
-    val df = remember { SimpleDateFormat("EEEE, d 'de' MMMM", Locale.forLanguageTag("es-VE")) }
+    val df = remember(cfg.dateFmt) { SimpleDateFormat(datePattern(cfg.dateFmt), Locale.forLanguageTag("es-VE")) }
     val ampm = if (cfg.clock24) "" else " " + af.format(now).replace(Regex("[\\s\\u00A0\\u202F]"), "").lowercase()
     val timeText = tf.format(now) + ampm
     val w = wline
