@@ -1,5 +1,6 @@
 package com.mini.launcher
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
@@ -11,6 +12,11 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.*
@@ -116,120 +122,265 @@ fun GhostBtn(text: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
 }
 
 // ---------- Editar apps (panel lateral derecho) ----------
+//
+// Dos vistas, pensadas para control remoto:
+//  - "Todas las apps": lista fija en orden alfabetico. Nada se mueve de lugar al marcar una
+//    favorita, ocultar o cambiar el tamano, asi el foco se queda en la misma app.
+//  - "Orden del dock": solo las favoritas, en el orden del dock. OK (o mantener OK) toma la app,
+//    las flechas la mueven y OK la suelta.
 
 private val EDIT_ACC: Color get() = Themes.current.acc
 
+/** Tamanos que recorre el boton de tamano de cada app (OK pasa al siguiente). */
+private val SIZE_STEPS = listOf(60, 80, 100, 120, 150, 200)
+
+private fun nextSize(cur: Int): Int = SIZE_STEPS.firstOrNull { it > cur } ?: SIZE_STEPS.first()
+
+/** Pestana de la parte de arriba (Todas las apps / Orden del dock). */
 @Composable
-private fun EditSectionLabel(text: String, count: Int, modifier: Modifier = Modifier) {
-    Row(
-        modifier.fillMaxWidth().padding(start = 8.dp, top = 12.dp, bottom = 4.dp),
-        verticalAlignment = Alignment.CenterVertically
+private fun EditTab(text: String, selected: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    var focused by remember { mutableStateOf(false) }
+    val shape = RoundedCornerShape(12.dp)
+    Box(
+        modifier
+            .height(38.dp)
+            .clip(shape)
+            .background(
+                when {
+                    focused -> Color(0x40FFFFFF)
+                    selected -> EDIT_ACC.copy(alpha = 0.25f)
+                    else -> Color(0x14FFFFFF)
+                }
+            )
+            .border(
+                if (focused) 2.dp else 1.dp,
+                when {
+                    focused -> Color(0xDDFFFFFF)
+                    selected -> EDIT_ACC
+                    else -> Color(0x22FFFFFF)
+                },
+                shape
+            )
+            .onFocusChanged { focused = it.isFocused }
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
     ) {
         Text(
-            text, color = EDIT_ACC, fontSize = 12.sp, letterSpacing = 1.5.sp,
-            fontWeight = FontWeight.Medium
+            text,
+            color = if (selected || focused) Color.White else Color(0xB3FFFFFF),
+            fontSize = 15.sp, fontWeight = FontWeight.Medium,
+            modifier = Modifier.padding(horizontal = 16.dp)
         )
-        Spacer(Modifier.width(8.dp))
-        Text(count.toString(), color = Color(0x80FFFFFF), fontSize = 12.sp)
-        Spacer(Modifier.width(10.dp))
-        Box(Modifier.weight(1f).height(1.dp).background(Color(0x1FFFFFFF)))
+    }
+}
+
+/** Boton de una fila: favorita, ocultar o tamano. on = esta activado. */
+@Composable
+private fun EditChip(
+    text: String,
+    on: Boolean,
+    minWidth: Int,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    var focused by remember { mutableStateOf(false) }
+    val shape = RoundedCornerShape(10.dp)
+    Box(
+        modifier
+            .height(36.dp)
+            .widthIn(min = minWidth.dp)
+            .clip(shape)
+            .background(
+                when {
+                    focused -> Color(0x40FFFFFF)
+                    on -> EDIT_ACC.copy(alpha = 0.22f)
+                    else -> Color(0x14FFFFFF)
+                }
+            )
+            .border(
+                if (focused) 2.dp else 1.dp,
+                when {
+                    focused -> Color(0xDDFFFFFF)
+                    on -> EDIT_ACC.copy(alpha = 0.7f)
+                    else -> Color(0x22FFFFFF)
+                },
+                shape
+            )
+            .onFocusChanged { focused = it.isFocused }
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text,
+            color = when {
+                focused -> Color.White
+                on -> EDIT_ACC
+                else -> Color(0xCCFFFFFF)
+            },
+            fontSize = 14.sp, maxLines = 1,
+            modifier = Modifier.padding(horizontal = 8.dp)
+        )
+    }
+}
+
+@Composable
+private fun AppThumb(app: AppInfo) {
+    Box(
+        Modifier
+            .width(56.dp)
+            .height(34.dp)
+            .clip(RoundedCornerShape(9.dp))
+            .background(Color(0x14FFFFFF)),
+        contentAlignment = Alignment.Center
+    ) {
+        Image(
+            app.art, null, Modifier.fillMaxSize(),
+            contentScale = if (app.banner) ContentScale.Crop else ContentScale.Fit
+        )
     }
 }
 
 /**
- * Una app de la lista. OK despliega sus opciones debajo (favorita, orden, tamano, ocultar);
- * OK otra vez, o "Listo", las recoge y el foco vuelve a la fila.
+ * Fila de "Todas las apps": icono, nombre y tres botones (favorita, ocultar, tamano).
+ * Izquierda/derecha cambia de boton; arriba/abajo cambia de app sin salirse de la columna.
  */
 @Composable
-private fun AppEditRow(
+private fun AppRowAll(
     app: AppInfo,
-    isFav: Boolean,
+    favPos: Int,
     isHidden: Boolean,
     pct: Int,
-    expanded: Boolean,
-    canUp: Boolean,
-    canDown: Boolean,
     focusFirst: Boolean,
-    modifier: Modifier = Modifier,
-    onToggle: () -> Unit,
     onFav: () -> Unit,
-    onUp: () -> Unit,
-    onDown: () -> Unit,
     onHide: () -> Unit,
     onSize: (Int) -> Unit
 ) {
-    val headFr = remember { FocusRequester() }
-    val sub = buildString {
-        if (isFav) append("★ Favorita  ·  ")
-        append(if (isHidden) "Oculta" else "Visible")
-        append("  ·  ")
-        append(pct)
-        append("%")
+    val isFav = favPos > 0
+    val shape = RoundedCornerShape(12.dp)
+    val sub = when {
+        isHidden -> "Oculta (no sale en el dock)"
+        isFav -> "★ Favorita · puesto " + favPos.toString()
+        else -> "No es favorita"
     }
-    Column(modifier.fillMaxWidth()) {
-        FocusRow(
-            modifier = (if (focusFirst) Modifier.autoFocus() else Modifier).focusRequester(headFr),
-            onClick = onToggle
-        ) { focused ->
-            Box(
-                Modifier
-                    .width(56.dp)
-                    .height(34.dp)
-                    .clip(RoundedCornerShape(9.dp))
-                    .background(Color(0x14FFFFFF)),
-                contentAlignment = Alignment.Center
-            ) {
-                Image(
-                    app.art, null, Modifier.fillMaxSize(),
-                    contentScale = if (app.banner) ContentScale.Crop else ContentScale.Fit
-                )
-            }
-            Column(Modifier.weight(1f).padding(start = 12.dp, end = 6.dp)) {
-                Text(
-                    app.label,
-                    color = if (isHidden) Color(0x80FFFFFF) else Color(0xF2FFFFFF),
-                    fontSize = 17.sp, maxLines = 1, overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    sub, color = Color(0x80FFFFFF), fontSize = 12.sp, maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .background(if (isFav) EDIT_ACC.copy(alpha = 0.10f) else Color.Transparent)
+            .padding(start = 10.dp, end = 6.dp, top = 5.dp, bottom = 5.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        AppThumb(app)
+        Column(Modifier.weight(1f).padding(start = 12.dp, end = 8.dp)) {
             Text(
-                if (expanded) "⌃" else "›",
-                color = if (focused || expanded) EDIT_ACC else Color(0xAAFFFFFF),
-                fontSize = 20.sp
+                app.label,
+                color = if (isHidden) Color(0x80FFFFFF) else Color(0xF2FFFFFF),
+                fontSize = 17.sp, maxLines = 1, overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                sub,
+                color = if (isFav && !isHidden) EDIT_ACC else Color(0x80FFFFFF),
+                fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis
             )
         }
-        if (expanded) {
-            val box = RoundedCornerShape(14.dp)
-            Column(
-                Modifier
-                    .fillMaxWidth()
-                    .padding(start = 14.dp, end = 4.dp, top = 2.dp, bottom = 6.dp)
-                    .clip(box)
-                    .background(Color(0x0DFFFFFF))
-                    .padding(vertical = 4.dp),
-                verticalArrangement = Arrangement.spacedBy(2.dp)
-            ) {
-                // Izquierda/derecha no deben alternar sin querer: solo cambia si el valor es distinto.
-                SwitchRow("Favorita", isFav) { want -> if (want != isFav) onFav() }
-                if (isFav) {
-                    ActionRow("Mover antes en el dock  ▲") { if (canUp) onUp() }
-                    ActionRow("Mover después en el dock  ▼") { if (canDown) onDown() }
-                }
-                SliderRow("Tamaño de la ficha", pct, 50, 200, 10, "%") { onSize(it) }
-                SwitchRow("Ocultar app", isHidden) { want -> if (want != isHidden) onHide() }
-                ActionRow("Listo") {
-                    onToggle()
-                    runCatching { headFr.requestFocus() }
-                }
-            }
-        }
+        EditChip(
+            if (isFav) "★ " + favPos.toString() else "☆",
+            isFav, 54,
+            if (focusFirst) Modifier.autoFocus() else Modifier
+        ) { onFav() }
+        Spacer(Modifier.width(6.dp))
+        EditChip(if (isHidden) "Oculta" else "Ocultar", isHidden, 72) { onHide() }
+        Spacer(Modifier.width(6.dp))
+        EditChip(pct.toString() + "%", pct != 100, 56) { onSize(nextSize(pct)) }
     }
 }
 
+/**
+ * Fila de "Orden del dock". Con la app tomada (grabbed), arriba/abajo la mueven y el foco se
+ * queda en ella; OK la suelta.
+ */
 @OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun DockOrderRow(
+    app: AppInfo,
+    pos: Int,
+    isHidden: Boolean,
+    grabbed: Boolean,
+    modifier: Modifier = Modifier,
+    onGrab: () -> Unit,
+    onDrop: () -> Unit,
+    onMove: (Int) -> Unit
+) {
+    var focused by remember { mutableStateOf(false) }
+    val shape = RoundedCornerShape(12.dp)
+    Row(
+        modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .background(
+                when {
+                    grabbed -> EDIT_ACC.copy(alpha = 0.30f)
+                    focused -> Color(0x2BFFFFFF)
+                    else -> Color(0x0DFFFFFF)
+                }
+            )
+            .then(
+                if (grabbed) Modifier.border(2.dp, EDIT_ACC, shape)
+                else if (focused) Modifier.border(1.dp, Color(0x66FFFFFF), shape)
+                else Modifier
+            )
+            .onPreviewKeyEvent { e ->
+                if (!grabbed) {
+                    false
+                } else if (e.key == Key.DirectionUp || e.key == Key.DirectionDown) {
+                    if (e.type == KeyEventType.KeyDown) onMove(if (e.key == Key.DirectionUp) -1 else 1)
+                    true
+                } else if (e.key == Key.DirectionLeft || e.key == Key.DirectionRight) {
+                    true
+                } else {
+                    false
+                }
+            }
+            .onFocusChanged { focused = it.isFocused }
+            .combinedClickable(
+                onClick = { if (grabbed) onDrop() else onGrab() },
+                onLongClick = { if (!grabbed) onGrab() }
+            )
+            .padding(start = 12.dp, end = 14.dp, top = 6.dp, bottom = 6.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            pos.toString(),
+            color = if (grabbed) Color.White else EDIT_ACC,
+            fontSize = 18.sp, fontWeight = FontWeight.Medium,
+            textAlign = TextAlign.Center, modifier = Modifier.width(30.dp)
+        )
+        AppThumb(app)
+        Column(Modifier.weight(1f).padding(start = 12.dp, end = 8.dp)) {
+            Text(
+                app.label,
+                color = if (isHidden) Color(0x80FFFFFF) else Color(0xF2FFFFFF),
+                fontSize = 17.sp, maxLines = 1, overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                when {
+                    grabbed -> "▲ ▼ mueven la app · OK la suelta"
+                    isHidden -> "Oculta (no sale en el dock)"
+                    focused -> "OK para tomarla y moverla"
+                    else -> " "
+                },
+                color = if (grabbed) Color.White else Color(0x80FFFFFF),
+                fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis
+            )
+        }
+        Text(
+            if (grabbed) "↕" else "≡",
+            color = if (grabbed || focused) EDIT_ACC else Color(0x80FFFFFF),
+            fontSize = 22.sp
+        )
+    }
+}
+
 @Composable
 fun EditApps(
     apps: List<AppInfo>,
@@ -237,37 +388,44 @@ fun EditApps(
     hidden: Set<String>,
     sizes: Map<String, Int>,
     onFav: (String) -> Unit,
-    onUp: (String) -> Unit,
-    onDown: (String) -> Unit,
+    onReorder: (List<String>) -> Unit,
     onHide: (String) -> Unit,
     onSize: (String, Int) -> Unit
 ) {
-    val favApps = favs.mapNotNull { p -> apps.firstOrNull { it.pkg == p } }
-    val otherApps = apps.filter { it.pkg !in favs }
-    // El foco inicial se fija una sola vez (si no, al subir una app al primer lugar robaba el foco).
-    val firstPkg = remember { (favApps.firstOrNull() ?: otherApps.firstOrNull())?.pkg }
-    val listState = rememberLazyListState()
-    var movedPkg by remember { mutableStateOf<String?>(null) }
-    // App con las opciones desplegadas (solo una a la vez).
-    var openPkg by remember { mutableStateOf<String?>(null) }
+    // Orden alfabetico fijo: no cambia al marcar favoritas, ocultar o cambiar tamanos.
+    val sorted = remember(apps) { apps.sortedBy { it.label.lowercase() } }
+    val favApps = remember(apps, favs) { favs.mapNotNull { p -> apps.firstOrNull { it.pkg == p } } }
+    val posOf = remember(favApps) { favApps.withIndex().associate { it.value.pkg to (it.index + 1) } }
+    val hiddenCount = apps.count { it.pkg in hidden }
+    // El foco inicial se fija una sola vez, para que nada le robe el foco despues.
+    val firstPkg = remember { sorted.firstOrNull()?.pkg }
+
+    var tab by remember { mutableIntStateOf(0) }
+    var grabbed by remember { mutableStateOf<String?>(null) }
+    val allState = rememberLazyListState()
+    val orderState = rememberLazyListState()
     val orderKey = favApps.map { it.pkg }
 
-    // Despues de mover o marcar favorita, la fila se queda a la vista.
+    // Atras con una app tomada: la suelta (no cierra el panel).
+    BackHandler(enabled = grabbed != null) { grabbed = null }
+
+    // Mientras se mueve una app, se mantiene a la vista.
     LaunchedEffect(orderKey) {
-        val pkg = movedPkg ?: return@LaunchedEffect
-        delay(90)
-        val fi = favApps.indexOfFirst { it.pkg == pkg }
-        val idx = if (fi >= 0) {
-            1 + fi
-        } else {
-            val oi = otherApps.indexOfFirst { it.pkg == pkg }
-            if (oi < 0) return@LaunchedEffect
-            (if (favApps.isEmpty()) 1 else favApps.size + 2) + oi
+        val pkg = grabbed ?: return@LaunchedEffect
+        delay(60)
+        val idx = favApps.indexOfFirst { it.pkg == pkg }
+        val vis = orderState.layoutInfo.visibleItemsInfo
+        if (idx < 0 || vis.isEmpty()) return@LaunchedEffect
+        if (idx <= vis.first().index || idx >= vis.last().index) {
+            orderState.animateScrollToItem((idx - 2).coerceAtLeast(0))
         }
-        val vis = listState.layoutInfo.visibleItemsInfo
-        val first = vis.firstOrNull()?.index ?: 0
-        val last = vis.lastOrNull()?.index ?: 0
-        if (idx <= first || idx >= last) listState.animateScrollToItem((idx - 2).coerceAtLeast(0))
+    }
+
+    fun moveFav(pkg: String, d: Int) {
+        val order = favApps.map { it.pkg }
+        // Las favoritas de apps que ya no estan instaladas se conservan al final.
+        val extra = favs.filter { f -> f !in order }
+        onReorder(move(order, pkg, d) + extra)
     }
 
     GlassPanelFrame {
@@ -290,69 +448,81 @@ fun EditApps(
                 modifier = Modifier.padding(start = 6.dp, top = 2.dp)
             )
             Text(
-                favApps.size.toString() + " favoritas  ·  " +
-                    apps.count { it.pkg in hidden }.toString() + " ocultas",
+                apps.size.toString() + " apps  ·  " + favApps.size.toString() + " favoritas  ·  " +
+                    hiddenCount.toString() + " ocultas",
                 color = EDIT_ACC, fontSize = 13.sp, fontWeight = FontWeight.Medium,
                 modifier = Modifier.padding(start = 6.dp, top = 2.dp)
             )
-            Text(
-                "Las favoritas salen primero y en este orden en el dock. Pulsa OK en una app para editarla.",
-                color = Color(0x80FFFFFF), fontSize = 12.sp,
-                modifier = Modifier.padding(start = 6.dp, top = 4.dp, end = 6.dp)
-            )
-            Spacer(Modifier.height(10.dp))
-            Box(Modifier.fillMaxWidth().height(1.dp).background(Color(0x22FFFFFF)))
-            LazyColumn(
-                state = listState,
-                modifier = Modifier.weight(1f).fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(2.dp),
-                contentPadding = PaddingValues(top = 2.dp, bottom = 8.dp)
+            Row(
+                Modifier.padding(start = 2.dp, top = 10.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                if (favApps.isNotEmpty()) {
-                    item(key = "h-fav") {
-                        EditSectionLabel("FAVORITAS", favApps.size, Modifier.animateItem())
-                    }
-                    itemsIndexed(favApps, key = { _, app -> app.pkg }) { i, app ->
-                        AppEditRow(
+                EditTab("Todas las apps", tab == 0) {
+                    tab = 0
+                    grabbed = null
+                }
+                EditTab("Orden del dock", tab == 1) {
+                    tab = 1
+                    grabbed = null
+                }
+            }
+            Text(
+                if (tab == 0) {
+                    "OK en ★ marca o quita favorita · OK en Ocultar · OK en el % cambia el tamaño."
+                } else {
+                    "OK (o mantener OK) toma una app, ▲ ▼ la mueven y OK la suelta."
+                },
+                color = Color(0x80FFFFFF), fontSize = 12.sp,
+                modifier = Modifier.padding(start = 6.dp, top = 8.dp, end = 6.dp)
+            )
+            Spacer(Modifier.height(8.dp))
+            Box(Modifier.fillMaxWidth().height(1.dp).background(Color(0x22FFFFFF)))
+
+            if (tab == 0) {
+                LazyColumn(
+                    state = allState,
+                    modifier = Modifier.weight(1f).fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                    contentPadding = PaddingValues(top = 6.dp, bottom = 8.dp)
+                ) {
+                    items(sorted, key = { it.pkg }) { app ->
+                        AppRowAll(
                             app = app,
-                            isFav = true,
+                            favPos = posOf[app.pkg] ?: 0,
                             isHidden = app.pkg in hidden,
                             pct = sizes[app.pkg] ?: 100,
-                            expanded = openPkg == app.pkg,
-                            canUp = i > 0,
-                            canDown = i < favApps.lastIndex,
                             focusFirst = app.pkg == firstPkg,
-                            modifier = Modifier.animateItem(),
-                            onToggle = { openPkg = if (openPkg == app.pkg) null else app.pkg },
-                            onFav = { movedPkg = app.pkg; onFav(app.pkg) },
-                            onUp = { movedPkg = app.pkg; onUp(app.pkg) },
-                            onDown = { movedPkg = app.pkg; onDown(app.pkg) },
+                            onFav = { onFav(app.pkg) },
                             onHide = { onHide(app.pkg) },
                             onSize = { onSize(app.pkg, it) }
                         )
                     }
                 }
-                item(key = "h-all") {
-                    EditSectionLabel("TODAS LAS APPS", otherApps.size, Modifier.animateItem())
-                }
-                itemsIndexed(otherApps, key = { _, app -> app.pkg }) { _, app ->
-                    AppEditRow(
-                        app = app,
-                        isFav = false,
-                        isHidden = app.pkg in hidden,
-                        pct = sizes[app.pkg] ?: 100,
-                        expanded = openPkg == app.pkg,
-                        canUp = false,
-                        canDown = false,
-                        focusFirst = app.pkg == firstPkg,
-                        modifier = Modifier.animateItem(),
-                        onToggle = { openPkg = if (openPkg == app.pkg) null else app.pkg },
-                        onFav = { movedPkg = app.pkg; onFav(app.pkg) },
-                        onUp = {},
-                        onDown = {},
-                        onHide = { onHide(app.pkg) },
-                        onSize = { onSize(app.pkg, it) }
-                    )
+            } else if (favApps.isEmpty()) {
+                Text(
+                    "Todavía no hay favoritas. Márcalas con ★ en la pestaña \"Todas las apps\".",
+                    color = Color(0xCCFFFFFF), fontSize = 15.sp,
+                    modifier = Modifier.padding(start = 10.dp, top = 16.dp, end = 10.dp)
+                )
+            } else {
+                LazyColumn(
+                    state = orderState,
+                    modifier = Modifier.weight(1f).fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                    contentPadding = PaddingValues(top = 8.dp, bottom = 8.dp)
+                ) {
+                    itemsIndexed(favApps, key = { _, a -> a.pkg }) { i, app ->
+                        DockOrderRow(
+                            app = app,
+                            pos = i + 1,
+                            isHidden = app.pkg in hidden,
+                            grabbed = grabbed == app.pkg,
+                            modifier = Modifier.animateItem(),
+                            onGrab = { grabbed = app.pkg },
+                            onDrop = { grabbed = null },
+                            onMove = { d -> moveFav(app.pkg, d) }
+                        )
+                    }
                 }
             }
         }
