@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>One Piece Launcher</title>
+<style>
+body{font-family:system-ui,sans-serif;background:#0b1020;color:#eef;margin:0;padding:24px;display:flex;justify-content:center}
+main{max-width:640px;width:100%}h1{margin-bottom:4px}.card{background:#1b1d20;border-radius:16px;padding:20px;margin:16px 0}
+a.btn{display:inline-block;background:#9fb4ff;color:#10131a;font-weight:bold;padding:14px 22px;border-radius:12px;text-decoration:none}
+pre{white-space:pre-wrap;font-family:inherit;margin:0}small{color:#99a}
+</style></head><body><main>
+<h1>One Piece</h1><small>Launcher para Android TV</small>
+<div class="card"><h2 id="v">Buscando la última versión…</h2><p id="d"></p>
+<p><a class="btn" id="dl" href="https://github.com/Diexxzg/minilauncher/releases/latest">Descargar APK</a></p></div>
+<div class="card"><h3>Novedades</h3><pre id="n">Cargando…</pre></div>
+<script>
+fetch('https://api.github.com/repos/Diexxzg/minilauncher/releases/latest').then(r=>r.json()).then(r=>{
+  document.getElementById('v').textContent=r.name||r.tag_name;
+  document.getElementById('d').textContent='Publicada el '+new Date(r.published_at).toLocaleDateString('es');
+  const a=(r.assets||[]).find(x=>x.name.endsWith('.apk'));if(a)document.getElementById('dl').href=a.browser_download_url;
+  document.getElementById('n').textContent=r.body||'Sin notas.';
+}).catch(()=>{document.getElementById('v').textContent='No se pudo leer la versión';document.getElementById('n').textContent='Abre la página de Releases para ver las novedades.'});
+</script></main></body></html>
