@@ -9,6 +9,8 @@ import android.content.IntentFilter
 import androidx.core.content.ContextCompat
 import android.net.Uri
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.os.SystemClock
 import android.os.Bundle
 import android.view.KeyEvent as AKey
@@ -58,12 +60,23 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Text
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.lerp
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -71,6 +84,71 @@ import java.io.File
 
 /** TEMPORAL: muestra un aviso en cada Atras dentro de Configuracion. Ponlo en false cuando termines de probar. */
 private const val DEBUG_BACK = true
+
+/**
+ * Puente entre MainActivity y Configuracion (version 4.0). Configuracion lo usa sin cambiar
+ * la firma de SettingsScreen: pide el servidor del celular, arranca el temporizador de sueno
+ * y avisa cuando cambia algo que MainActivity debe releer.
+ */
+object HomeBridge {
+    /** Temporizador de sueno (30): Configuracion llama start(mins) o cancel(). */
+    val sleep = SleepTimer()
+    /** Configuracion pone true al abrir "Conexion con el celular" y false al salir. */
+    var phoneOn by mutableStateOf(false)
+    /** MainActivity los llena cuando el servidor ya esta activo (vacios si esta apagado). */
+    var phoneAddress by mutableStateOf("")
+    var phoneCode by mutableStateOf("")
+    /** Subir en 1 despues de guardar carpetas (prefs.saveGroups) o apps del perfil de ninos. */
+    var groupsTick by mutableIntStateOf(0)
+    var kidsTick by mutableIntStateOf(0)
+    /** Subir en 1 para volver a aplicar nombres, iconos y brillos propios sobre las apps. */
+    var appsTick by mutableIntStateOf(0)
+}
+
+private const val SEARCH_KEY = "recentSearches"
+
+private fun loadSearches(prefs: Prefs): List<String> =
+    prefs.getStr(SEARCH_KEY, "").split("\u0001").filter { it.isNotBlank() }.take(8)
+
+/** Guarda una busqueda reciente (maximo 8, sin repetidas) y devuelve la lista nueva. */
+private fun pushSearch(prefs: Prefs, q: String): List<String> {
+    val t = q.trim()
+    val cur = loadSearches(prefs)
+    if (t.length < 2) return cur
+    val l = (listOf(t) + cur.filter { !it.equals(t, ignoreCase = true) }).take(8)
+    prefs.putStr(SEARCH_KEY, l.joinToString("\u0001"))
+    return l
+}
+
+@Suppress("DEPRECATION")
+private fun appVersionCode(ctx: Context): Int = try {
+    val pi = ctx.packageManager.getPackageInfo(ctx.packageName, 0)
+    if (Build.VERSION.SDK_INT >= 28) pi.longVersionCode.toInt() else pi.versionCode
+} catch (e: Exception) {
+    0
+}
+
+/** Aviso de app nueva (19): ofrece anadirla al dock. */
+@Composable
+private fun NewAppDialog(label: String, onAdd: () -> Unit, onClose: () -> Unit) {
+    val shape = RoundedCornerShape(26.dp)
+    Dialog(onDismissRequest = onClose, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Column(
+            Modifier
+                .widthIn(max = 480.dp)
+                .clip(shape)
+                .background(Color(0xF0101624))
+                .border(1.dp, Color(0x33FFFFFF), shape)
+                .padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text("Nueva app instalada", color = Color.White, fontSize = 20.sp)
+            Text(label, color = Color(0xB3FFFFFF), fontSize = 15.sp)
+            ActionRow("Añadir al dock", Modifier.autoFocus()) { onAdd() }
+            ActionRow("Ahora no") { onClose() }
+        }
+    }
+}
 
 class MainActivity : ComponentActivity() {
     // tick: solo cambia al instalar/desinstalar/actualizar apps (recarga la lista).
@@ -80,15 +158,24 @@ class MainActivity : ComponentActivity() {
     private var resumeTick by mutableIntStateOf(0)
     // appPaused: el launcher no esta en primer plano (hay otra app abierta): pausa el fondo animado.
     private var appPaused by mutableStateOf(false)
+    // addedPkg: ultima app recien instalada (no actualizada); HomeRoot ofrece anadirla al dock.
+    private var addedPkg by mutableStateOf("")
 
     private val pkgReceiver = object : BroadcastReceiver() {
         override fun onReceive(c: Context?, i: Intent?) {
+            if (i != null && i.action == Intent.ACTION_PACKAGE_ADDED &&
+                !i.getBooleanExtra(Intent.EXTRA_REPLACING, false)
+            ) {
+                val p = i.data?.schemeSpecificPart
+                if (!p.isNullOrEmpty()) addedPkg = p
+            }
             tick++
         }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        runBootApp(this)
         val f = IntentFilter().apply {
             addAction(Intent.ACTION_PACKAGE_ADDED)
             addAction(Intent.ACTION_PACKAGE_REMOVED)
@@ -97,7 +184,7 @@ class MainActivity : ComponentActivity() {
         }
         ContextCompat.registerReceiver(this, pkgReceiver, f, ContextCompat.RECEIVER_EXPORTED)
         addOnNewIntentListener { homeTick++ }
-        setContent { HomeRoot(tick, homeTick, resumeTick, appPaused) }
+        setContent { HomeRoot(tick, homeTick, resumeTick, appPaused, addedPkg) { addedPkg = "" } }
     }
 
     override fun onResume() {
@@ -121,13 +208,23 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun HomeRoot(tick: Int, homeTick: Int, resumeTick: Int, appPaused: Boolean = false) {
+fun HomeRoot(
+    tick: Int,
+    homeTick: Int,
+    resumeTick: Int,
+    appPaused: Boolean = false,
+    addedPkg: String = "",
+    onAddedHandled: () -> Unit = {}
+) {
     val ctx = LocalContext.current
     val baseDensity = LocalDensity.current
     val scope = rememberCoroutineScope()
     val prefs = remember { Prefs(ctx) }
     val cfg = remember { Cfg(prefs) }
-    var apps by remember { mutableStateOf(AppCache.apps) }
+    // baseApps: lista tal como la carga el sistema; apps: con nombre, brillo e icono propios (16).
+    var baseApps by remember { mutableStateOf(AppCache.apps) }
+    var apps by remember { mutableStateOf(applyOverrides(ctx, prefs, AppCache.apps)) }
+    var ovTick by remember { mutableIntStateOf(0) }
     var favs by remember { mutableStateOf(prefs.favs()) }
     var hidden by remember { mutableStateOf(prefs.hidden()) }
     var walls by remember { mutableStateOf<List<File>>(emptyList()) }
@@ -182,6 +279,22 @@ fun HomeRoot(tick: Int, homeTick: Int, resumeTick: Int, appPaused: Boolean = fal
     var accentTarget by remember { mutableStateOf(Color.White) }
     val dockState = rememberLazyListState()
 
+    // Version 4.0: carpetas, busquedas, celular, nota, novedades, aviso de app nueva y clima.
+    val view = LocalView.current
+    var groupMap by remember { mutableStateOf(prefs.groups()) }
+    var openFolder by remember { mutableStateOf<String?>(null) }
+    var recentSearches by remember { mutableStateOf(loadSearches(prefs)) }
+    var extQuery by remember { mutableStateOf("") }
+    var iconPkg by remember { mutableStateOf<String?>(null) }
+    var newAppAsk by remember { mutableStateOf<AppInfo?>(null) }
+    var noteEdit by remember { mutableStateOf(false) }
+    var whatsNew by remember { mutableStateOf<Pair<String, String>?>(null) }
+    var wxCode by remember { mutableIntStateOf(-1) }
+    var prevPanel by remember { mutableStateOf(false) }
+    val sleep = HomeBridge.sleep
+    val verCode = remember { appVersionCode(ctx) }
+    val kidsSet = remember(HomeBridge.kidsTick) { prefs.kidsApps() }
+
     // Modo ahorro y modo noche: valores efectivos. Los ajustes guardados no se tocan, asi que
     // al apagar el modo todo vuelve a como estaba.
     val hourNow = remember(minute) { java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY) }
@@ -203,14 +316,18 @@ fun HomeRoot(tick: Int, homeTick: Int, resumeTick: Int, appPaused: Boolean = fal
     val profileSel = profileIndex(scalePct, spacing, corner, glowLvl, cfg)
 
     // Tema de color: se fija antes de dibujar nada y se actualiza al cambiarlo.
-    remember { Themes.set(cfg.theme); 0 }
-    SideEffect { Themes.set(cfg.theme) }
+    val themeIdx = Themes.pick(cfg, hourNow)
+    remember { Themes.set(themeIdx, cfg.accentCustom); 0 }
+    SideEffect { Themes.set(themeIdx, cfg.accentCustom) }
 
     // Tecla Home: si ya estas en el inicio, vuelve al principio de la fila, devuelve el
     // foco a la primera ficha y sale del modo ambiente / menus.
     // Barra superior oculta: solo con el inicio libre (sin paneles ni menus) y sin foco en la barra.
-    val barFree = screen == "home" && menuApp == null && !showMore && !showQuick &&
-        !showPower && pinAsk == null && !showSaverHint && !upd.visible
+    val showWizard = appsLoaded && !cfg.wizardDone && !cfg.kids && screen == "home"
+    val homeFree = screen == "home" && menuApp == null && !showMore && !showQuick &&
+        !showPower && pinAsk == null && !showSaverHint && !upd.visible &&
+        openFolder == null && newAppAsk == null && !showWizard && whatsNew == null && !noteEdit
+    val barFree = homeFree
     LaunchedEffect(cfg.hideBar, cfg.hideBarSecs, barFree, barFocus, barTick) {
         barHidden = false
         if (!cfg.hideBar || !barFree || barFocus) return@LaunchedEffect
@@ -251,6 +368,7 @@ fun HomeRoot(tick: Int, homeTick: Int, resumeTick: Int, appPaused: Boolean = fal
         showMore = false
         showQuick = false
         showSaverHint = false
+        openFolder = null
         if (homeTick > 0) {
             dockState.animateScrollToItem(0)
             focusTick++
@@ -262,11 +380,12 @@ fun HomeRoot(tick: Int, homeTick: Int, resumeTick: Int, appPaused: Boolean = fal
         delay(250)
         backdropApp = focusedApp
     }
-
-    // Al cerrar Configuracion el inicio no se recompone: se devuelve el foco a la primera ficha.
+        // Al cerrar Configuracion el inicio no se recompone: se devuelve el foco a la primera ficha.
     LaunchedEffect(screen) {
         if (screen == "home" && prevScreen == "settings") focusTick++
         if (screen == "home") settingsCat = -1
+        if (screen == "home" || (screen != "all" && prevScreen == "all")) extQuery = ""
+        if (screen != "settings") HomeBridge.phoneOn = false
         prevScreen = screen
     }
 
@@ -284,8 +403,10 @@ fun HomeRoot(tick: Int, homeTick: Int, resumeTick: Int, appPaused: Boolean = fal
         // Un reemplazo de app dispara varios avisos seguidos: se espera un poco.
         if (tick > 0) delay(500)
         val loaded = withContext(Dispatchers.IO) { loadApps(ctx) }
+        val shown = withContext(Dispatchers.IO) { applyOverrides(ctx, prefs, loaded) }
         AppCache.apps = loaded
-        apps = loaded
+        baseApps = loaded
+        apps = shown
         appsLoaded = true
         if (!prefs.initDone && loaded.isNotEmpty()) {
             favs = loaded.take(6).map { it.pkg }
@@ -296,6 +417,116 @@ fun HomeRoot(tick: Int, homeTick: Int, resumeTick: Int, appPaused: Boolean = fal
         if (!prefs.hasSeen() && loaded.isNotEmpty()) {
             seen = loaded.map { it.pkg }.toSet()
             prefs.saveSeen(seen)
+        }
+    }
+
+    // ---- Version 4.0: efectos ----
+    // Nombres, iconos y brillos propios (16): se vuelven a aplicar sobre la lista cargada.
+    LaunchedEffect(ovTick, HomeBridge.appsTick) {
+        if (ovTick == 0 && HomeBridge.appsTick == 0) return@LaunchedEffect
+        apps = withContext(Dispatchers.IO) { applyOverrides(ctx, prefs, baseApps) }
+    }
+
+    // Carpetas editadas desde Configuracion (17).
+    LaunchedEffect(HomeBridge.groupsTick) { groupMap = prefs.groups() }
+
+    // Temporizador de sueno (30): al cumplirse pasa a pantalla negra o modo ambiente.
+    LaunchedEffect(sleep.active) {
+        while (sleep.active) {
+            delay(2000)
+            if (sleep.due()) {
+                screen = if (cfg.sleepAction == 1) "ambient" else "black"
+                break
+            }
+        }
+    }
+
+    // Conexion con el celular (36-38): el servidor solo vive mientras Configuracion lo pida.
+    LaunchedEffect(HomeBridge.phoneOn) {
+        if (!HomeBridge.phoneOn) return@LaunchedEffect
+        val ui = Handler(Looper.getMainLooper())
+        val srv = PhoneServer(
+            ctx.applicationContext, prefs,
+            onText = { t ->
+                ui.post {
+                    extQuery = t
+                    if (screen == "home" || screen == "all") {
+                        searchFocus = false
+                        screen = "all"
+                    } else {
+                        toast(ctx, "Texto recibido del celular.")
+                    }
+                }
+            },
+            onWall = {
+                ui.post {
+                    scope.launch { walls = withContext(Dispatchers.IO) { listWalls(ctx) } }
+                }
+            },
+            onConfig = { ui.post { findActivity(ctx)?.recreate() } }
+        )
+        val ok = withContext(Dispatchers.IO) { srv.start() }
+        if (!ok) {
+            toast(ctx, "No se pudo abrir la conexión con el celular.")
+            HomeBridge.phoneOn = false
+            return@LaunchedEffect
+        }
+        HomeBridge.phoneCode = srv.code
+        HomeBridge.phoneAddress = withContext(Dispatchers.IO) { srv.address() }
+        try {
+            awaitCancellation()
+        } finally {
+            srv.stop()
+            HomeBridge.phoneAddress = ""
+            HomeBridge.phoneCode = ""
+        }
+    }
+
+    // Codigo de clima real para la capa de clima del fondo (23). Apagado con el modo ahorro.
+    LaunchedEffect(cfg.weatherFx, cfg.saver, cfg.city) {
+        if (!cfg.weatherFx || cfg.saver) {
+            wxCode = -1
+            return@LaunchedEffect
+        }
+        while (true) {
+            val r = withContext(Dispatchers.IO) { fetchWeatherRaw(cfg.city, false) }
+            if (r != null) wxCode = r.first
+            delay(if (r == null) 60_000L else 1_800_000L)
+        }
+    }
+
+    // Aviso de app nueva (19): al instalar una app se ofrece anadirla al dock.
+    LaunchedEffect(addedPkg, apps) {
+        if (addedPkg.isEmpty()) return@LaunchedEffect
+        val a = apps.firstOrNull { it.pkg == addedPkg } ?: return@LaunchedEffect
+        if (cfg.newAppAlert && !cfg.kids && a.pkg !in favs) newAppAsk = a
+        onAddedHandled()
+    }
+
+    // Novedades (35): tras actualizar, se muestran las notas del ultimo Release.
+    LaunchedEffect(appsLoaded, cfg.wizardDone) {
+        if (!appsLoaded || !cfg.wizardDone || verCode == 0) return@LaunchedEffect
+        if (cfg.lastVersion == 0) {
+            cfg.setLastVersion(verCode)
+        } else if (cfg.lastVersion != verCode) {
+            delay(4000)
+            val n = withContext(Dispatchers.IO) { fetchReleaseNotes() }
+            if (n != null) {
+                while (screen != "home" || menuApp != null) delay(2000)
+                whatsNew = n
+            }
+        }
+    }
+
+    // Sonido corto al abrir y cerrar paneles (26).
+    val anyPanel = (screen != "home" && screen != "ambient" && screen != "black") ||
+        menuApp != null || showPower || showMore || showQuick || openFolder != null
+    LaunchedEffect(anyPanel) {
+        if (anyPanel != prevPanel) {
+            prevPanel = anyPanel
+            if (cfg.panelSounds && appsLoaded) {
+                playPanelSound(view, if (cfg.soundLevel == 2) 0.7f else 0.3f, anyPanel)
+            }
         }
     }
 
@@ -329,7 +560,9 @@ fun HomeRoot(tick: Int, homeTick: Int, resumeTick: Int, appPaused: Boolean = fal
     val art = remember(m?.title, m?.artist, m?.bitmap != null) { m?.bitmap?.asImageBitmap() }
     val mm = minute
     // Rotacion de fondos: por tiempo o segun la hora del dia.
-    val selected: File? = if (walls.isEmpty()) null else when (cfg.rot) {
+    val selected: File? = if (walls.isEmpty()) null else if (cfg.wallShow && walls.size > 1) {
+        walls[((mm / cfg.wallShowMins.coerceIn(1, 120)) % walls.size).toInt()]
+    } else when (cfg.rot) {
         1 -> walls[((mm / 30L) % walls.size).toInt()]
         2 -> walls[((mm / 60L) % walls.size).toInt()]
         3 -> walls[java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY) * walls.size / 24]
@@ -371,6 +604,9 @@ fun HomeRoot(tick: Int, homeTick: Int, resumeTick: Int, appPaused: Boolean = fal
     fun goBack() {
         when {
             pinAsk != null -> pinAsk = null
+            noteEdit -> noteEdit = false
+            openFolder != null -> openFolder = null
+            newAppAsk != null -> newAppAsk = null
             upd.visible -> {
                 upd.dismiss()
                 focusTick++
@@ -411,6 +647,19 @@ fun HomeRoot(tick: Int, homeTick: Int, resumeTick: Int, appPaused: Boolean = fal
         }
     }
 
+    // Icono propio de una app (16).
+    val iconPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
+        val p = iconPkg
+        iconPkg = null
+        if (uri != null && p != null) {
+            scope.launch {
+                val ok = withContext(Dispatchers.IO) { importIcon(ctx, uri, p) }
+                toast(ctx, if (ok) "Icono guardado." else "No se pudo usar esa imagen.")
+                if (ok) ovTick++
+            }
+        }
+    }
+
     // Copias de seguridad: guardar donde elija el usuario y restaurar desde cualquier archivo.
     val backupSaver = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/json")
@@ -441,11 +690,32 @@ fun HomeRoot(tick: Int, homeTick: Int, resumeTick: Int, appPaused: Boolean = fal
         scope.launch { net = withContext(Dispatchers.IO) { readNet(ctx) } }
     }
 
-    val visible = remember(apps, hidden) { apps.filter { it.pkg !in hidden } }
-    val hiddenApps = remember(apps, hidden) { apps.filter { it.pkg in hidden } }
-    val dock = remember(visible, favs) {
-        val byPkg = visible.associateBy { it.pkg }
-        favs.mapNotNull { byPkg[it] }
+    // Perfil para ninos (34): solo las apps permitidas. Carpetas (17): sus apps no salen sueltas en el dock.
+    val visible = remember(apps, hidden, cfg.kids, kidsSet) {
+        if (cfg.kids) apps.filter { it.pkg in kidsSet } else apps.filter { it.pkg !in hidden }
+    }
+    val hiddenApps = remember(apps, hidden, cfg.kids) {
+        if (cfg.kids) emptyList<AppInfo>() else apps.filter { it.pkg in hidden }
+    }
+    val folderNames = remember(groupMap) { groupMap.keys.take(MAX_FOLDERS) }
+    val inFolders = remember(groupMap, folderNames) {
+        folderNames.flatMap { groupMap[it] ?: emptyList() }.toSet()
+    }
+    val dock = remember(visible, favs, cfg.kids, inFolders) {
+        if (cfg.kids) {
+            visible
+        } else {
+            val byPkg = visible.associateBy { it.pkg }
+            favs.filter { it !in inFolders }.mapNotNull { byPkg[it] }
+        }
+    }
+    val groupList = remember(groupMap, folderNames, visible, cfg.kids) {
+        if (cfg.kids) {
+            emptyList<Pair<String, List<AppInfo>>>()
+        } else {
+            val byPkg = visible.associateBy { it.pkg }
+            folderNames.map { n -> n to (groupMap[n] ?: emptyList()).mapNotNull { byPkg[it] } }
+        }
     }
     val newPkgs = remember(visible, seen) { visible.map { it.pkg }.filter { it !in seen }.toSet() }
     val badges = remember(newPkgs, unread) { Badges(newPkgs, unread) }
@@ -461,9 +731,16 @@ fun HomeRoot(tick: Int, homeTick: Int, resumeTick: Int, appPaused: Boolean = fal
         }
     }
 
-    fun startNow(a: AppInfo) {
+    fun startNow(a: AppInfo, b: Rect?) {
         val opts = try {
-            ActivityOptions.makeCustomAnimation(ctx, 0, 0).toBundle()
+            if (cfg.openAnim && !cfg.saver && b != null && b.width > 1f && b.height > 1f) {
+                // Animacion (27): la app crece desde la ficha que se pulso.
+                ActivityOptions.makeScaleUpAnimation(
+                    view, b.left.toInt(), b.top.toInt(), b.width.toInt(), b.height.toInt()
+                ).toBundle()
+            } else {
+                ActivityOptions.makeCustomAnimation(ctx, 0, 0).toBundle()
+            }
         } catch (e: Exception) {
             null
         }
@@ -478,10 +755,27 @@ fun HomeRoot(tick: Int, homeTick: Int, resumeTick: Int, appPaused: Boolean = fal
     fun openApp(a: AppInfo) {
         recents = prefs.pushRecent(a.pkg)
         usage = prefs.bumpUsage(a.pkg)
+        prefs.bumpDay(a.pkg)
         lastUsed = prefs.markUsed(a.pkg)
         seen = prefs.markSeen(a.pkg)
+        val b = TileBounds.last
         TileBounds.last = null
-        startNow(a)
+        startNow(a, b)
+    }
+        // Carpetas (17): una app esta en una sola carpeta a la vez.
+    fun toggleFolder(p: String, i: Int) {
+        val n = folderNames.getOrNull(i) ?: return
+        val inIt = p in (groupMap[n] ?: emptyList())
+        val nm = LinkedHashMap<String, List<String>>()
+        for ((k, v) in groupMap) {
+            nm[k] = if (k == n) {
+                if (inIt) v - p else v + p
+            } else {
+                v - p
+            }
+        }
+        groupMap = nm
+        prefs.saveGroups(nm)
     }
 
     // Perfil de diseno: aplica de una vez dock, brillo, fondo dinamico, filas y reloj.
@@ -582,7 +876,30 @@ fun HomeRoot(tick: Int, homeTick: Int, resumeTick: Int, appPaused: Boolean = fal
             else -> openSystem(ctx, "access")
         }
     }
-        val uiScale = cfg.uiScale / 100f
+    // ---- Botones de color (13) ----
+    fun runColorAction(a: Int) {
+        when (a) {
+            1 -> {
+                searchFocus = false
+                screen = "all"
+            }
+            2 -> guarded(cfg.lockSettings) { screen = "settings" }
+            3 -> {
+                inputs = listInputs(ctx)
+                screen = "inputs"
+            }
+            4 -> {
+                searchFocus = true
+                screen = "all"
+            }
+            5 -> showPower = true
+            6 -> guarded(cfg.lockSettings) { screen = "edit" }
+            7 -> screen = "ambient"
+            8 -> screen = "black"
+        }
+    }
+
+    val uiScale = cfg.uiScale / 100f
     // Vista previa en vivo: en Apariencia y Dock el fondo no se oscurece ni se desenfoca,
     // y la primera ficha del dock se ve "enfocada" para que se note cada cambio.
     val preview = screen == "settings" && settingsCat in 0..1
@@ -622,8 +939,7 @@ fun HomeRoot(tick: Int, homeTick: Int, resumeTick: Int, appPaused: Boolean = fal
     }
     // Si el control va muy lento varias veces seguidas, se sugiere el modo ahorro.
         SlowWatch(
-        active = screen == "home" && !cfg.saver && cfg.saverHint && !saverSkip && !showSaverHint && !upd.visible &&
-            menuApp == null && !showMore && !showQuick && !showPower && pinAsk == null,
+        active = homeFree && !cfg.saver && cfg.saverHint && !saverSkip,
         lastInputMs = { lastInput.longValue },
         onSlow = { showSaverHint = true }
     )
@@ -642,6 +958,16 @@ fun HomeRoot(tick: Int, homeTick: Int, resumeTick: Int, appPaused: Boolean = fal
                         goBack()
                     }
                     return@onPreviewKeyEvent true
+                }
+                // Botones de color (13): solo con el inicio libre y fuera del perfil para ninos.
+                if (it.type == KeyEventType.KeyDown && it.nativeKeyEvent.repeatCount == 0 &&
+                    homeFree && !cfg.kids
+                ) {
+                    val act = colorKeyAction(cfg, k)
+                    if (act != null) {
+                        if (act != 0) runColorAction(act)
+                        return@onPreviewKeyEvent act != 0
+                    }
                 }
                 // Arriba con la barra oculta: la muestra (la tecla sigue su camino normal).
                 if (barHidden && it.type == KeyEventType.KeyDown && k == Key.DirectionUp) {
@@ -682,6 +1008,11 @@ fun HomeRoot(tick: Int, homeTick: Int, resumeTick: Int, appPaused: Boolean = fal
                 label = "wall"
             ) { f -> WallpaperLayer(f, wallPaused) }
             FocusBackdrop(bdApp, eDyn)
+            // Capa de clima (23): apagada con el ajuste, el modo ahorro o si el launcher esta en pausa.
+            WeatherFx(
+                wxCode, hourNow < 7 || hourNow >= 19,
+                cfg.weatherFx && !cfg.saver && !appPaused && screen != "ambient" && screen != "black"
+            )
             Box(
                 Modifier.fillMaxSize().background(
                     Brush.verticalGradient(listOf(Color(0x22000000), Color.Transparent, Color(0x99000000)))
@@ -698,7 +1029,10 @@ fun HomeRoot(tick: Int, homeTick: Int, resumeTick: Int, appPaused: Boolean = fal
         } else {
             CompositionLocalProvider(
                 LocalDock provides style,
-                LocalDensity provides Density(baseDensity.density * uiScale, baseDensity.fontScale),
+                LocalDensity provides Density(
+                    baseDensity.density * uiScale,
+                    baseDensity.fontScale * (if (cfg.bigText) 1.25f else 1f)
+                ),
                 LocalUiScale provides uiScale,
                 LocalOverscan provides cfg.overscan,
                 LocalAccent provides when (cfg.glowSrc) {
@@ -709,13 +1043,15 @@ fun HomeRoot(tick: Int, homeTick: Int, resumeTick: Int, appPaused: Boolean = fal
                 LocalSounds provides cfg.sounds,
                 LocalFocusStyle provides (if (cfg.saver && cfg.focusStyle == 2) 1 else cfg.focusStyle),
                 LocalSoundVol provides (if (cfg.soundLevel == 2) 0.7f else 0.3f),
-                LocalBadges provides badges
+                LocalBadges provides badges,
+                LocalThickFocus provides cfg.thickFocus,
+                LocalHighContrast provides cfg.highContrast
             ) {
                 Box(Modifier.fillMaxSize()) {
                     if (dimColor.alpha > 0.001f) {
                         Box(Modifier.fillMaxSize().background(dimColor))
                     }
-                    if (screen == "settings" && cfg.overscan > 0) {
+                                        if (screen == "settings" && cfg.overscan > 0) {
                         // Guia: el borde del area segura mientras ajustas el margen.
                         Box(
                             Modifier
@@ -757,12 +1093,12 @@ fun HomeRoot(tick: Int, homeTick: Int, resumeTick: Int, appPaused: Boolean = fal
                                                 }
                                             },
                                             onSettings = {
-                                                if (live) guarded(cfg.lockSettings) { screen = "settings" }
+                                                if (live) guarded(cfg.lockSettings || cfg.kids) { screen = "settings" }
                                             },
                                             onWifi = { if (live) openSystem(ctx, "wifi") },
                                             cfg = cfg,
                                             recents = recentApps,
-                                            onMenu = { if (live) menuApp = it },
+                                            onMenu = { if (live && !cfg.kids) menuApp = it },
                                             rows = rowList,
                                             net = net,
                                             onMore = { if (live) showMore = true },
@@ -782,7 +1118,10 @@ fun HomeRoot(tick: Int, homeTick: Int, resumeTick: Int, appPaused: Boolean = fal
                                             quickBack = quickBack,
                                             focusedApp = if (preview) dock.firstOrNull() else focusedApp,
                                             lastUsed = lastUsed,
-                                            sidePanel = s == "settings" || s == "edit"
+                                            sidePanel = s == "settings" || s == "edit",
+                                            groups = groupList,
+                                            onFolder = { if (live) openFolder = it },
+                                            onEditNote = { if (live) noteEdit = true }
                                         )
                                     }
                                     AnimatedVisibility(
@@ -930,18 +1269,25 @@ fun HomeRoot(tick: Int, homeTick: Int, resumeTick: Int, appPaused: Boolean = fal
                                         openInput(ctx, it)
                                         screen = "home"
                                     },
-                                    onClose = { screen = "home" }
+                                    onClose = { screen = "home" },
+                                    prefs = prefs
                                 )
                                 "all" -> AllApps(
                                     visible, usage, recents, cfg.sort,
                                     { cfg.setSort(it) },
-                                    { menuApp = it },
+                                    { if (!cfg.kids) menuApp = it },
                                     focusSearch = searchFocus,
                                     loading = !appsLoaded,
                                     onHidden = if (hiddenApps.isNotEmpty()) {
                                         { guarded(cfg.lockHidden) { screen = "hidden" } }
                                     } else {
                                         null
+                                    },
+                                    recentSearches = recentSearches,
+                                    onSearched = { q -> recentSearches = pushSearch(prefs, q) },
+                                    externalQuery = extQuery,
+                                    onVoice = {
+                                        if (!launchAssistant(ctx)) toast(ctx, "Esta TV no tiene asistente de voz.")
                                     }
                                 ) { openApp(it) }
                                 "hidden" -> AllApps(
@@ -962,7 +1308,7 @@ fun HomeRoot(tick: Int, homeTick: Int, resumeTick: Int, appPaused: Boolean = fal
                             }
                         }
                     }
-                    val ma = menuApp
+                    val ma = menuApp?.let { m -> apps.firstOrNull { it.pkg == m.pkg } ?: m }
                     if (ma != null) {
                         val p = ma.pkg
                         AppMenu(
@@ -1009,7 +1355,33 @@ fun HomeRoot(tick: Int, homeTick: Int, resumeTick: Int, appPaused: Boolean = fal
                                 val nl = if (p in l) l - p else l + p
                                 rowApps = rowApps.mapIndexed { j, x -> if (j == i) nl else x }
                                 prefs.saveRowApps(i, nl)
-                            }
+                            },
+                            customName = prefs.names()[p] ?: "",
+                            onRename = { v ->
+                                prefs.setName(p, v)
+                                ovTick++
+                            },
+                            glowIndex = glowPresetIndex(prefs, p),
+                            onGlow = { gi ->
+                                prefs.setGlow(p, GLOW_PRESETS.getOrNull(gi)?.second)
+                                ovTick++
+                            },
+                            hasIcon = hasCustomIcon(ctx, p),
+                            onIcon = {
+                                iconPkg = p
+                                try {
+                                    iconPicker.launch(arrayOf("image/*"))
+                                    } catch (e: Exception) {
+                                    toast(ctx, "Esta TV no tiene selector de archivos.")
+                                }
+                            },
+                            onIconReset = {
+                                resetIcon(ctx, p)
+                                ovTick++
+                            },
+                            folderNames = folderNames,
+                            inFolder = folderNames.map { n -> p in (groupMap[n] ?: emptyList()) },
+                            onFolder = { fi -> toggleFolder(p, fi) }
                         )
                     }
                     if (showMore) {
@@ -1042,7 +1414,7 @@ fun HomeRoot(tick: Int, homeTick: Int, resumeTick: Int, appPaused: Boolean = fal
                             onSettings = {
                                 showQuick = false
                                 quickBack++
-                                guarded(cfg.lockSettings) { screen = "settings" }
+                                guarded(cfg.lockSettings || cfg.kids) { screen = "settings" }
                             },
                             onClose = {
                                 showQuick = false
@@ -1093,6 +1465,76 @@ fun HomeRoot(tick: Int, homeTick: Int, resumeTick: Int, appPaused: Boolean = fal
                     val pa = pinAsk
                     if (pa != null) {
                         PinPad(pa, pinErr) { pinAsk = null }
+                    }
+                    val of = openFolder
+                    if (of != null) {
+                        FolderDialog(
+                            name = of,
+                            apps = groupList.firstOrNull { it.first == of }?.second ?: emptyList(),
+                            onLaunch = {
+                                openFolder = null
+                                TileBounds.last = null
+                                openApp(it)
+                            },
+                            onMenu = { if (!cfg.kids) menuApp = it },
+                            onClose = { openFolder = null }
+                        )
+                    }
+                    val na = newAppAsk
+                    if (na != null) {
+                        NewAppDialog(
+                            label = na.label,
+                            onAdd = {
+                                if (na.pkg !in favs) {
+                                    favs = favs + na.pkg
+                                    prefs.saveFavs(favs)
+                                }
+                                newAppAsk = null
+                                toast(ctx, "Añadida al dock.")
+                            },
+                            onClose = { newAppAsk = null }
+                        )
+                    }
+                    if (noteEdit) {
+                        TextEditDialog(
+                            title = "Nota rápida",
+                            initial = cfg.noteText,
+                            hint = "Se muestra junto al reloj (hasta 80 letras).",
+                            maxLen = 80,
+                            onSave = {
+                                cfg.setNoteText(it)
+                                noteEdit = false
+                            },
+                            onClose = { noteEdit = false }
+                        )
+                    }
+                    if (showWizard) {
+                        SetupWizard(
+                            onSetHome = { requestHome(ctx) { homeLauncher.launch(it) } },
+                            onNotifications = {
+                                if (!tryStart(ctx, "android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS")) {
+                                    openSystem(ctx, "access")
+                                }
+                            },
+                            onProfile = { applyProfile(it) },
+                            onDone = {
+                                cfg.setWizardDone(true)
+                                cfg.setLastVersion(verCode)
+                                focusTick++
+                            }
+                        )
+                    }
+                    val wn = whatsNew
+                    if (wn != null) {
+                        WhatsNewDialog(
+                            title = wn.first,
+                            body = wn.second,
+                            onClose = {
+                                cfg.setLastVersion(verCode)
+                                whatsNew = null
+                                focusTick++
+                            }
+                        )
                     }
                 }
             }
