@@ -1,5 +1,11 @@
 # Novedades
 
+## 4.2
+Configuración
+- Reorganizada en 11 categorías más claras: Fondo y color, Dock y diseño, Pantalla y energía, Permisos y más.
+- Opciones agrupadas en tarjetas de cristal, con iconos nuevos y guía de botones arriba.
+- Todos los permisos ahora están juntos en una sola categoría.
+
 ## 4.1
 Configuración
 - Nuevo diseño en dos columnas: categorías a la izquierda y opciones a la derecha, con el panel más ancho y textos más grandes.
