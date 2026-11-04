@@ -1,4 +1,64 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="power_service_desc">Permite abrir el menú de energía del sistema (reiniciar, apagar) y suspender la TV desde el launcher. No lee el contenido de la pantalla.</string>
+
+    <!-- Comunes -->
+    <string name="x_close">Cerrar</string>
+    <string name="x_cancel">Cancelar</string>
+    <string name="x_news">Novedades</string>
+
+    <!-- Temporizador de sueño (30) -->
+    <string name="sleep_label">Temporizador de sueño</string>
+    <string name="sleep_label_left">Temporizador de sueño · faltan %1$d min</string>
+
+    <!-- Estadísticas (32) -->
+    <string name="stats_title">Estadísticas de uso · esta semana</string>
+
+    <!-- Conexión con el celular (36-38) -->
+    <string name="phone_title">Conexión con el celular</string>
+    <string name="phone_connecting">Conectando…</string>
+    <string name="phone_failed">No se pudo conectar. Revisa que la TV tenga red y vuelve a abrir esta pantalla.</string>
+    <string name="phone_steps">Con el celular en la misma red Wi-Fi, abre esta dirección en su navegador y escribe el código:</string>
+    <string name="phone_code">Código: %1$s</string>
+    <string name="phone_use">Sirve para subir fondos, escribir texto en la TV y copiar o restaurar la configuración.</string>
+
+    <!-- Perfil para niños (34) -->
+    <string name="kids_title">Apps permitidas para niños</string>
+    <string name="kids_hint">Marca con OK las apps que verán los niños.</string>
+    <string name="kids_none">No se encontraron apps.</string>
+    <string name="kids_clear">Quitar todas</string>
+
+    <!-- Selector de app (18) -->
+    <string name="picker_none">Ninguna</string>
+
+    <!-- Carpetas del dock (17) -->
+    <string name="folders_title">Carpetas del dock</string>
+    <string name="folders_hint">Hasta %1$d carpetas. Para meter una app, mantén OK sobre ella y elige la carpeta.</string>
+    <string name="folders_create">Crear carpeta</string>
+    <string name="folders_rename">Renombrar «%1$s» · %2$d apps</string>
+    <string name="folders_delete">Borrar «%1$s»</string>
+    <string name="folders_new_title">Nueva carpeta</string>
+    <string name="folders_rename_title">Renombrar carpeta</string>
+    <string name="folders_name_hint">Escribe el nombre (hasta 20 letras).</string>
+    <string name="folders_taken">Ya existe una carpeta con ese nombre.</string>
+    <string name="folders_delete_title">¿Borrar la carpeta «%1$s»?</string>
+    <string name="folders_delete_text">Las apps no se desinstalan.</string>
+    <string name="folders_delete_yes">Sí, borrar</string>
+
+    <!-- Color de acento (21) -->
+    <string name="accent_title">Color de acento propio</string>
+    <string name="accent_hue">Tono</string>
+    <string name="accent_sat">Intensidad</string>
+    <string name="accent_val">Brillo</string>
+    <string name="accent_use">Usar este color</string>
+    <string name="accent_clear">Quitar el color propio</string>
+
+    <!-- Novedades (35) -->
+    <string name="news_loading">Buscando las novedades…</string>
+    <string name="news_failed">No se pudieron leer las novedades. Revisa la conexión a internet.</string>
+
+    <!-- Visor de errores (42) -->
+    <string name="errors_title">Visor de errores</string>
+    <string name="errors_empty">No hay errores registrados.</string>
+    <string name="errors_clear">Borrar el registro</string>
 </resources>
