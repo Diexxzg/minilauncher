@@ -382,7 +382,7 @@ fun HomeRoot(
     }
         // Al cerrar Configuracion el inicio no se recompone: se devuelve el foco a la primera ficha.
     LaunchedEffect(screen) {
-        if (screen == "home" && prevScreen == "settings") focusTick++
+        if (screen == "home" && (prevScreen == "settings" || prevScreen == "wizard")) focusTick++
         if (screen == "home") {
             settingsCat = 0
             settingsRight = false
@@ -603,6 +603,20 @@ fun HomeRoot(
         }
     }
 
+    // Al volver de "restablecer/importar" se reabre Configuracion; en el primer uso se ofrece el asistente.
+    LaunchedEffect(Unit) {
+        delay(400)
+        val r = prefs.getInt("reopenCat", -1)
+        if (r >= 0) {
+            prefs.putInt("reopenCat", -1)
+            settingsCat = r.coerceIn(0, 10)
+            screen = "settings"
+        } else if (prefs.getInt("wizardDone", 0) == 0 && !cfg.lockSettings && !cfg.kids) {
+            delay(1500)
+            if (screen == "home") screen = "wizard"
+        }
+    }
+
     // Un solo lugar para "Atras": lo usan la tecla (antes de que llegue a nada mas) y BackHandler.
     fun goBack() {
         when {
@@ -630,9 +644,9 @@ fun HomeRoot(
             }
             showPower -> showPower = false
             screen == "walls" || screen == "edit" || screen == "dock" -> screen = "settings"
-            screen == "settings" && settingsRight -> {
-                settingsRight = false
-                railBack++
+            screen == "wizard" -> {
+                prefs.putInt("wizardDone", 1)
+                screen = "home"
             }
             screen == "hidden" -> screen = "all"
             else -> screen = "home"
@@ -686,6 +700,32 @@ fun HomeRoot(
                     findActivity(ctx)?.recreate()
                 } else {
                     toast(ctx, "Ese archivo no es una copia válida.")
+                }
+            }
+        }
+    }
+
+    // Diseño (solo el aspecto): guardar en un archivo y cargarlo sin tocar apps ni PIN.
+    val designSaver = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/json")
+    ) { uri: Uri? ->
+        if (uri != null) {
+            scope.launch {
+                val ok = withContext(Dispatchers.IO) { writeDesignTo(ctx, prefs, uri) }
+                toast(ctx, if (ok) "Diseño guardado." else "No se pudo guardar el diseño.")
+            }
+        }
+    }
+    val designPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
+        if (uri != null) {
+            scope.launch {
+                val ok = withContext(Dispatchers.IO) { readDesignFrom(ctx, prefs, uri) }
+                if (ok) {
+                    toast(ctx, "Diseño aplicado.")
+                    prefs.putInt("reopenCat", 1)
+                    findActivity(ctx)?.recreate()
+                } else {
+                    toast(ctx, "Ese archivo no es un diseño válido.")
                 }
             }
         }
@@ -908,8 +948,8 @@ fun HomeRoot(
     val uiScale = cfg.uiScale / 100f
     // Vista previa en vivo: en Apariencia y Dock el fondo no se oscurece ni se desenfoca,
     // y la primera ficha del dock se ve "enfocada" para que se note cada cambio.
-    val preview = screen == "settings" && settingsPreviewCat(settingsCat)
-    val sideOpen = screen == "settings" || screen == "edit"
+    val preview = (screen == "settings" && settingsPreviewCat(settingsCat)) || screen == "wizard"
+    val sideOpen = screen == "settings" || screen == "edit" || screen == "wizard"
     // Ancho que ocupa el panel lateral: el inicio se hace mas angosto para no quedar debajo.
     val availW = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp / uiScale -
         2f * cfg.overscan / uiScale
@@ -922,6 +962,7 @@ fun HomeRoot(
         "all", "hidden" -> 0x99000000
         "walls" -> 0xAA000000
         "settings" -> if (preview) 0x14000000L else 0x40000000L
+        "wizard" -> 0x14000000L
         "edit" -> 0x14000000
         "inputs" -> 0x55000000
         else -> 0L
@@ -1161,7 +1202,34 @@ fun HomeRoot(
                                             }
                                         )
                                     }
-                                                                                                            AnimatedVisibility(
+                                    if (s == "wizard") {
+                                        SetupWizard(
+                                            style = realStyle,
+                                            cfg = cfg,
+                                            onProfile = { applyProfile(it) },
+                                            onWalls = {
+                                                prefs.putInt("wizardDone", 1)
+                                                screen = "walls"
+                                            },
+                                            onNetPerm = {
+                                                val perms = ArrayList<String>()
+                                                perms.add(Manifest.permission.ACCESS_FINE_LOCATION)
+                                                if (Build.VERSION.SDK_INT >= 31) {
+                                                    perms.add(Manifest.permission.BLUETOOTH_CONNECT)
+                                                }
+                                                try {
+                                                    netPerm.launch(perms.toTypedArray())
+                                                } catch (e: Exception) {
+                                                    toast(ctx, "Esta TV no permite pedir ese permiso.")
+                                                }
+                                            },
+                                            onClose = {
+                                                prefs.putInt("wizardDone", 1)
+                                                screen = "home"
+                                            }
+                                        )
+                                    }
+                                    AnimatedVisibility(
                                         visible = s == "settings",
                                         enter = if (eAnim) {
                                             fadeIn(tween(240)) + slideInVertically(tween(280, easing = FastOutSlowInEasing)) { h -> h / 24 }
@@ -1192,6 +1260,21 @@ fun HomeRoot(
                                             railBack = railBack,
                                             onProfile = { applyProfile(it) },
                                             onUpdate = { upd.open(scope) },
+                                            onDesignSave = {
+                                                try {
+                                                    designSaver.launch("diseno_launcher.json")
+                                                } catch (e: Exception) {
+                                                    toast(ctx, "Esta TV no tiene selector de archivos.")
+                                                }
+                                            },
+                                            onDesignPick = {
+                                                try {
+                                                    designPicker.launch(arrayOf("*/*"))
+                                                } catch (e: Exception) {
+                                                    toast(ctx, "Esta TV no tiene selector de archivos.")
+                                                }
+                                            },
+                                            onWizard = { screen = "wizard" },
                                             updBack = updBack,
                                             blocked = upd.visible,
                                             onBackupSave = {

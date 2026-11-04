@@ -104,10 +104,10 @@ private const val ABOUT = 10
 /** Orden de las secciones dentro de cada categoría (las no listadas van al final, en orden de código). */
 private val SEC_ORDER = mapOf(
     0 to listOf("Fondo", "Color"),
-    1 to listOf("Perfil", "Fichas", "Información", "Filas extra", "Foco y efectos", "Restablecer"),
+    1 to listOf("Perfil", "Fichas", "Información", "Filas extra", "Foco y efectos", "Compartir diseño"),
     2 to listOf("Parte superior", "Reloj y fecha", "Tarjetas junto al reloj", "Clima", "Contenido", "Barra superior"),
     3 to listOf("Pantalla", "Rendimiento", "Noche", "Reposo", "Sonido"),
-    6 to listOf("Conexiones", "Sistema", "Celular", "Botones de color", "Arranque"),
+    6 to listOf("Conexiones", "Sistema", "Celular", "Botones de color", "Arranque", "Asistente"),
     7 to listOf("Permisos")
 )
 
@@ -354,6 +354,51 @@ private fun SectionCard(content: @Composable () -> Unit) {
     ) { content() }
 }
 
+/** Pestaña de categoria (solo icono): se selecciona al recibir el foco, sin pulsar OK. */
+@Composable
+private fun TabChip(
+    icon: String,
+    selected: Boolean,
+    modifier: Modifier = Modifier,
+    onFocus: () -> Unit,
+    onClick: () -> Unit
+) {
+    var focused by remember { mutableStateOf(false) }
+    val shape = RoundedCornerShape(12.dp)
+    Box(
+        modifier
+            .width(44.dp)
+            .height(40.dp)
+            .clip(shape)
+            .background(
+                when {
+                    focused -> Color(0x2BFFFFFF)
+                    selected -> ACC.copy(alpha = 0.18f)
+                    else -> Color.Transparent
+                }
+            )
+            .then(if (focused) Modifier.border(1.dp, Color(0x66FFFFFF), shape) else Modifier)
+            .drawBehind {
+                if (selected) {
+                    drawRoundRect(
+                        color = ACC,
+                        topLeft = Offset(size.width * 0.3f, size.height - 4.dp.toPx()),
+                        size = Size(size.width * 0.4f, 2.5.dp.toPx()),
+                        cornerRadius = CornerRadius(2.dp.toPx())
+                    )
+                }
+            }
+            .onFocusChanged {
+                focused = it.isFocused
+                if (it.isFocused) onFocus()
+            }
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        LineIcon(icon, if (focused || selected) ACC else TAB_IDLE, 22)
+    }
+}
+
 /** Fila de la lista de categorias: icono, nombre y una descripcion corta. */
 @Composable
 private fun CategoryRow(
@@ -546,6 +591,9 @@ fun SettingsScreen(
     onBackupShare: () -> Unit = {},
     onRestorePick: () -> Unit = {},
     onUpdate: () -> Unit = {},
+    onDesignSave: () -> Unit = {},
+    onDesignPick: () -> Unit = {},
+    onWizard: () -> Unit = {},
     updBack: Int = 0,
     blocked: Boolean = false
 ) {
@@ -751,8 +799,11 @@ fun SettingsScreen(
         add(SItem(1, "Asignar apps", "Filas extra", false) {
             InfoRow("Asignar apps", "mantén OK en la app")
         })
-        add(SItem(1, "Restablecer dock", "Restablecer") { m ->
-            ActionRow("Restablecer dock", m) { onResetDock() }
+        add(SItem(1, "Exportar diseño", "Compartir diseño") { m ->
+            ActionRow("Guardar el diseño en un archivo", m) { onDesignSave() }
+        })
+        add(SItem(1, "Importar diseño", "Compartir diseño") { m ->
+            ActionRow("Cargar un diseño desde un archivo", m) { onDesignPick() }
         })
         // ---- Inicio ----
         add(SItem(2, "Elementos de arriba", "Parte superior") { m ->
@@ -1042,6 +1093,9 @@ fun SettingsScreen(
                 tryStart(ctx, "android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS")
             }
         })
+        add(SItem(6, "Asistente de configuración", "Asistente") { m ->
+            ActionRow("Abrir el asistente de configuración", m) { onWizard() }
+        })
         // ---- Seguridad ----
         if (!cfg.pinSet) {
             add(SItem(6, "Estado del PIN", "Código PIN", false) { InfoRow("Estado", "Sin PIN") })
@@ -1132,7 +1186,8 @@ fun SettingsScreen(
         })
     }
 
-    // Siempre hay una categoria seleccionada (columna izquierda); las opciones salen a la derecha.
+    // Siempre hay una categoria seleccionada. Las categorias son pestañas arriba: se cambian con
+    // izquierda/derecha (sin pulsar OK) y Atras cierra Configuracion de una sola vez.
     val curCat = if (cat in 0..CATS.lastIndex) cat else 0
     val secOrder = SEC_ORDER[curCat] ?: emptyList()
     val shown = items.filter { it.cat == curCat }
@@ -1140,26 +1195,15 @@ fun SettingsScreen(
     val title = CATS[curCat].name
     val subtitle = if (settingsPreviewCat(curCat)) "Los cambios se ven en vivo a la izquierda" else CATS[curCat].desc
     val scroll = remember(curCat) { androidx.compose.foundation.ScrollState(0) }
-    val railScroll = rememberScrollState()
-    val focusManager = LocalFocusManager.current
     val startCat = remember { curCat }
-    // Mientras el usuario no toque las categorias, al volver de un sub-panel el foco regresa a su fila.
-    var leftOnce by remember { mutableStateOf(false) }
-    val retItem: String? = if (retKey != null && !leftOnce) retKey else null
-    val railFr = remember { List(CATS.size) { FocusRequester() } }
-    LaunchedEffect(Unit) {
-        if (retKey == null) {
-            delay(150)
-            runCatching { railFr[startCat].requestFocus() }
-        }
-    }
-    // Atras desde las opciones: el foco vuelve a la categoria seleccionada.
-    LaunchedEffect(railBack) {
-        if (railBack > 0) {
-            delay(100)
-            runCatching { railFr[curCat].requestFocus() }
-        }
-    }
+    // Mientras no se toquen las pestañas, el foco cae solo en la primera opcion (o en la fila que abrio un sub-panel).
+    var tabTouched by remember { mutableStateOf(false) }
+    val tabFr = remember { List(CATS.size) { FocusRequester() } }
+    val retItem: String? = if (retKey != null && !tabTouched) retKey else null
+    val firstFocus = !tabTouched && retKey == null && curCat == startCat
+    val firstLabel = shown.firstOrNull { it.focusable }?.label
+    // Arriba desde la primera opcion siempre vuelve a la pestaña de la categoria abierta.
+    val upMod = Modifier.focusProperties { up = tabFr[curCat] }
     DisposableEffect(Unit) { onDispose { onRightFocus(false) } }
 
     GlassPanelFrame(wide = true) {
@@ -1167,7 +1211,7 @@ fun SettingsScreen(
             Modifier
                 .fillMaxSize()
                 .focusProperties { canFocus = !blocked }
-                .padding(start = 18.dp, end = 18.dp, top = 16.dp, bottom = 14.dp)
+                .padding(start = 18.dp, end = 18.dp, top = 14.dp, bottom = 12.dp)
         ) {
             Row(Modifier.padding(start = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                 GearIcon(Color(0x99FFFFFF), 14)
@@ -1177,80 +1221,85 @@ fun SettingsScreen(
                     letterSpacing = 1.sp, fontWeight = FontWeight.Normal
                 )
                 Spacer(Modifier.weight(1f))
-                Text("‹ › cambiar  ·  OK abrir  ·  Atrás volver", color = Color(0x80FFFFFF), fontSize = 12.sp, maxLines = 1)
+                Text(
+                    "‹ › cambiar  ·  Atrás cerrar", color = Color(0x80FFFFFF),
+                    fontSize = 12.sp, maxLines = 1
+                )
             }
             Spacer(Modifier.height(10.dp))
-            Row(Modifier.weight(1f).fillMaxWidth()) {
-                // Columna izquierda: categorias.
-                Column(
-                    Modifier.width(210.dp).fillMaxHeight().verticalScroll(railScroll),
-                    verticalArrangement = Arrangement.spacedBy(2.dp)
-                ) {
-                    CATS.forEachIndexed { i, c ->
-                        RailItem(
-                            c.icon, c.name, i == curCat,
-                            Modifier.focusRequester(railFr[i]),
-                            onFocus = {
-                                leftOnce = true
-                                if (i != curCat) onCat(i)
-                            },
-                            onClick = {
-                                onCat(i)
-                                focusManager.moveFocus(FocusDirection.Right)
-                            }
-                        )
-                    }
-                }
-                Box(
-                    Modifier.padding(horizontal = 12.dp).width(1.dp).fillMaxHeight()
-                        .background(Color(0x22FFFFFF))
-                )
-                // Columna derecha: opciones de la categoria.
-                Column(
-                    Modifier.weight(1f).fillMaxHeight().onFocusChanged { onRightFocus(it.hasFocus) }
-                ) {
-                    Row(Modifier.padding(start = 6.dp, top = 2.dp), verticalAlignment = Alignment.CenterVertically) {
-                        LineIcon(CATS[curCat].icon, ACC, 26)
-                        Spacer(Modifier.width(10.dp))
-                        Text(title, color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Normal, maxLines = 1)
-                    }
-                    Text(
-                        subtitle, color = Color(0x99FFFFFF), fontSize = 14.sp,
-                        modifier = Modifier.padding(start = 6.dp, top = 2.dp)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                CATS.forEachIndexed { i, c ->
+                    TabChip(
+                        c.icon, i == curCat, Modifier.focusRequester(tabFr[i]),
+                        onFocus = {
+                            tabTouched = true
+                            if (i != curCat) onCat(i)
+                        },
+                        onClick = { onCat(i) }
                     )
-                    Spacer(Modifier.height(10.dp))
-                    Box(Modifier.fillMaxWidth().height(1.dp).background(Color(0x22FFFFFF)))
-                    Spacer(Modifier.height(4.dp))
-                    Column(
-                        Modifier
-                            .weight(1f)
-                            .fillMaxWidth()
-                            .verticalScroll(scroll),
-                        verticalArrangement = Arrangement.spacedBy(2.dp)
-                    ) {
-                        if (curCat == ABOUT) {
-                            AboutPage(
-                                cfg = cfg,
-                                updItems = shown.filter { it.sec == "Actualizaciones" },
-                                bakItems = shown.filter { it.sec == "Copias de seguridad" },
-                                toolItems = shown.filter { it.sec == "Uso y diagnóstico" }
-                            )
-                        } else {
-                            for ((group, list) in shown.groupBy { it.sec }) {
-                                if (group.isNotEmpty()) SectionLabel(group)
-                                SectionCard {
-                                    for (si in list) {
-                                        key(si.cat to si.label) {
-                                            si.content(
-                                                if (si.focusable && si.label == retItem) Modifier.autoFocus() else Modifier
-                                            )
-                                        }
+                }
+            }
+            Spacer(Modifier.height(12.dp))
+            Row(Modifier.padding(start = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                LineIcon(CATS[curCat].icon, ACC, 26)
+                Spacer(Modifier.width(10.dp))
+                Text(title, color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Normal, maxLines = 1)
+            }
+            Text(
+                subtitle, color = Color(0x99FFFFFF), fontSize = 14.sp,
+                modifier = Modifier.padding(start = 6.dp, top = 2.dp)
+            )
+            Spacer(Modifier.height(8.dp))
+            Box(Modifier.fillMaxWidth().height(1.dp).background(Color(0x22FFFFFF)))
+            Spacer(Modifier.height(2.dp))
+            Column(
+                Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .verticalScroll(scroll),
+                verticalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
+                if (curCat == ABOUT) {
+                    AboutPage(
+                        cfg = cfg,
+                        updItems = shown.filter { it.sec == "Actualizaciones" },
+                        bakItems = shown.filter { it.sec == "Copias de seguridad" },
+                        toolItems = shown.filter { it.sec == "Uso y diagnóstico" },
+                        firstMod = if (firstFocus) upMod.autoFocus() else upMod
+                    )
+                } else {
+                    for ((group, list) in shown.groupBy { it.sec }) {
+                        if (group.isNotEmpty()) SectionLabel(group)
+                        SectionCard {
+                            for (si in list) {
+                                key(si.cat to si.label) {
+                                    val isFirst = si.label == firstLabel
+                                    var m: Modifier = if (isFirst) upMod else Modifier
+                                    if (si.focusable && si.label == retItem) {
+                                        m = m.autoFocus()
+                                    } else if (isFirst && firstFocus) {
+                                        m = m.autoFocus()
+                                    }
+                                    si.content(m)
+                                    val d = DESCS[si.label]
+                                    if (d != null) {
+                                        Text(
+                                            d, color = Color(0x80FFFFFF), fontSize = 12.sp,
+                                            modifier = Modifier.padding(start = 22.dp, end = 16.dp, bottom = 8.dp)
+                                        )
                                     }
                                 }
                             }
                         }
                     }
+                    if (RESET_KEYS.containsKey(curCat)) {
+                        SectionLabel("Restablecer")
+                        SectionCard {
+                            ResetCategoryRow(title) { resetCategory(ctx, curCat) }
+                        }
+                    }
                 }
+                Spacer(Modifier.height(12.dp))
             }
         }
     }
@@ -1448,7 +1497,13 @@ private fun OptionsDivider() {
  */
 @Suppress("DEPRECATION")
 @Composable
-private fun AboutPage(cfg: Cfg, updItems: List<SItem>, bakItems: List<SItem>, toolItems: List<SItem>) {
+private fun AboutPage(
+    cfg: Cfg,
+    updItems: List<SItem>,
+    bakItems: List<SItem>,
+    toolItems: List<SItem>,
+    firstMod: Modifier = Modifier
+) {
     val ctx = LocalContext.current
     val version = remember {
         runCatching { ctx.packageManager.getPackageInfo(ctx.packageName, 0).versionName }.getOrNull() ?: "?"
@@ -1488,7 +1543,7 @@ private fun AboutPage(cfg: Cfg, updItems: List<SItem>, bakItems: List<SItem>, to
     SectionLabel("Versión y actualizaciones")
     InfoCard(
         listOf("Versión" to version, "Código de versión" to code),
-        Modifier.autoFocus()
+        firstMod
     )
     OptionsDivider()
     for (si in updItems) key(si.label) { si.content(Modifier) }

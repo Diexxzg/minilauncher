@@ -55,6 +55,12 @@ fun ExtraDialog(
 ) {
     val shape = RoundedCornerShape(26.dp)
     Dialog(onDismissRequest = onClose, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        // Sin esto el primer OK solo "entraba" al cuadro: ahora el foco cae en el primer boton solo.
+        val fm = androidx.compose.ui.platform.LocalFocusManager.current
+        LaunchedEffect(Unit) {
+            delay(120)
+            runCatching { fm.moveFocus(androidx.compose.ui.focus.FocusDirection.Next) }
+        }
         Column(
             Modifier
                 .widthIn(max = maxWidth.dp)

@@ -95,6 +95,48 @@ class Prefs(ctx: Context) {
             false
         }
     }
+    /** Borra solo estas claves (restablecer una categoria). */
+    fun removeKeys(keys: Collection<String>) {
+        val e = sp.edit()
+        for (k in keys) e.remove(k)
+        e.commit()
+    }
+    /** Copia solo las claves dadas (diseño exportable). */
+    fun exportKeysJson(keys: Collection<String>): String {
+        val o = JSONObject()
+        for ((k, v) in sp.all) {
+            if (k !in keys) continue
+            when (v) {
+                is Int, is Long, is Boolean, is String -> o.put(k, v)
+                else -> {}
+            }
+        }
+        o.put("_design", 1)
+        return o.toString(2)
+    }
+    /** Aplica solo las claves permitidas del archivo, sin borrar nada mas. false si no hay ninguna. */
+    fun importKeysJson(text: String, keys: Collection<String>): Boolean {
+        return try {
+            val o = JSONObject(text)
+            val e = sp.edit()
+            var n = 0
+            for (k in keys) {
+                if (!o.has(k)) continue
+                var ok = true
+                when (val v = o.get(k)) {
+                    is Int -> e.putInt(k, v)
+                    is Long -> e.putLong(k, v)
+                    is Boolean -> e.putBoolean(k, v)
+                    is String -> e.putString(k, v)
+                    else -> ok = false
+                }
+                if (ok) n++
+            }
+            if (n == 0) false else e.commit()
+        } catch (ex: Exception) {
+            false
+        }
+    }
     fun getStr(k: String, d: String): String = sp.getString(k, d) ?: d
     fun putStr(k: String, v: String) {
         sp.edit().putString(k, v).apply()
