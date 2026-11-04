@@ -1,5 +1,12 @@
 # Novedades
 
+## 4.3
+Configuración
+- Nuevo diseño: las categorías son pestañas arriba. Cambias de categoría con izquierda/derecha, sin pulsar OK.
+- Atrás cierra Configuración de una sola vez, y los cuadros ya enfocan solos (se acabó el doble clic).
+- Cada categoría tiene «Restablecer», y algunas opciones traen una explicación corta debajo.
+- Nuevo: exportar e importar solo el diseño, y un asistente de 4 pasos (fondo, tema, pantalla y permisos).
+
 ## 4.2
 Configuración
 - Reorganizada en 11 categorías más claras: Fondo y color, Dock y diseño, Pantalla y energía, Permisos y más.
