@@ -1,5 +1,14 @@
 # Novedades
 
+## 4.1
+Configuración
+- Nuevo diseño en dos columnas: categorías a la izquierda y opciones a la derecha, con el panel más ancho y textos más grandes.
+- Atrás ya no muestra ningún aviso. Desde las opciones vuelve a las categorías y desde las categorías cierra Configuración.
+
+Inicio
+- Nueva opción «Elementos de arriba» (Completa, Reducida o Mínima) para mostrar menos cosas en la parte superior.
+- Nueva opción «Tamaño de la parte superior» (60 % a 150 %).
+
 ## 4.0
 Inicio
 - Fila «Continuar»: la última app abierta se oculta y las que usaste hoy salen primero con la etiqueta HOY (12).
