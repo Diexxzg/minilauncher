@@ -82,9 +82,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 
-/** TEMPORAL: muestra un aviso en cada Atras dentro de Configuracion. Ponlo en false cuando termines de probar. */
-private const val DEBUG_BACK = true
-
 /**
  * Puente entre MainActivity y Configuracion (version 4.0). Configuracion lo usa sin cambiar
  * la firma de SettingsScreen: pide el servidor del celular, arranca el temporizador de sueno
@@ -260,8 +257,11 @@ fun HomeRoot(
     var showQuick by remember { mutableStateOf(false) }
     var quickBack by remember { mutableIntStateOf(0) }
     var appsLoaded by remember { mutableStateOf(AppCache.apps.isNotEmpty()) }
-    // Configuracion: -1 = lista de categorias; 0.. = categoria abierta (vive aqui para que Atras funcione).
-    var settingsCat by remember { mutableIntStateOf(-1) }
+    // Configuracion: categoria seleccionada en la columna izquierda (siempre hay una).
+    var settingsCat by remember { mutableIntStateOf(0) }
+    // true mientras el foco esta en las opciones (derecha); Atras primero lo devuelve a las categorias.
+    var settingsRight by remember { mutableStateOf(false) }
+    var railBack by remember { mutableIntStateOf(0) }
     var focusedApp by remember { mutableStateOf<AppInfo?>(null) }
     // Ultimo uso de cada app (tarjeta bajo el dock) y aviso de modo ahorro.
     var lastUsed by remember { mutableStateOf(prefs.lastUsedMap()) }
@@ -383,7 +383,10 @@ fun HomeRoot(
         // Al cerrar Configuracion el inicio no se recompone: se devuelve el foco a la primera ficha.
     LaunchedEffect(screen) {
         if (screen == "home" && prevScreen == "settings") focusTick++
-        if (screen == "home") settingsCat = -1
+        if (screen == "home") {
+            settingsCat = 0
+            settingsRight = false
+        }
         if (screen == "home" || (screen != "all" && prevScreen == "all")) extQuery = ""
         if (screen != "settings") HomeBridge.phoneOn = false
         prevScreen = screen
@@ -627,7 +630,10 @@ fun HomeRoot(
             }
             showPower -> showPower = false
             screen == "walls" || screen == "edit" || screen == "dock" -> screen = "settings"
-            screen == "settings" && settingsCat >= 0 -> settingsCat = -1
+            screen == "settings" && settingsRight -> {
+                settingsRight = false
+                railBack++
+            }
             screen == "hidden" -> screen = "all"
             else -> screen = "home"
         }
@@ -910,7 +916,7 @@ fun HomeRoot(
     val sideSpec: androidx.compose.animation.core.AnimationSpec<androidx.compose.ui.unit.Dp> =
         if (eAnim) tween(260) else androidx.compose.animation.core.snap()
     val sideInset by animateDpAsState(
-        if (sideOpen) (sidePanelWidth(availW) + 20f).dp else 0.dp, sideSpec, label = "sideInset"
+        if (sideOpen) (sidePanelWidth(availW, screen == "settings") + 20f).dp else 0.dp, sideSpec, label = "sideInset"
     )
     val dimLayer: Long = when (screen) {
         "all", "hidden" -> 0x99000000
@@ -954,7 +960,6 @@ fun HomeRoot(
                 // pulsacion = un nivel. Se ignoran las repeticiones al mantener la tecla.
                 if (k == Key.Back && screen == "settings") {
                     if (it.type == KeyEventType.KeyDown && it.nativeKeyEvent.repeatCount == 0) {
-                        if (DEBUG_BACK) toast(ctx, "Atrás · categoría " + settingsCat.toString())
                         goBack()
                     }
                     return@onPreviewKeyEvent true
@@ -1183,6 +1188,8 @@ fun HomeRoot(
                                             },
                                             cat = settingsCat,
                                             onCat = { settingsCat = it },
+                                            onRightFocus = { settingsRight = it },
+                                            railBack = railBack,
                                             onProfile = { applyProfile(it) },
                                             onUpdate = { upd.open(scope) },
                                             updBack = updBack,

@@ -153,36 +153,44 @@ fun HomeScreen(
     val cont = remember(recents, lastUsed, cfg.continueRow) {
         if (cfg.continueRow) continueList(recents, lastUsed) else recents
     }
+    // Parte superior: tamaño ajustable (60 a 150 %) y modo completa / reducida / minima.
+    val topS = cfg.topScale / 100f
+    val topDens = androidx.compose.ui.platform.LocalDensity.current.let {
+        androidx.compose.ui.unit.Density(it.density * topS, it.fontScale)
+    }
+    val topMode = cfg.topMode
     Box(Modifier.fillMaxSize()) {
-        Column(Modifier.align(Alignment.TopStart).padding(32.dp)) {
+        CompositionLocalProvider(androidx.compose.ui.platform.LocalDensity provides topDens) {
+        Column(Modifier.align(Alignment.TopStart).padding((32f / topS).dp)) {
             if (cfg.bigClock) {
                 // Reloj grande, con la fecha y el clima debajo.
                 Clock(cfg.clock24, size = 68.sp, ampmSize = 24.sp)
-                if (cfg.showDate) DateText(Modifier.padding(top = 2.dp), size = 20.sp, fmt = cfg.dateFmt)
-                if (cfg.showWeather) {
+                if (cfg.showDate && topMode < 2) DateText(Modifier.padding(top = 2.dp), size = 20.sp, fmt = cfg.dateFmt)
+                if (cfg.showWeather && topMode < 2) {
                     WeatherText(cfg.city, cfg.fahrenheit, Modifier.padding(top = 4.dp), size = 18.sp)
                 }
             } else {
-                if (cfg.showWeather) WeatherText(cfg.city, cfg.fahrenheit)
-                if (cfg.showDate) DateText(Modifier.padding(top = 2.dp), fmt = cfg.dateFmt)
+                if (cfg.showWeather && topMode < 2) WeatherText(cfg.city, cfg.fahrenheit)
+                if (cfg.showDate && topMode < 2) DateText(Modifier.padding(top = 2.dp), fmt = cfg.dateFmt)
             }
-            ClockCards(cfg, onEditNote, Modifier.padding(top = 10.dp))
+            if (topMode == 0) ClockCards(cfg, onEditNote, Modifier.padding(top = 10.dp))
         }
-        if (!sidePanel) Row(
+        }
+        if (!sidePanel) CompositionLocalProvider(androidx.compose.ui.platform.LocalDensity provides topDens) { Row(
             Modifier
                 .align(Alignment.TopEnd)
-                .padding(32.dp)
+                .padding((32f / topS).dp)
                 .onFocusChanged { onBarFocus(it.hasFocus) },
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             if (media != null) {
-                if (cfg.showMusic && cfg.musicPos == 0) {
+                if (cfg.showMusic && cfg.musicPos == 0 && topMode < 2) {
                     Box(Modifier.focusProperties { down = dockFr }.then(barMod)) {
                         ScaledPill(media, art, cfg.musicSize)
                     }
                 }
-            } else if (!listenerOn) {
+            } else if (!listenerOn && topMode == 0) {
                 Text(
                     "Música: falta permitir el acceso a notificaciones",
                     color = Color(0xB3FFFFFF), fontSize = 14.sp,
@@ -190,8 +198,8 @@ fun HomeScreen(
                 )
             }
             if (!cfg.bigClock) Clock(cfg.clock24)
-            NetPill(net, onWifi, Modifier.focusProperties { down = dockFr }.then(barMod))
-            GlassBox(
+            if (topMode == 0) NetPill(net, onWifi, Modifier.focusProperties { down = dockFr }.then(barMod))
+            if (topMode == 0) GlassBox(
                 onClick = onMore,
                 modifier = Modifier.size(44.dp).focusRequester(moreFr).focusProperties { down = dockFr }.then(barMod),
                 shape = CircleShape
@@ -207,8 +215,8 @@ fun HomeScreen(
             ) {
                 GearIcon(Color.White)
             }
-        }
-        if (media != null && cfg.showMusic && cfg.musicPos == 1 && !sidePanel) {
+        } }
+        if (media != null && cfg.showMusic && cfg.musicPos == 1 && topMode < 2 && !sidePanel) {
             Box(
                 Modifier
                     .align(Alignment.TopCenter)

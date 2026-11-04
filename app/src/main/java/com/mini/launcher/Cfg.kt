@@ -63,6 +63,8 @@ class Cfg(private val p: Prefs) {
     private var _dateFmt by mutableStateOf(p.getInt("dateFmt", 0).coerceIn(0, 4))
     private var _hideBar by mutableStateOf(p.getInt("hideBar", 0) == 1)
     private var _hideBarSecs by mutableStateOf(p.getInt("hideBarSecs", 12).coerceIn(3, 60))
+    private var _topMode by mutableStateOf(p.getInt("topMode", 0).coerceIn(0, 2))
+    private var _topScale by mutableStateOf(p.getInt("topScale", 100).coerceIn(60, 150))
     // Mejoras 12 a 39.
     private var _continueRow by mutableStateOf(p.getInt("continueRow", 1) == 1)
     private var _cardEvent by mutableStateOf(p.getInt("cardEvent", 0) == 1)
@@ -159,6 +161,10 @@ class Cfg(private val p: Prefs) {
     /** Oculta la barra superior tras unos segundos sin pulsar nada; Arriba la muestra. */
     val hideBar: Boolean get() = _hideBar
     val hideBarSecs: Int get() = _hideBarSecs
+    /** Parte superior del inicio: 0 = completa, 1 = reducida, 2 = minima (solo reloj y ajustes). */
+    val topMode: Int get() = _topMode
+    /** Tamaño de la parte superior del inicio, en porcentaje (60 a 150). */
+    val topScale: Int get() = _topScale
 
     // Mejoras 12 a 39 (lectura).
     val continueRow: Boolean get() = _continueRow
@@ -407,6 +413,16 @@ class Cfg(private val p: Prefs) {
     fun setHideBar(v: Boolean) {
         _hideBar = v
         p.putInt("hideBar", if (v) 1 else 0)
+    }
+
+    fun setTopMode(v: Int) {
+        _topMode = v.coerceIn(0, 2)
+        p.putInt("topMode", _topMode)
+    }
+
+    fun setTopScale(v: Int) {
+        _topScale = v.coerceIn(60, 150)
+        p.putInt("topScale", _topScale)
     }
 
     fun setHideBarSecs(v: Int) {

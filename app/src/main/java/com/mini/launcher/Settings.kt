@@ -29,6 +29,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.key
@@ -43,6 +44,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
@@ -62,6 +64,7 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -112,8 +115,13 @@ private const val PANEL_SCALE = 0.84f
  * Ancho (dp) del panel lateral derecho para un ancho disponible dado.
  * Lo usan el panel y el inicio (que se hace mas angosto) para no taparse entre si.
  */
-fun sidePanelWidth(availDp: Float): Float =
-    (availDp * 0.40f).coerceIn(400f, 560f).coerceAtMost(availDp * 0.62f)
+fun sidePanelWidth(availDp: Float, wide: Boolean = false): Float =
+    if (wide) {
+        // Configuracion: categorias a la izquierda y opciones a la derecha.
+        (availDp * 0.52f).coerceIn(600f, 780f).coerceAtMost(availDp * 0.66f)
+    } else {
+        (availDp * 0.40f).coerceIn(400f, 560f).coerceAtMost(availDp * 0.62f)
+    }
 
 private val ACC: Color get() = Themes.current.acc
 private val ACC_DIM: Color get() = Themes.current.accDim
@@ -301,8 +309,8 @@ fun InfoRow(label: String, value: String) {
 private fun SectionLabel(text: String) {
     Text(
         text.uppercase(),
-        color = Color(0x80FFFFFF), fontSize = 11.sp, letterSpacing = 1.2.sp,
-        modifier = Modifier.padding(start = 10.dp, top = 14.dp, bottom = 4.dp)
+        color = ACC, fontSize = 12.sp, letterSpacing = 1.2.sp,
+        modifier = Modifier.padding(start = 10.dp, top = 16.dp, bottom = 4.dp)
     )
 }
 
@@ -337,6 +345,56 @@ private fun CategoryRow(
     }
 }
 
+/** Fila de la columna de categorias: icono y nombre; la seleccionada queda resaltada. */
+@Composable
+private fun RailItem(
+    icon: String,
+    name: String,
+    selected: Boolean,
+    modifier: Modifier = Modifier,
+    onFocus: () -> Unit,
+    onClick: () -> Unit
+) {
+    var focused by remember { mutableStateOf(false) }
+    val shape = RoundedCornerShape(12.dp)
+    Row(
+        modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .background(
+                when {
+                    focused -> Color(0x2BFFFFFF)
+                    selected -> ACC.copy(alpha = 0.16f)
+                    else -> Color.Transparent
+                }
+            )
+            .then(if (focused) Modifier.border(1.dp, Color(0x66FFFFFF), shape) else Modifier)
+            .onFocusChanged {
+                focused = it.isFocused
+                if (it.isFocused) onFocus()
+            }
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 11.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            Modifier
+                .size(34.dp)
+                .clip(RoundedCornerShape(10.dp))
+                .background(if (focused || selected) ACC.copy(alpha = 0.22f) else Color(0x14FFFFFF)),
+            contentAlignment = Alignment.Center
+        ) {
+            LineIcon(icon, if (focused || selected) ACC else TAB_IDLE, 20)
+        }
+        Spacer(Modifier.width(12.dp))
+        Text(
+            name,
+            color = if (focused || selected) Color.White else Color(0xCCFFFFFF),
+            fontSize = 17.sp, maxLines = 1, overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
 // ---------- Marco de cristal (compartido por Configuracion y Editar apps) ----------
 
 /**
@@ -345,7 +403,7 @@ private fun CategoryRow(
  * El contenido se dibuja a PANEL_SCALE para verse mas compacto.
  */
 @Composable
-fun GlassPanelFrame(content: @Composable () -> Unit) {
+fun GlassPanelFrame(wide: Boolean = false, content: @Composable () -> Unit) {
     val conf = LocalConfiguration.current
     val dens = androidx.compose.ui.platform.LocalDensity.current
     val us = LocalUiScale.current
@@ -354,7 +412,7 @@ fun GlassPanelFrame(content: @Composable () -> Unit) {
     LaunchedEffect(Unit) { shown = true }
     val p by animateFloatAsState(if (shown) 1f else 0f, tween(300), label = "panelIn")
     val availW = conf.screenWidthDp.toFloat() / us - 2f * ov
-    val pw = sidePanelWidth(availW)
+    val pw = sidePanelWidth(availW, wide)
     val shape = RoundedCornerShape(22.dp)
     val panelBg = Brush.verticalGradient(listOf(Themes.current.panelTop, Themes.current.panelBottom))
     val panelBorder = Brush.verticalGradient(listOf(Color(0x55FFFFFF), Color(0x1AFFFFFF)))
@@ -420,6 +478,8 @@ fun SettingsScreen(
     cfg: Cfg,
     cat: Int,
     onCat: (Int) -> Unit,
+    onRightFocus: (Boolean) -> Unit = {},
+    railBack: Int = 0,
     onSet: (String, Int) -> Unit,
     onResetDock: () -> Unit,
     onWalls: () -> Unit,
@@ -473,9 +533,6 @@ fun SettingsScreen(
         WeatherOpts.forecast = if (cfg.forecast) 1 else 0
         WeatherOpts.autoLoc = if (cfg.autoLoc) 1 else 0
     }
-    // Ultima categoria abierta: al volver a la lista el foco regresa a ella.
-    var lastCat by remember { mutableIntStateOf(if (cat >= 0) cat else 0) }
-    LaunchedEffect(cat) { if (cat >= 0) lastCat = cat }
     // Si venimos de un sub-panel, el foco vuelve a la fila que lo abrio (se lee una sola vez).
     val retKey = remember { returnKey.also { returnKey = null } }
 
@@ -648,6 +705,27 @@ fun SettingsScreen(
             ActionRow("Restablecer dock", m) { onResetDock() }
         })
         // ---- Inicio ----
+        add(SItem(2, "Elementos de arriba", "Parte superior") { m ->
+            ChoiceRow(
+                "Elementos de arriba",
+                listOf("Completa", "Reducida", "Mínima"),
+                cfg.topMode, m
+            ) { cfg.setTopMode(it) }
+        })
+        add(SItem(2, "Aviso de elementos de arriba", "Parte superior", false) {
+            Text(
+                when (cfg.topMode) {
+                    0 -> "Se ve todo: reloj, fecha, clima, tarjetas, música, red y botón Más."
+                    1 -> "Reloj, fecha, clima, música y ajustes. Sin tarjetas, red ni botón Más."
+                    else -> "Solo el reloj y el botón de ajustes."
+                },
+                color = Color(0x99FFFFFF), fontSize = 14.sp,
+                modifier = Modifier.padding(start = 22.dp, end = 16.dp, bottom = 4.dp)
+            )
+        })
+        add(SItem(2, "Tamaño de arriba", "Parte superior") { m ->
+            SliderRow("Tamaño de la parte superior", cfg.topScale, 60, 150, 10, " %", m) { cfg.setTopScale(it) }
+        })
         add(SItem(2, "Reloj grande", "Reloj y fecha") { m ->
             SwitchRow("Reloj grande", cfg.bigClock, m) { cfg.setBigClock(it) }
         })
@@ -1009,19 +1087,35 @@ fun SettingsScreen(
         })
     }
 
-    val shown = if (cat >= 0) items.filter { it.cat == cat } else emptyList()
-    val inCat = cat in 0..CATS.lastIndex
-    val title = if (inCat) CATS[cat].name else "¿Qué quieres cambiar?"
-    val subtitle = when {
-        inCat && cat <= 1 -> "Los cambios se ven en vivo a la izquierda"
-        inCat -> CATS[cat].desc
-        else -> "Elige una categoría"
+    // Siempre hay una categoria seleccionada (columna izquierda); las opciones salen a la derecha.
+    val curCat = if (cat in 0..CATS.lastIndex) cat else 0
+    val shown = items.filter { it.cat == curCat }
+    val title = CATS[curCat].name
+    val subtitle = if (curCat <= 1) "Los cambios se ven en vivo a la izquierda" else CATS[curCat].desc
+    val scroll = remember(curCat) { androidx.compose.foundation.ScrollState(0) }
+    val railScroll = rememberScrollState()
+    val focusManager = LocalFocusManager.current
+    val startCat = remember { curCat }
+    // Mientras el usuario no toque las categorias, al volver de un sub-panel el foco regresa a su fila.
+    var leftOnce by remember { mutableStateOf(false) }
+    val retItem: String? = if (retKey != null && !leftOnce) retKey else null
+    val railFr = remember { List(CATS.size) { FocusRequester() } }
+    LaunchedEffect(Unit) {
+        if (retKey == null) {
+            delay(150)
+            runCatching { railFr[startCat].requestFocus() }
+        }
     }
-    val scroll = remember(cat) { androidx.compose.foundation.ScrollState(0) }
-    val focusItem = (if (retKey != null) shown.firstOrNull { it.focusable && it.label == retKey } else null)
-        ?: shown.firstOrNull { it.focusable }
+    // Atras desde las opciones: el foco vuelve a la categoria seleccionada.
+    LaunchedEffect(railBack) {
+        if (railBack > 0) {
+            delay(100)
+            runCatching { railFr[curCat].requestFocus() }
+        }
+    }
+    DisposableEffect(Unit) { onDispose { onRightFocus(false) } }
 
-    GlassPanelFrame {
+    GlassPanelFrame(wide = true) {
         Column(
             Modifier
                 .fillMaxSize()
@@ -1035,53 +1129,74 @@ fun SettingsScreen(
                     "CONFIGURACIÓN", color = Color(0x99FFFFFF), fontSize = 13.sp,
                     letterSpacing = 1.sp, fontWeight = FontWeight.Normal
                 )
-                if (inCat) {
-                    Text(
-                        "   ›   " + CATS[cat].name.uppercase(), color = ACC, fontSize = 13.sp,
-                        letterSpacing = 1.sp, fontWeight = FontWeight.Normal, maxLines = 1
-                    )
-                }
             }
-            Text(
-                title, color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.Normal,
-                maxLines = 1, modifier = Modifier.padding(start = 6.dp, top = 2.dp)
-            )
-            Text(
-                subtitle, color = Color(0x80FFFFFF), fontSize = 13.sp,
-                modifier = Modifier.padding(start = 6.dp, top = 2.dp)
-            )
-            Spacer(Modifier.height(12.dp))
-            Box(Modifier.fillMaxWidth().height(1.dp).background(Color(0x22FFFFFF)))
-            Spacer(Modifier.height(4.dp))
-            Column(
-                Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
-                    .verticalScroll(scroll),
-                verticalArrangement = Arrangement.spacedBy(2.dp)
-            ) {
-                if (cat < 0) {
+            Spacer(Modifier.height(10.dp))
+            Row(Modifier.weight(1f).fillMaxWidth()) {
+                // Columna izquierda: categorias.
+                Column(
+                    Modifier.width(210.dp).fillMaxHeight().verticalScroll(railScroll),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
                     CATS.forEachIndexed { i, c ->
-                        CategoryRow(
-                            c.icon, c.name, c.desc,
-                            if (i == lastCat) Modifier.autoFocus() else Modifier
-                        ) { onCat(i) }
+                        RailItem(
+                            c.icon, c.name, i == curCat,
+                            Modifier.focusRequester(railFr[i]),
+                            onFocus = {
+                                leftOnce = true
+                                if (i != curCat) onCat(i)
+                            },
+                            onClick = {
+                                onCat(i)
+                                focusManager.moveFocus(FocusDirection.Right)
+                            }
+                        )
                     }
-                } else if (cat == ABOUT) {
-                    AboutPage(
-                        cfg = cfg,
-                        updItems = shown.filter { it.sec == "Actualizaciones" },
-                        bakItems = shown.filter { it.sec == "Copias de seguridad" },
-                        toolItems = shown.filter { it.sec == "Uso y diagnóstico" }
+                }
+                Box(
+                    Modifier.padding(horizontal = 12.dp).width(1.dp).fillMaxHeight()
+                        .background(Color(0x22FFFFFF))
+                )
+                // Columna derecha: opciones de la categoria.
+                Column(
+                    Modifier.weight(1f).fillMaxHeight().onFocusChanged { onRightFocus(it.hasFocus) }
+                ) {
+                    Text(
+                        title, color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Normal,
+                        maxLines = 1, modifier = Modifier.padding(start = 6.dp, top = 2.dp)
                     )
-                } else {
-                    var lastGroup = ""
-                    for (si in shown) {
-                        val group = si.sec
-                        if (group.isNotEmpty() && group != lastGroup) SectionLabel(group)
-                        lastGroup = group
-                        key(si.cat to si.label) {
-                            si.content(if (si === focusItem) Modifier.autoFocus() else Modifier)
+                    Text(
+                        subtitle, color = Color(0x99FFFFFF), fontSize = 14.sp,
+                        modifier = Modifier.padding(start = 6.dp, top = 2.dp)
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    Box(Modifier.fillMaxWidth().height(1.dp).background(Color(0x22FFFFFF)))
+                    Spacer(Modifier.height(4.dp))
+                    Column(
+                        Modifier
+                            .weight(1f)
+                            .fillMaxWidth()
+                            .verticalScroll(scroll),
+                        verticalArrangement = Arrangement.spacedBy(2.dp)
+                    ) {
+                        if (curCat == ABOUT) {
+                            AboutPage(
+                                cfg = cfg,
+                                updItems = shown.filter { it.sec == "Actualizaciones" },
+                                bakItems = shown.filter { it.sec == "Copias de seguridad" },
+                                toolItems = shown.filter { it.sec == "Uso y diagnóstico" }
+                            )
+                        } else {
+                            var lastGroup = ""
+                            for (si in shown) {
+                                val group = si.sec
+                                if (group.isNotEmpty() && group != lastGroup) SectionLabel(group)
+                                lastGroup = group
+                                key(si.cat to si.label) {
+                                    si.content(
+                                        if (si.focusable && si.label == retItem) Modifier.autoFocus() else Modifier
+                                    )
+                                }
+                            }
                         }
                     }
                 }
