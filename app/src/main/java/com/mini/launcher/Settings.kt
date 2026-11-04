@@ -85,19 +85,34 @@ import kotlinx.coroutines.withContext
 private class Cat(val icon: String, val name: String, val desc: String)
 
 private val CATS = listOf(
-    Cat("palette", "Apariencia", "Fondo, tema, brillo y rendimiento"),
-    Cat("folder", "Dock", "Fichas, filas y tarjeta de la app"),
-    Cat("home", "Inicio", "Reloj, clima y modo ambiente"),
-    Cat("music", "Música", "Reproductor y permisos"),
-    Cat("device", "Apps", "Favoritas, orden, carpetas y ocultas"),
-    Cat("globe", "Sistema", "Red, botones de color, celular y permisos"),
+    Cat("palette", "Fondo y color", "Fondos, temas, acento y brillo"),
+    Cat("layout", "Dock y diseño", "Perfil, fichas, filas y efectos"),
+    Cat("home", "Inicio", "Parte superior, reloj, clima y contenido"),
+    Cat("bolt", "Pantalla y energía", "Tamaño, ahorro, noche, reposo y sonido"),
+    Cat("music", "Música", "Reproductor y posición"),
+    Cat("device", "Apps", "Organizar, carpetas y apps nuevas"),
+    Cat("globe", "Sistema", "Red, celular, botones de color y arranque"),
+    Cat("shield", "Permisos", "Calendario, ubicación, red y notificaciones"),
     Cat("lock", "Seguridad", "PIN, protección y perfil para niños"),
-    Cat("device", "Accesibilidad", "Texto grande, contraste y foco"),
-    Cat("info", "Acerca de", "Versión, equipo, estadísticas y copias de seguridad")
+    Cat("eye", "Accesibilidad", "Texto grande, contraste y foco"),
+    Cat("info", "Acerca de", "Versión, equipo, copias y actualizaciones")
 )
 
 /** Indice de la categoría "Acerca de" (la última de la lista). */
-private const val ABOUT = 8
+private const val ABOUT = 10
+
+/** Orden de las secciones dentro de cada categoría (las no listadas van al final, en orden de código). */
+private val SEC_ORDER = mapOf(
+    0 to listOf("Fondo", "Color"),
+    1 to listOf("Perfil", "Fichas", "Información", "Filas extra", "Foco y efectos", "Restablecer"),
+    2 to listOf("Parte superior", "Reloj y fecha", "Tarjetas junto al reloj", "Clima", "Contenido", "Barra superior"),
+    3 to listOf("Pantalla", "Rendimiento", "Noche", "Reposo", "Sonido"),
+    6 to listOf("Conexiones", "Sistema", "Celular", "Botones de color", "Arranque"),
+    7 to listOf("Permisos")
+)
+
+/** Categorías que muestran la vista previa en vivo a la izquierda (Fondo y color, Dock y diseño). */
+fun settingsPreviewCat(cat: Int): Boolean = cat in 0..1
 
 private val CITIES = listOf(
     "Caracas", "Maracaibo", "Valencia", "Barquisimeto", "Bogotá", "Medellín",
@@ -277,11 +292,18 @@ fun ChoiceRow(
         onClick = { onSelect((sel + 1) % options.size) }
     ) { focused ->
         Text(label, color = Color(0xF2FFFFFF), fontSize = 17.sp, modifier = Modifier.weight(1f))
-        Text(
-            (if (focused) "‹  " else "") + options[sel] + (if (focused) "  ›" else ""),
-            color = if (focused) Color.White else Color(0xCCFFFFFF),
-            fontSize = 16.sp, fontWeight = FontWeight.Normal
-        )
+        Box(
+            Modifier
+                .clip(RoundedCornerShape(10.dp))
+                .background(if (focused) ACC.copy(alpha = 0.22f) else Color(0x14FFFFFF))
+                .padding(horizontal = 12.dp, vertical = 5.dp)
+        ) {
+            Text(
+                (if (focused) "‹  " else "") + options[sel] + (if (focused) "  ›" else ""),
+                color = if (focused) Color.White else Color(0xCCFFFFFF),
+                fontSize = 16.sp, fontWeight = FontWeight.Normal, maxLines = 1
+            )
+        }
     }
 }
 
@@ -304,14 +326,32 @@ fun InfoRow(label: String, value: String) {
     }
 }
 // ---------- Etiqueta de seccion ----------
-/** Titulo pequeno que agrupa opciones dentro de una categoria. */
+/** Titulo pequeno que agrupa opciones dentro de una categoria (con una linea fina a la derecha). */
 @Composable
 private fun SectionLabel(text: String) {
-    Text(
-        text.uppercase(),
-        color = ACC, fontSize = 12.sp, letterSpacing = 1.2.sp,
-        modifier = Modifier.padding(start = 10.dp, top = 16.dp, bottom = 4.dp)
-    )
+    Row(
+        Modifier.fillMaxWidth().padding(start = 8.dp, end = 4.dp, top = 16.dp, bottom = 6.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(text.uppercase(), color = ACC, fontSize = 12.sp, letterSpacing = 1.2.sp, maxLines = 1)
+        Spacer(Modifier.width(10.dp))
+        Box(Modifier.weight(1f).height(1.dp).background(Color(0x1AFFFFFF)))
+    }
+}
+
+/** Tarjeta de cristal que agrupa las filas de una seccion. */
+@Composable
+private fun SectionCard(content: @Composable () -> Unit) {
+    val shape = RoundedCornerShape(16.dp)
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .background(Color(0x0DFFFFFF))
+            .border(1.dp, Color(0x14FFFFFF), shape)
+            .padding(vertical = 4.dp, horizontal = 2.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp)
+    ) { content() }
 }
 
 /** Fila de la lista de categorias: icono, nombre y una descripcion corta. */
@@ -374,7 +414,17 @@ private fun RailItem(
                 if (it.isFocused) onFocus()
             }
             .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 11.dp),
+            .drawBehind {
+                if (selected) {
+                    drawRoundRect(
+                        color = ACC,
+                        topLeft = Offset(3.dp.toPx(), size.height * 0.24f),
+                        size = Size(3.dp.toPx(), size.height * 0.52f),
+                        cornerRadius = CornerRadius(2.dp.toPx())
+                    )
+                }
+            }
+            .padding(horizontal = 14.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(
@@ -581,19 +631,19 @@ fun SettingsScreen(
         add(SItem(0, "Clima en el fondo", "Fondo") { m ->
             SwitchRow("Clima en el fondo (se apaga con modo ahorro)", cfg.weatherFx, m) { cfg.setWeatherFx(it) }
         })
-        add(SItem(0, "Perfil de diseño", "Diseño") { m ->
+        add(SItem(1, "Perfil de diseño", "Perfil") { m ->
             // Izquierda/derecha cambia de perfil; la opcion "Personalizado" solo indica el estado.
             ChoiceRow("Perfil de diseño", PROFILE_OPTIONS, profSel, m) {
                 onProfile(if (it > 0) it - 1 else 0)
             }
         })
-        add(SItem(0, "Tema de color", "Diseño") { m ->
+        add(SItem(0, "Tema de color", "Color") { m ->
             ChoiceRow("Tema de color", Themes.list.map { it.name }, cfg.theme, m) { cfg.setTheme(it) }
         })
-        add(SItem(0, "Tema automático", "Diseño") { m ->
+        add(SItem(0, "Tema automático", "Color") { m ->
             SwitchRow("Tema automático (día y noche)", cfg.autoTheme, m) { cfg.setAutoTheme(it) }
         })
-        add(SItem(0, "Color de acento propio", "Diseño") { m ->
+        add(SItem(0, "Color de acento propio", "Color") { m ->
             DialogRow(
                 if (cfg.accentCustom != 0) "Color de acento propio (activo)" else "Color de acento propio",
                 m
@@ -612,62 +662,62 @@ fun SettingsScreen(
                 )
             }
         })
-        add(SItem(0, "Brillo de color", "Diseño") { m ->
+        add(SItem(0, "Brillo de color", "Color") { m ->
             ChoiceRow("Brillo de color", GLOW_NAMES, style.glow, m) { onSet("glow", it) }
         })
-        add(SItem(0, "Color del brillo", "Diseño") { m ->
+        add(SItem(0, "Color del brillo", "Color") { m ->
             ChoiceRow(
                 "Color del brillo",
                 listOf("Color de cada app", "Color del fondo", "Color del tema"),
                 cfg.glowSrc, m
             ) { cfg.setGlowSrc(it) }
         })
-        add(SItem(0, "Estilo de foco", "Diseño") { m ->
+        add(SItem(1, "Estilo de foco", "Foco y efectos") { m ->
             ChoiceRow("Estilo de foco", FOCUS_STYLES, cfg.focusStyle, m) { cfg.setFocusStyle(it) }
         })
-        add(SItem(0, "Oscurecer fondo", "Diseño") { m ->
+        add(SItem(0, "Oscurecer fondo", "Color") { m ->
             SliderRow("Oscurecer fondo", cfg.dim, 0, 80, 5, "%", m) { cfg.setDim(it) }
         })
-        add(SItem(0, "Desenfoque al abrir paneles", "Diseño") { m ->
+        add(SItem(1, "Desenfoque al abrir paneles", "Foco y efectos") { m ->
             SwitchRow("Desenfoque al abrir paneles", cfg.blur, m) { cfg.setBlur(it) }
         })
-        add(SItem(0, "Animar cambio de pantallas", "Diseño") { m ->
+        add(SItem(1, "Animar cambio de pantallas", "Foco y efectos") { m ->
             SwitchRow("Animar cambio de pantallas", cfg.screenAnim, m) { cfg.setScreenAnim(it) }
         })
-        add(SItem(0, "Animación al abrir apps", "Diseño") { m ->
+        add(SItem(1, "Animación al abrir apps", "Foco y efectos") { m ->
             SwitchRow("Animación al abrir una app", cfg.openAnim, m) { cfg.setOpenAnim(it) }
         })
-        add(SItem(0, "Tamaño de la interfaz", "Pantalla") { m ->
+        add(SItem(3, "Tamaño de la interfaz", "Pantalla") { m ->
             SliderRow("Tamaño de la interfaz", cfg.uiScale, 70, 130, 5, "%", m) { cfg.setUiScale(it) }
         })
-        add(SItem(0, "Margen de seguridad", "Pantalla") { m ->
+        add(SItem(3, "Margen de seguridad", "Pantalla") { m ->
             SliderRow("Margen de seguridad", cfg.overscan, 0, 60, 2, " dp", m) { cfg.setOverscan(it) }
         })
-        add(SItem(0, "Modo ahorro", "Rendimiento y noche") { m ->
+        add(SItem(3, "Modo ahorro", "Rendimiento") { m ->
             SwitchRow("Modo ahorro (TV modesta)", cfg.saver, m) { cfg.setSaver(it) }
         })
-        add(SItem(0, "Sugerir modo ahorro", "Rendimiento y noche") { m ->
+        add(SItem(3, "Sugerir modo ahorro", "Rendimiento") { m ->
             SwitchRow("Sugerir modo ahorro si va lenta", cfg.saverHint, m) { cfg.setSaverHint(it) }
         })
-        add(SItem(0, "Modo noche automático", "Rendimiento y noche") { m ->
+        add(SItem(3, "Modo noche automático", "Noche") { m ->
             SwitchRow("Modo noche automático", cfg.night, m) { cfg.setNight(it) }
         })
         if (cfg.night) {
-            add(SItem(0, "Noche desde", "Rendimiento y noche") { m ->
+            add(SItem(3, "Noche desde", "Noche") { m ->
                 SliderRow("Noche desde las", cfg.nightFrom, 0, 23, 1, ":00", m) { cfg.setNightFrom(it) }
             })
-            add(SItem(0, "Noche hasta", "Rendimiento y noche") { m ->
+            add(SItem(3, "Noche hasta", "Noche") { m ->
                 SliderRow("Noche hasta las", cfg.nightTo, 0, 23, 1, ":00", m) { cfg.setNightTo(it) }
             })
         }
-        add(SItem(0, "Sonido al mover el foco", "Sonido") { m ->
+        add(SItem(3, "Sonido al mover el foco", "Sonido") { m ->
             ChoiceRow(
                 "Sonido al mover el foco",
                 listOf("Apagado", "Suave", "Medio"),
                 cfg.soundLevel, m
             ) { cfg.setSoundLevel(it) }
         })
-        add(SItem(0, "Sonido de paneles", "Sonido") { m ->
+        add(SItem(3, "Sonido de paneles", "Sonido") { m ->
             SwitchRow("Sonido al abrir y cerrar paneles", cfg.panelSounds, m) { cfg.setPanelSounds(it) }
         })
         // ---- Dock ----
@@ -856,88 +906,83 @@ fun SettingsScreen(
                 SliderRow("Ocultar tras", cfg.hideBarSecs, 3, 60, 3, " s", m) { cfg.setHideBarSecs(it) }
             })
         }
-                add(SItem(2, "Modo ambiente", "Reposo") { m ->
+                add(SItem(3, "Modo ambiente", "Reposo") { m ->
             ChoiceRow(
                 "Modo ambiente",
                 listOf("Desactivado", "2 min", "5 min", "10 min", "20 min"),
                 cfg.ambient, m
             ) { cfg.setAmbient(it) }
         })
-        add(SItem(2, "Protección contra quemado", "Reposo") { m ->
+        add(SItem(3, "Protección contra quemado", "Reposo") { m ->
             SwitchRow("Mover el reloj en modo ambiente", cfg.burnIn, m) { cfg.setBurnIn(it) }
         })
-        add(SItem(2, "Temporizador de sueño", "Reposo") { m -> SleepRow(m) })
-        add(SItem(2, "Al terminar el temporizador", "Reposo") { m ->
+        add(SItem(3, "Temporizador de sueño", "Reposo") { m -> SleepRow(m) })
+        add(SItem(3, "Al terminar el temporizador", "Reposo") { m ->
             ChoiceRow("Al terminar el temporizador", SLEEP_ACTIONS, cfg.sleepAction, m) { cfg.setSleepAction(it) }
         })
         // ---- Música ----
-        add(SItem(3, "Mostrar reproductor", "Reproductor") { m ->
+        add(SItem(4, "Mostrar reproductor", "Reproductor") { m ->
             SwitchRow("Mostrar reproductor", cfg.showMusic, m) { cfg.setShowMusic(it) }
         })
-        add(SItem(3, "Tamaño del reproductor", "Reproductor") { m ->
+        add(SItem(4, "Tamaño del reproductor", "Reproductor") { m ->
             SliderRow("Tamaño del reproductor", cfg.musicSize, 50, 120, 5, "%", m) { cfg.setMusicSize(it) }
         })
-        add(SItem(3, "Posición del reproductor", "Reproductor") { m ->
+        add(SItem(4, "Posición del reproductor", "Reproductor") { m ->
             ChoiceRow(
                 "Posición del reproductor",
                 listOf("Junto al reloj", "Arriba al centro"),
                 cfg.musicPos, m
             ) { cfg.setMusicPos(it) }
         })
-        add(SItem(3, "Permitir acceso a notificaciones", "Permisos") { m ->
-            ActionRow("Permitir acceso a notificaciones", m) {
-                tryStart(ctx, "android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS")
-            }
-        })
         // ---- Apps ----
-        add(SItem(4, "Editar apps", "Organizar") { m ->
+        add(SItem(5, "Editar apps", "Organizar") { m ->
             ActionRow("Editar apps (favoritas, orden, tamaño, ocultas)", m) {
                 returnKey = "Editar apps"
                 onEdit()
             }
         })
-        add(SItem(4, "Carpetas del dock", "Carpetas") { m ->
+        add(SItem(5, "Carpetas del dock", "Carpetas") { m ->
             DialogRow("Carpetas del dock (crear, renombrar, borrar)", m) { close ->
                 FoldersDialog(prefs, close)
             }
         })
-        add(SItem(4, "Aviso de app nueva", "Apps nuevas") { m ->
+        add(SItem(5, "Aviso de app nueva", "Apps nuevas") { m ->
             SwitchRow("Avisar al instalar una app nueva", cfg.newAppAlert, m) { cfg.setNewAppAlert(it) }
         })
         // ---- Sistema ----
-        add(SItem(5, "Wi-Fi", "Conexiones") { m ->
+        add(SItem(6, "Wi-Fi", "Conexiones") { m ->
             ActionRow("Wi-Fi", m) { onOpen("wifi") }
         })
-        add(SItem(5, "Bluetooth", "Conexiones") { m ->
+        add(SItem(6, "Bluetooth", "Conexiones") { m ->
             ActionRow("Bluetooth", m) { onOpen("bt") }
         })
-        add(SItem(5, "Entradas (HDMI)", "Conexiones") { m ->
+        add(SItem(6, "Entradas (HDMI)", "Conexiones") { m ->
             ActionRow("Entradas (HDMI)", m) {
                 returnKey = "Entradas (HDMI)"
                 onInputs()
             }
         })
-        add(SItem(5, "Permitir nombre de red y Bluetooth", "Conexiones") { m ->
+        add(SItem(7, "Permitir nombre de red y Bluetooth", "Permisos") { m ->
             ActionRow("Permitir nombre de red y Bluetooth", m) { onNetPerm() }
         })
-        add(SItem(5, "Todos los ajustes de Android", "Sistema") { m ->
+        add(SItem(6, "Todos los ajustes de Android", "Sistema") { m ->
             ActionRow("Todos los ajustes de Android", m) { onOpen("all") }
         })
-        add(SItem(5, "Menú de energía (accesibilidad)", "Sistema") { m ->
+        add(SItem(6, "Menú de energía (accesibilidad)", "Sistema") { m ->
             ActionRow("Menú de energía (accesibilidad)", m) { onOpen("access") }
         })
-        add(SItem(5, "Protector de pantalla del sistema", "Sistema") { m ->
+        add(SItem(6, "Protector de pantalla del sistema", "Sistema") { m ->
             ActionRow("Protector de pantalla del sistema", m) { onOpen("dream") }
         })
-        add(SItem(5, "Establecer como inicio predeterminado", "Sistema") { m ->
+        add(SItem(6, "Establecer como inicio predeterminado", "Sistema") { m ->
             ActionRow("Establecer como inicio predeterminado", m) { onSetHome() }
         })
-        add(SItem(5, "Conexión con el celular", "Celular") { m ->
+        add(SItem(6, "Conexión con el celular", "Celular") { m ->
             DialogRow("Conexión con el celular (fondos, texto, copia)", m) { close -> PhoneDialog(close) }
         })
         val colorNames = listOf("rojo", "verde", "amarillo", "azul")
         for (ci in 0..3) {
-            add(SItem(5, "Botón " + colorNames[ci], "Botones de color") { m ->
+            add(SItem(6, "Botón " + colorNames[ci], "Botones de color") { m ->
                 ChoiceRow("Botón " + colorNames[ci], COLOR_ACTIONS, cfg.colorAction(ci), m) { v ->
                     when (ci) {
                         0 -> cfg.setKeyRed(v)
@@ -948,13 +993,13 @@ fun SettingsScreen(
                 }
             })
         }
-        add(SItem(5, "Abrir app al encender", "Arranque") { m ->
+        add(SItem(6, "Abrir app al encender", "Arranque") { m ->
             SwitchRow("Abrir una app al encender la TV", cfg.bootEnabled, m) { on ->
                 cfg.setBootEnabled(on)
                 if (on && cfg.bootApp.isEmpty()) toast(ctx, "Elige también la app de arranque.")
             }
         })
-        add(SItem(5, "App de arranque", "Arranque") { m ->
+        add(SItem(6, "App de arranque", "Arranque") { m ->
             val bootLabel = AppCache.apps.firstOrNull { it.pkg == cfg.bootApp }?.label
                 ?: (if (cfg.bootApp.isEmpty()) "ninguna" else cfg.bootApp)
             DialogRow("App de arranque: " + bootLabel, m) { close ->
@@ -969,7 +1014,7 @@ fun SettingsScreen(
                 )
             }
         })
-        add(SItem(5, "Permiso del calendario", "Permisos") { m ->
+        add(SItem(7, "Permiso del calendario", "Permisos") { m ->
             val ok = remember(permTick) { hasCalendarPermission(ctx) }
             ActionRow("Calendario: " + (if (ok) "permitido" else "falta (se pide al activar el evento)"), m) {
                 if (ok) {
@@ -979,7 +1024,7 @@ fun SettingsScreen(
                 }
             }
         })
-        add(SItem(5, "Permiso de ubicación", "Permisos") { m ->
+        add(SItem(7, "Permiso de ubicación", "Permisos") { m ->
             val ok = remember(permTick) { hasLocationPermission(ctx) }
             ActionRow("Ubicación: " + (if (ok) "permitida" else "falta (se pide al activarla)"), m) {
                 if (ok) {
@@ -989,26 +1034,26 @@ fun SettingsScreen(
                 }
             }
         })
-        add(SItem(5, "Permiso de notificaciones", "Permisos") { m ->
+        add(SItem(7, "Permiso de notificaciones", "Permisos") { m ->
             val ok = remember(permTick) {
                 NotificationManagerCompat.getEnabledListenerPackages(ctx).contains(ctx.packageName)
             }
-            ActionRow("Notificaciones (música): " + (if (ok) "activo" else "falta permitir"), m) {
+            ActionRow("Acceso a notificaciones (música): " + (if (ok) "activo" else "falta permitir"), m) {
                 tryStart(ctx, "android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS")
             }
         })
         // ---- Seguridad ----
         if (!cfg.pinSet) {
             add(SItem(6, "Estado del PIN", "Código PIN", false) { InfoRow("Estado", "Sin PIN") })
-            add(SItem(6, "Crear PIN de 4 dígitos", "Código PIN") { m ->
+            add(SItem(8, "Crear PIN de 4 dígitos", "Código PIN") { m ->
                 ActionRow("Crear PIN de 4 dígitos", m) { onPin("create") }
             })
         } else {
             add(SItem(6, "Estado del PIN", "Código PIN", false) { InfoRow("Estado", "PIN activo") })
-            add(SItem(6, "Cambiar PIN", "Código PIN") { m ->
+            add(SItem(8, "Cambiar PIN", "Código PIN") { m ->
                 ActionRow("Cambiar PIN", m) { onPin("change") }
             })
-            add(SItem(6, "Quitar PIN", "Código PIN") { m ->
+            add(SItem(8, "Quitar PIN", "Código PIN") { m ->
                 ActionRow("Quitar PIN", m) {
                     if (cfg.kids) {
                         toast(ctx, "Desactiva antes el perfil para niños.")
@@ -1017,14 +1062,14 @@ fun SettingsScreen(
                     }
                 }
             })
-            add(SItem(6, "Proteger ajustes", "Protección") { m ->
+            add(SItem(8, "Proteger ajustes", "Protección") { m ->
                 SwitchRow("Proteger ajustes", cfg.lockSettings, m) { cfg.setLockSettings(it) }
             })
-            add(SItem(6, "Proteger apps ocultas", "Protección") { m ->
+            add(SItem(8, "Proteger apps ocultas", "Protección") { m ->
                 SwitchRow("Proteger apps ocultas", cfg.lockHidden, m) { cfg.setLockHidden(it) }
             })
         }
-        add(SItem(6, "Perfil para niños", "Perfil para niños") { m ->
+        add(SItem(8, "Perfil para niños", "Perfil para niños") { m ->
             SwitchRow("Perfil para niños", cfg.kids, m) { on ->
                 if (on && !cfg.pinSet) {
                     toast(ctx, "Primero crea un PIN (arriba, en Código PIN) para activar el perfil para niños.")
@@ -1033,17 +1078,17 @@ fun SettingsScreen(
                 }
             }
         })
-        add(SItem(6, "Apps permitidas para niños", "Perfil para niños") { m ->
+        add(SItem(8, "Apps permitidas para niños", "Perfil para niños") { m ->
             DialogRow("Apps permitidas para niños", m) { close -> KidsAppsDialog(prefs, close) }
         })
         // ---- Accesibilidad ----
-        add(SItem(7, "Texto grande", "Lectura") { m ->
+        add(SItem(9, "Texto grande", "Lectura") { m ->
             SwitchRow("Texto grande", cfg.bigText, m) { cfg.setBigText(it) }
         })
-        add(SItem(7, "Alto contraste", "Lectura") { m ->
+        add(SItem(9, "Alto contraste", "Lectura") { m ->
             SwitchRow("Alto contraste", cfg.highContrast, m) { cfg.setHighContrast(it) }
         })
-        add(SItem(7, "Foco grueso", "Navegación") { m ->
+        add(SItem(9, "Foco grueso", "Navegación") { m ->
             SwitchRow("Foco más grueso en las fichas", cfg.thickFocus, m) { cfg.setThickFocus(it) }
         })
         // ---- Acerca de ----
@@ -1089,9 +1134,11 @@ fun SettingsScreen(
 
     // Siempre hay una categoria seleccionada (columna izquierda); las opciones salen a la derecha.
     val curCat = if (cat in 0..CATS.lastIndex) cat else 0
+    val secOrder = SEC_ORDER[curCat] ?: emptyList()
     val shown = items.filter { it.cat == curCat }
+        .sortedBy { i -> secOrder.indexOf(i.sec).let { if (it < 0) 99 else it } }
     val title = CATS[curCat].name
-    val subtitle = if (curCat <= 1) "Los cambios se ven en vivo a la izquierda" else CATS[curCat].desc
+    val subtitle = if (settingsPreviewCat(curCat)) "Los cambios se ven en vivo a la izquierda" else CATS[curCat].desc
     val scroll = remember(curCat) { androidx.compose.foundation.ScrollState(0) }
     val railScroll = rememberScrollState()
     val focusManager = LocalFocusManager.current
@@ -1129,13 +1176,15 @@ fun SettingsScreen(
                     "CONFIGURACIÓN", color = Color(0x99FFFFFF), fontSize = 13.sp,
                     letterSpacing = 1.sp, fontWeight = FontWeight.Normal
                 )
+                Spacer(Modifier.weight(1f))
+                Text("‹ › cambiar  ·  OK abrir  ·  Atrás volver", color = Color(0x80FFFFFF), fontSize = 12.sp, maxLines = 1)
             }
             Spacer(Modifier.height(10.dp))
             Row(Modifier.weight(1f).fillMaxWidth()) {
                 // Columna izquierda: categorias.
                 Column(
                     Modifier.width(210.dp).fillMaxHeight().verticalScroll(railScroll),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
                 ) {
                     CATS.forEachIndexed { i, c ->
                         RailItem(
@@ -1160,10 +1209,11 @@ fun SettingsScreen(
                 Column(
                     Modifier.weight(1f).fillMaxHeight().onFocusChanged { onRightFocus(it.hasFocus) }
                 ) {
-                    Text(
-                        title, color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Normal,
-                        maxLines = 1, modifier = Modifier.padding(start = 6.dp, top = 2.dp)
-                    )
+                    Row(Modifier.padding(start = 6.dp, top = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+                        LineIcon(CATS[curCat].icon, ACC, 26)
+                        Spacer(Modifier.width(10.dp))
+                        Text(title, color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Normal, maxLines = 1)
+                    }
                     Text(
                         subtitle, color = Color(0x99FFFFFF), fontSize = 14.sp,
                         modifier = Modifier.padding(start = 6.dp, top = 2.dp)
@@ -1186,15 +1236,16 @@ fun SettingsScreen(
                                 toolItems = shown.filter { it.sec == "Uso y diagnóstico" }
                             )
                         } else {
-                            var lastGroup = ""
-                            for (si in shown) {
-                                val group = si.sec
-                                if (group.isNotEmpty() && group != lastGroup) SectionLabel(group)
-                                lastGroup = group
-                                key(si.cat to si.label) {
-                                    si.content(
-                                        if (si.focusable && si.label == retItem) Modifier.autoFocus() else Modifier
-                                    )
+                            for ((group, list) in shown.groupBy { it.sec }) {
+                                if (group.isNotEmpty()) SectionLabel(group)
+                                SectionCard {
+                                    for (si in list) {
+                                        key(si.cat to si.label) {
+                                            si.content(
+                                                if (si.focusable && si.label == retItem) Modifier.autoFocus() else Modifier
+                                            )
+                                        }
+                                    }
                                 }
                             }
                         }

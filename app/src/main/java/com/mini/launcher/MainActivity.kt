@@ -908,7 +908,7 @@ fun HomeRoot(
     val uiScale = cfg.uiScale / 100f
     // Vista previa en vivo: en Apariencia y Dock el fondo no se oscurece ni se desenfoca,
     // y la primera ficha del dock se ve "enfocada" para que se note cada cambio.
-    val preview = screen == "settings" && settingsCat in 0..1
+    val preview = screen == "settings" && settingsPreviewCat(settingsCat)
     val sideOpen = screen == "settings" || screen == "edit"
     // Ancho que ocupa el panel lateral: el inicio se hace mas angosto para no quedar debajo.
     val availW = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp / uiScale -

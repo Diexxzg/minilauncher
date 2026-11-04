@@ -277,6 +277,41 @@ fun LineIcon(kind: String, color: Color, s: Int = 24) {
                     style = st
                 )
             }
+            "layout" -> {
+                drawRoundRect(color, Offset(w * 0.1f, w * 0.16f), Size(w * 0.8f, w * 0.68f), CornerRadius(w * 0.08f, w * 0.08f), style = st)
+                drawLine(color, Offset(w * 0.1f, w * 0.6f), Offset(w * 0.9f, w * 0.6f), strokeWidth = sw, cap = StrokeCap.Round)
+                drawCircle(color, radius = sw * 0.7f, center = Offset(w * 0.3f, w * 0.72f))
+                drawCircle(color, radius = sw * 0.7f, center = Offset(w * 0.5f, w * 0.72f))
+                drawCircle(color, radius = sw * 0.7f, center = Offset(w * 0.7f, w * 0.72f))
+            }
+            "bolt" -> {
+                val p = Path()
+                p.moveTo(w * 0.56f, w * 0.1f)
+                p.lineTo(w * 0.26f, w * 0.54f)
+                p.lineTo(w * 0.5f, w * 0.54f)
+                p.lineTo(w * 0.44f, w * 0.9f)
+                p.lineTo(w * 0.74f, w * 0.44f)
+                p.lineTo(w * 0.5f, w * 0.44f)
+                p.close()
+                drawPath(p, color, style = st)
+            }
+            "shield" -> {
+                val p = Path()
+                p.moveTo(w * 0.5f, w * 0.1f)
+                p.lineTo(w * 0.84f, w * 0.22f)
+                p.lineTo(w * 0.84f, w * 0.5f)
+                p.cubicTo(w * 0.84f, w * 0.72f, w * 0.64f, w * 0.84f, w * 0.5f, w * 0.9f)
+                p.cubicTo(w * 0.36f, w * 0.84f, w * 0.16f, w * 0.72f, w * 0.16f, w * 0.5f)
+                p.lineTo(w * 0.16f, w * 0.22f)
+                p.close()
+                drawPath(p, color, style = st)
+                drawLine(color, Offset(w * 0.34f, w * 0.5f), Offset(w * 0.46f, w * 0.62f), strokeWidth = sw, cap = StrokeCap.Round)
+                drawLine(color, Offset(w * 0.46f, w * 0.62f), Offset(w * 0.68f, w * 0.38f), strokeWidth = sw, cap = StrokeCap.Round)
+            }
+            "eye" -> {
+                drawOval(color, topLeft = Offset(w * 0.08f, w * 0.26f), size = Size(w * 0.84f, w * 0.48f), style = st)
+                drawCircle(color, radius = w * 0.11f, center = Offset(w * 0.5f, w * 0.5f), style = st)
+            }
             else -> {
                 drawCircle(color, radius = w * 0.4f, center = Offset(w * 0.5f, w * 0.5f), style = st)
                 drawCircle(color, radius = sw * 0.7f, center = Offset(w * 0.5f, w * 0.31f))
