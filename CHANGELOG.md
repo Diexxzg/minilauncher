@@ -1,5 +1,12 @@
 # Novedades
 
+## 4.4
+Configuración
+- El panel de Configuración es más pequeño y ya no ocupa la mitad de la pantalla.
+- Desde las pestañas, Abajo (o OK) entra directo a las opciones de la categoría.
+- El foco ya no se escapa al dock del inicio mientras estás en Configuración.
+- Corregido el asistente de primer uso, que dejaba la pantalla vacía.
+
 ## 4.3
 Configuración
 - Nuevo diseño: las categorías son pestañas arriba. Cambias de categoría con izquierda/derecha, sin pulsar OK.
