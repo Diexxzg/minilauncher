@@ -1,5 +1,7 @@
 package com.mini.launcher
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -28,6 +30,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.key
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.runtime.getValue
@@ -65,10 +68,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.app.NotificationManagerCompat
 import androidx.compose.ui.text.style.TextOverflow
+import android.Manifest
 import android.content.Context
+import android.content.pm.PackageManager
 import android.content.Intent
 import android.content.IntentFilter
 import android.os.BatteryManager
+import android.os.SystemClock
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -80,11 +86,15 @@ private val CATS = listOf(
     Cat("folder", "Dock", "Fichas, filas y tarjeta de la app"),
     Cat("home", "Inicio", "Reloj, clima y modo ambiente"),
     Cat("music", "Música", "Reproductor y permisos"),
-    Cat("device", "Apps", "Favoritas, orden y ocultas"),
-    Cat("globe", "Sistema", "Red, entradas y ajustes de Android"),
-    Cat("lock", "Seguridad", "PIN y protección"),
-    Cat("info", "Acerca de", "Versión, equipo y copias de seguridad")
+    Cat("device", "Apps", "Favoritas, orden, carpetas y ocultas"),
+    Cat("globe", "Sistema", "Red, botones de color, celular y permisos"),
+    Cat("lock", "Seguridad", "PIN, protección y perfil para niños"),
+    Cat("device", "Accesibilidad", "Texto grande, contraste y foco"),
+    Cat("info", "Acerca de", "Versión, equipo, estadísticas y copias de seguridad")
 )
+
+/** Indice de la categoría "Acerca de" (la última de la lista). */
+private const val ABOUT = 8
 
 private val CITIES = listOf(
     "Caracas", "Maracaibo", "Valencia", "Barquisimeto", "Bogotá", "Medellín",
@@ -380,7 +390,6 @@ fun GlassPanelFrame(content: @Composable () -> Unit) {
         }
     }
 }
-
 // ---------- Opciones ----------
 
 /**
@@ -431,6 +440,39 @@ fun SettingsScreen(
     blocked: Boolean = false
 ) {
     val ctx = LocalContext.current
+    val prefs = remember { Prefs(ctx) }
+    // Permisos que se piden solo al activar la opcion que los necesita.
+    var permTick by remember { mutableIntStateOf(0) }
+    var calWantsOn by remember { mutableStateOf(false) }
+    var locWantsOn by remember { mutableStateOf(false) }
+    val calPerm = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { ok ->
+        permTick++
+        if (calWantsOn) {
+            if (ok) {
+                cfg.setCardEvent(true)
+            } else {
+                toast(ctx, "Sin el permiso del calendario no se puede mostrar el próximo evento.")
+            }
+        }
+        calWantsOn = false
+    }
+    val locPerm = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { ok ->
+        permTick++
+        if (locWantsOn) {
+            if (ok) {
+                cfg.setAutoLoc(true)
+                WeatherOpts.autoLoc = 1
+            } else {
+                toast(ctx, "Sin el permiso de ubicación se usa la ciudad elegida.")
+            }
+        }
+        locWantsOn = false
+    }
+    // Weather.kt lee estos dos ajustes fuera de Configuracion: se mantienen al dia aqui.
+    SideEffect {
+        WeatherOpts.forecast = if (cfg.forecast) 1 else 0
+        WeatherOpts.autoLoc = if (cfg.autoLoc) 1 else 0
+    }
     // Ultima categoria abierta: al volver a la lista el foco regresa a ella.
     var lastCat by remember { mutableIntStateOf(if (cat >= 0) cat else 0) }
     LaunchedEffect(cat) { if (cat >= 0) lastCat = cat }
@@ -471,6 +513,17 @@ fun SettingsScreen(
                 cfg.dynBg, m
             ) { cfg.setDynBg(it) }
         })
+        add(SItem(0, "Presentación de fondos", "Fondo") { m ->
+            SwitchRow("Presentación de fondos (cambian solos)", cfg.wallShow, m) { cfg.setWallShow(it) }
+        })
+        if (cfg.wallShow) {
+            add(SItem(0, "Cambiar cada", "Fondo") { m ->
+                SliderRow("Cambiar el fondo cada", cfg.wallShowMins, 5, 120, 5, " min", m) { cfg.setWallShowMins(it) }
+            })
+        }
+        add(SItem(0, "Clima en el fondo", "Fondo") { m ->
+            SwitchRow("Clima en el fondo (se apaga con modo ahorro)", cfg.weatherFx, m) { cfg.setWeatherFx(it) }
+        })
         add(SItem(0, "Perfil de diseño", "Diseño") { m ->
             // Izquierda/derecha cambia de perfil; la opcion "Personalizado" solo indica el estado.
             ChoiceRow("Perfil de diseño", PROFILE_OPTIONS, profSel, m) {
@@ -479,6 +532,28 @@ fun SettingsScreen(
         })
         add(SItem(0, "Tema de color", "Diseño") { m ->
             ChoiceRow("Tema de color", Themes.list.map { it.name }, cfg.theme, m) { cfg.setTheme(it) }
+        })
+        add(SItem(0, "Tema automático", "Diseño") { m ->
+            SwitchRow("Tema automático (día y noche)", cfg.autoTheme, m) { cfg.setAutoTheme(it) }
+        })
+        add(SItem(0, "Color de acento propio", "Diseño") { m ->
+            DialogRow(
+                if (cfg.accentCustom != 0) "Color de acento propio (activo)" else "Color de acento propio",
+                m
+            ) { close ->
+                AccentPickerDialog(
+                    current = cfg.accentCustom,
+                    onSave = {
+                        cfg.setAccentCustom(it)
+                        close()
+                    },
+                    onClear = {
+                        cfg.setAccentCustom(0)
+                        close()
+                    },
+                    onClose = close
+                )
+            }
         })
         add(SItem(0, "Brillo de color", "Diseño") { m ->
             ChoiceRow("Brillo de color", GLOW_NAMES, style.glow, m) { onSet("glow", it) }
@@ -501,6 +576,9 @@ fun SettingsScreen(
         })
         add(SItem(0, "Animar cambio de pantallas", "Diseño") { m ->
             SwitchRow("Animar cambio de pantallas", cfg.screenAnim, m) { cfg.setScreenAnim(it) }
+        })
+        add(SItem(0, "Animación al abrir apps", "Diseño") { m ->
+            SwitchRow("Animación al abrir una app", cfg.openAnim, m) { cfg.setOpenAnim(it) }
         })
         add(SItem(0, "Tamaño de la interfaz", "Pantalla") { m ->
             SliderRow("Tamaño de la interfaz", cfg.uiScale, 70, 130, 5, "%", m) { cfg.setUiScale(it) }
@@ -531,6 +609,9 @@ fun SettingsScreen(
                 listOf("Apagado", "Suave", "Medio"),
                 cfg.soundLevel, m
             ) { cfg.setSoundLevel(it) }
+        })
+        add(SItem(0, "Sonido de paneles", "Sonido") { m ->
+            SwitchRow("Sonido al abrir y cerrar paneles", cfg.panelSounds, m) { cfg.setPanelSounds(it) }
         })
         // ---- Dock ----
         add(SItem(1, "Tamaño general", "Fichas") { m ->
@@ -581,6 +662,71 @@ fun SettingsScreen(
         add(SItem(2, "Formato de fecha", "Reloj y fecha") { m ->
             ChoiceRow("Formato de fecha", dateLabels, cfg.dateFmt, m) { cfg.setDateFmt(it) }
         })
+        add(SItem(2, "Próximo evento", "Tarjetas junto al reloj") { m ->
+            SwitchRow("Próximo evento del calendario", cfg.cardEvent, m) { on ->
+                if (on && !hasCalendarPermission(ctx)) {
+                    calWantsOn = true
+                    calPerm.launch(Manifest.permission.READ_CALENDAR)
+                } else {
+                    cfg.setCardEvent(on)
+                }
+            }
+        })
+        add(SItem(2, "Tarjeta de nota", "Tarjetas junto al reloj") { m ->
+            SwitchRow("Tarjeta con una nota", cfg.cardNote, m) { cfg.setCardNote(it) }
+        })
+        add(SItem(2, "Escribir la nota", "Tarjetas junto al reloj") { m ->
+            DialogRow(if (cfg.noteText.isBlank()) "Escribir la nota" else "Editar la nota", m) { close ->
+                TextEditDialog(
+                    title = "Nota del inicio",
+                    initial = cfg.noteText,
+                    hint = "Se muestra en una tarjeta junto al reloj.",
+                    maxLen = 80,
+                    onSave = {
+                        cfg.setNoteText(it)
+                        close()
+                    },
+                    onClose = close
+                )
+            }
+        })
+        add(SItem(2, "Tarjeta de cuenta regresiva", "Tarjetas junto al reloj") { m ->
+            SwitchRow("Tarjeta de cuenta regresiva", cfg.cardCountdown, m) { cfg.setCardCountdown(it) }
+        })
+        add(SItem(2, "Fecha de la cuenta regresiva", "Tarjetas junto al reloj") { m ->
+            DialogRow("Fecha: " + cfg.countdownDate.ifBlank { "sin elegir" }, m) { close ->
+                TextEditDialog(
+                    title = "Fecha de la cuenta regresiva",
+                    initial = cfg.countdownDate,
+                    hint = "Escribe año-mes-día, por ejemplo 2026-12-25.",
+                    maxLen = 10,
+                    onSave = { v ->
+                        if (v.isEmpty() || validDate(v)) {
+                            cfg.setCountdownDate(v)
+                            close()
+                        } else {
+                            toast(ctx, "Fecha no válida. Usa año-mes-día, por ejemplo 2026-12-25.")
+                        }
+                    },
+                    onClose = close
+                )
+            }
+        })
+        add(SItem(2, "Nombre de la cuenta regresiva", "Tarjetas junto al reloj") { m ->
+            DialogRow("Nombre: " + cfg.countdownLabel.ifBlank { "sin elegir" }, m) { close ->
+                TextEditDialog(
+                    title = "Nombre de la cuenta regresiva",
+                    initial = cfg.countdownLabel,
+                    hint = "Por ejemplo: Navidad o Mi cumpleaños.",
+                    maxLen = 30,
+                    onSave = {
+                        cfg.setCountdownLabel(it)
+                        close()
+                    },
+                    onClose = close
+                )
+            }
+        })
         add(SItem(2, "Mostrar clima", "Clima") { m ->
             SwitchRow("Mostrar clima", cfg.showWeather, m) { cfg.setShowWeather(it) }
         })
@@ -593,6 +739,26 @@ fun SettingsScreen(
             ChoiceRow("Unidades", listOf("°C", "°F"), if (cfg.fahrenheit) 1 else 0, m) {
                 cfg.setFahrenheit(it == 1)
             }
+        })
+        add(SItem(2, "Pronóstico de 3 días", "Clima") { m ->
+            SwitchRow("Pronóstico de 3 días", cfg.forecast, m) {
+                cfg.setForecast(it)
+                WeatherOpts.forecast = if (it) 1 else 0
+            }
+        })
+        add(SItem(2, "Ubicación automática", "Clima") { m ->
+            SwitchRow("Ubicación automática (si la TV la entrega)", cfg.autoLoc, m) { on ->
+                if (on && !hasLocationPermission(ctx)) {
+                    locWantsOn = true
+                    locPerm.launch(Manifest.permission.ACCESS_COARSE_LOCATION)
+                } else {
+                    cfg.setAutoLoc(on)
+                    WeatherOpts.autoLoc = if (on) 1 else 0
+                }
+            }
+        })
+        add(SItem(2, "Fila Continuar", "Contenido") { m ->
+            SwitchRow("Fila «Continuar» (última app y las de hoy)", cfg.continueRow, m) { cfg.setContinueRow(it) }
         })
         add(SItem(2, "Mostrar recientes", "Contenido") { m ->
             SwitchRow("Mostrar recientes", cfg.showRecents, m) { cfg.setShowRecents(it) }
@@ -622,6 +788,10 @@ fun SettingsScreen(
         add(SItem(2, "Protección contra quemado", "Reposo") { m ->
             SwitchRow("Mover el reloj en modo ambiente", cfg.burnIn, m) { cfg.setBurnIn(it) }
         })
+        add(SItem(2, "Temporizador de sueño", "Reposo") { m -> SleepRow(m) })
+        add(SItem(2, "Al terminar el temporizador", "Reposo") { m ->
+            ChoiceRow("Al terminar el temporizador", SLEEP_ACTIONS, cfg.sleepAction, m) { cfg.setSleepAction(it) }
+        })
         // ---- Música ----
         add(SItem(3, "Mostrar reproductor", "Reproductor") { m ->
             SwitchRow("Mostrar reproductor", cfg.showMusic, m) { cfg.setShowMusic(it) }
@@ -647,6 +817,14 @@ fun SettingsScreen(
                 returnKey = "Editar apps"
                 onEdit()
             }
+        })
+        add(SItem(4, "Carpetas del dock", "Carpetas") { m ->
+            DialogRow("Carpetas del dock (crear, renombrar, borrar)", m) { close ->
+                FoldersDialog(prefs, close)
+            }
+        })
+        add(SItem(4, "Aviso de app nueva", "Apps nuevas") { m ->
+            SwitchRow("Avisar al instalar una app nueva", cfg.newAppAlert, m) { cfg.setNewAppAlert(it) }
         })
         // ---- Sistema ----
         add(SItem(5, "Wi-Fi", "Conexiones") { m ->
@@ -676,6 +854,71 @@ fun SettingsScreen(
         add(SItem(5, "Establecer como inicio predeterminado", "Sistema") { m ->
             ActionRow("Establecer como inicio predeterminado", m) { onSetHome() }
         })
+        add(SItem(5, "Conexión con el celular", "Celular") { m ->
+            DialogRow("Conexión con el celular (fondos, texto, copia)", m) { close -> PhoneDialog(close) }
+        })
+        val colorNames = listOf("rojo", "verde", "amarillo", "azul")
+        for (ci in 0..3) {
+            add(SItem(5, "Botón " + colorNames[ci], "Botones de color") { m ->
+                ChoiceRow("Botón " + colorNames[ci], COLOR_ACTIONS, cfg.colorAction(ci), m) { v ->
+                    when (ci) {
+                        0 -> cfg.setKeyRed(v)
+                        1 -> cfg.setKeyGreen(v)
+                        2 -> cfg.setKeyYellow(v)
+                        else -> cfg.setKeyBlue(v)
+                    }
+                }
+            })
+        }
+        add(SItem(5, "Abrir app al encender", "Arranque") { m ->
+            SwitchRow("Abrir una app al encender la TV", cfg.bootEnabled, m) { on ->
+                cfg.setBootEnabled(on)
+                if (on && cfg.bootApp.isEmpty()) toast(ctx, "Elige también la app de arranque.")
+            }
+        })
+        add(SItem(5, "App de arranque", "Arranque") { m ->
+            val bootLabel = AppCache.apps.firstOrNull { it.pkg == cfg.bootApp }?.label
+                ?: (if (cfg.bootApp.isEmpty()) "ninguna" else cfg.bootApp)
+            DialogRow("App de arranque: " + bootLabel, m) { close ->
+                AppPickerDialog(
+                    title = "App de arranque",
+                    current = cfg.bootApp,
+                    onPick = {
+                        cfg.setBootApp(it)
+                        close()
+                    },
+                    onClose = close
+                )
+            }
+        })
+        add(SItem(5, "Permiso del calendario", "Permisos") { m ->
+            val ok = remember(permTick) { hasCalendarPermission(ctx) }
+            ActionRow("Calendario: " + (if (ok) "permitido" else "falta (se pide al activar el evento)"), m) {
+                if (ok) {
+                    toast(ctx, "El calendario ya está permitido.")
+                } else {
+                    calPerm.launch(Manifest.permission.READ_CALENDAR)
+                }
+            }
+        })
+        add(SItem(5, "Permiso de ubicación", "Permisos") { m ->
+            val ok = remember(permTick) { hasLocationPermission(ctx) }
+            ActionRow("Ubicación: " + (if (ok) "permitida" else "falta (se pide al activarla)"), m) {
+                if (ok) {
+                    toast(ctx, "La ubicación ya está permitida.")
+                } else {
+                    locPerm.launch(Manifest.permission.ACCESS_COARSE_LOCATION)
+                }
+            }
+        })
+        add(SItem(5, "Permiso de notificaciones", "Permisos") { m ->
+            val ok = remember(permTick) {
+                NotificationManagerCompat.getEnabledListenerPackages(ctx).contains(ctx.packageName)
+            }
+            ActionRow("Notificaciones (música): " + (if (ok) "activo" else "falta permitir"), m) {
+                tryStart(ctx, "android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS")
+            }
+        })
         // ---- Seguridad ----
         if (!cfg.pinSet) {
             add(SItem(6, "Estado del PIN", "Código PIN", false) { InfoRow("Estado", "Sin PIN") })
@@ -688,7 +931,13 @@ fun SettingsScreen(
                 ActionRow("Cambiar PIN", m) { onPin("change") }
             })
             add(SItem(6, "Quitar PIN", "Código PIN") { m ->
-                ActionRow("Quitar PIN", m) { onPin("remove") }
+                ActionRow("Quitar PIN", m) {
+                    if (cfg.kids) {
+                        toast(ctx, "Desactiva antes el perfil para niños.")
+                    } else {
+                        onPin("remove")
+                    }
+                }
             })
             add(SItem(6, "Proteger ajustes", "Protección") { m ->
                 SwitchRow("Proteger ajustes", cfg.lockSettings, m) { cfg.setLockSettings(it) }
@@ -697,24 +946,55 @@ fun SettingsScreen(
                 SwitchRow("Proteger apps ocultas", cfg.lockHidden, m) { cfg.setLockHidden(it) }
             })
         }
+        add(SItem(6, "Perfil para niños", "Perfil para niños") { m ->
+            SwitchRow("Perfil para niños", cfg.kids, m) { on ->
+                if (on && !cfg.pinSet) {
+                    toast(ctx, "Primero crea un PIN (arriba, en Código PIN) para activar el perfil para niños.")
+                } else {
+                    cfg.setKids(on)
+                }
+            }
+        })
+        add(SItem(6, "Apps permitidas para niños", "Perfil para niños") { m ->
+            DialogRow("Apps permitidas para niños", m) { close -> KidsAppsDialog(prefs, close) }
+        })
+        // ---- Accesibilidad ----
+        add(SItem(7, "Texto grande", "Lectura") { m ->
+            SwitchRow("Texto grande", cfg.bigText, m) { cfg.setBigText(it) }
+        })
+        add(SItem(7, "Alto contraste", "Lectura") { m ->
+            SwitchRow("Alto contraste", cfg.highContrast, m) { cfg.setHighContrast(it) }
+        })
+        add(SItem(7, "Foco grueso", "Navegación") { m ->
+            SwitchRow("Foco más grueso en las fichas", cfg.thickFocus, m) { cfg.setThickFocus(it) }
+        })
         // ---- Acerca de ----
-        add(SItem(7, "Guardar copia de seguridad", "Copias de seguridad") { m ->
+        add(SItem(ABOUT, "Estadísticas de uso", "Uso y diagnóstico") { m ->
+            DialogRow("Estadísticas de uso (esta semana)", m) { close -> StatsDialog(prefs, close) }
+        })
+        add(SItem(ABOUT, "Novedades", "Uso y diagnóstico") { m ->
+            DialogRow("Novedades de la última versión", m) { close -> ReleaseNotesFlow(close) }
+        })
+        add(SItem(ABOUT, "Visor de errores", "Uso y diagnóstico") { m ->
+            DialogRow("Visor de errores", m) { close -> ErrorsDialog(close) }
+        })
+        add(SItem(ABOUT, "Guardar copia de seguridad", "Copias de seguridad") { m ->
             ActionRow("Guardar copia de seguridad", m) { onBackup() }
         })
-        add(SItem(7, "Restaurar copia de seguridad", "Copias de seguridad") { m ->
+        add(SItem(ABOUT, "Restaurar copia de seguridad", "Copias de seguridad") { m ->
             ActionRow("Restaurar copia de seguridad", m) { onRestore() }
         })
-        add(SItem(7, "Guardar copia en…", "Copias de seguridad") { m ->
+        add(SItem(ABOUT, "Guardar copia en…", "Copias de seguridad") { m ->
             ActionRow("Guardar copia en… (elegir dónde)", m) { onBackupSave() }
         })
-        add(SItem(7, "Compartir copia de seguridad", "Copias de seguridad") { m ->
+        add(SItem(ABOUT, "Compartir copia de seguridad", "Copias de seguridad") { m ->
             ActionRow("Compartir copia de seguridad", m) { onBackupShare() }
         })
-        add(SItem(7, "Restaurar desde un archivo…", "Copias de seguridad") { m ->
+        add(SItem(ABOUT, "Restaurar desde un archivo…", "Copias de seguridad") { m ->
             ActionRow("Restaurar desde un archivo…", m) { onRestorePick() }
         })
         // Actualizaciones desde GitHub Releases.
-        add(SItem(7, "Buscar actualizaciones", "Actualizaciones") { m ->
+        add(SItem(ABOUT, "Buscar actualizaciones", "Actualizaciones") { m ->
             val fr = remember { FocusRequester() }
             LaunchedEffect(updBack) {
                 if (updBack > 0) {
@@ -724,7 +1004,7 @@ fun SettingsScreen(
             }
             ActionRow("Buscar actualizaciones", m.focusRequester(fr)) { onUpdate() }
         })
-        add(SItem(7, "Avisar de actualizaciones", "Actualizaciones") { m ->
+        add(SItem(ABOUT, "Avisar de actualizaciones", "Actualizaciones") { m ->
             SwitchRow("Avisar si hay versión nueva (1 vez al día)", cfg.updateCheck, m) { cfg.setUpdateCheck(it) }
         })
     }
@@ -787,11 +1067,12 @@ fun SettingsScreen(
                             if (i == lastCat) Modifier.autoFocus() else Modifier
                         ) { onCat(i) }
                     }
-                } else if (cat == 7) {
+                } else if (cat == ABOUT) {
                     AboutPage(
                         cfg = cfg,
                         updItems = shown.filter { it.sec == "Actualizaciones" },
-                        bakItems = shown.filter { it.sec == "Copias de seguridad" }
+                        bakItems = shown.filter { it.sec == "Copias de seguridad" },
+                        toolItems = shown.filter { it.sec == "Uso y diagnóstico" }
                     )
                 } else {
                     var lastGroup = ""
@@ -818,7 +1099,8 @@ private class AboutSnap(
     val storage: String,
     val ram: String,
     val temp: String?,
-    val net: List<Pair<String, String>>
+    val net: List<Pair<String, String>>,
+    val up: String
 )
 
 private fun fmtBytes(b: Long): String {
@@ -846,6 +1128,35 @@ private fun readTemp(ctx: Context): String? {
     } catch (e: Exception) {
     }
     return null
+}
+
+/** Tiempo desde que se encendio la TV, en texto corto. */
+private fun fmtUptime(ms: Long): String {
+    val mins = ms / 60000L
+    val d = mins / 1440L
+    val h = (mins % 1440L) / 60L
+    val m = mins % 60L
+    return when {
+        d > 0L -> d.toString() + " d " + h.toString() + " h"
+        h > 0L -> h.toString() + " h " + m.toString() + " min"
+        else -> m.toString() + " min"
+    }
+}
+
+/** true si One Piece es el inicio predeterminado de la TV. */
+private fun isDefaultHome(ctx: Context): Boolean = try {
+    val i = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
+    ctx.packageManager.resolveActivity(i, PackageManager.MATCH_DEFAULT_ONLY)?.activityInfo?.packageName == ctx.packageName
+} catch (e: Exception) {
+    false
+}
+
+/** true si el texto es una fecha aaaa-mm-dd valida. */
+private fun validDate(s: String): Boolean = try {
+    java.time.LocalDate.parse(s.trim())
+    true
+} catch (e: Exception) {
+    false
 }
 
 /** Primera direccion IPv4 de la TV (sin permisos). */
@@ -918,7 +1229,7 @@ private fun readAboutSnap(ctx: Context): AboutSnap {
         "Apagado"
     }
     net.add(Pair("Bluetooth", btName))
-    return AboutSnap(res, dpi, hz, storage, ram, readTemp(ctx), net)
+    return AboutSnap(res, dpi, hz, storage, ram, readTemp(ctx), net, fmtUptime(SystemClock.elapsedRealtime()))
 }
 
 /**
@@ -971,7 +1282,7 @@ private fun OptionsDivider() {
  */
 @Suppress("DEPRECATION")
 @Composable
-private fun AboutPage(cfg: Cfg, updItems: List<SItem>, bakItems: List<SItem>) {
+private fun AboutPage(cfg: Cfg, updItems: List<SItem>, bakItems: List<SItem>, toolItems: List<SItem>) {
     val ctx = LocalContext.current
     val version = remember {
         runCatching { ctx.packageManager.getPackageInfo(ctx.packageName, 0).versionName }.getOrNull() ?: "?"
@@ -984,6 +1295,7 @@ private fun AboutPage(cfg: Cfg, updItems: List<SItem>, bakItems: List<SItem>) {
         NotificationManagerCompat.getEnabledListenerPackages(ctx).contains(ctx.packageName)
     }
     val wallCount = remember { listWalls(ctx).size }
+    val defaultHome = remember { isDefaultHome(ctx) }
 
     var fps by remember { mutableIntStateOf(0) }
     LaunchedEffect(Unit) {
@@ -1026,7 +1338,10 @@ private fun AboutPage(cfg: Cfg, updItems: List<SItem>, bakItems: List<SItem>) {
             "Apps instaladas" to AppCache.apps.size.toString(),
             "Fondos guardados" to wallCount.toString(),
             "Permiso de música" to if (listenerOn) "Activo" else "Falta permitir",
-            "Fotogramas por segundo" to fps.toString()
+            "Fotogramas por segundo" to fps.toString(),
+            "Encendida desde hace" to snap.up,
+            "Parche de seguridad" to (android.os.Build.VERSION.SECURITY_PATCH.takeIf { it.isNotBlank() } ?: "—"),
+            "Launcher predeterminado" to if (defaultHome) "Sí" else "No"
         )
     )
 
@@ -1051,6 +1366,9 @@ private fun AboutPage(cfg: Cfg, updItems: List<SItem>, bakItems: List<SItem>) {
 
     SectionLabel("Red")
     InfoCard(snap.net)
+
+    SectionLabel("Uso y diagnóstico")
+    for (si in toolItems) key(si.label) { si.content(Modifier) }
 
     SectionLabel("Copias de seguridad")
     for (si in bakItems) key(si.label) { si.content(Modifier) }
