@@ -133,7 +133,7 @@ private const val PANEL_SCALE = 0.84f
 fun sidePanelWidth(availDp: Float, wide: Boolean = false): Float =
     if (wide) {
         // Configuracion: categorias a la izquierda y opciones a la derecha.
-        (availDp * 0.52f).coerceIn(600f, 780f).coerceAtMost(availDp * 0.66f)
+        (availDp * 0.38f).coerceIn(440f, 540f).coerceAtMost(availDp * 0.5f)
     } else {
         (availDp * 0.40f).coerceIn(400f, 560f).coerceAtMost(availDp * 0.62f)
     }
@@ -361,14 +361,14 @@ private fun TabChip(
     selected: Boolean,
     modifier: Modifier = Modifier,
     onFocus: () -> Unit,
+    onEnter: () -> Boolean,
     onClick: () -> Unit
 ) {
     var focused by remember { mutableStateOf(false) }
     val shape = RoundedCornerShape(12.dp)
     Box(
         modifier
-            .width(44.dp)
-            .height(40.dp)
+            .height(38.dp)
             .clip(shape)
             .background(
                 when {
@@ -387,6 +387,10 @@ private fun TabChip(
                         cornerRadius = CornerRadius(2.dp.toPx())
                     )
                 }
+            }
+            .onKeyEvent { e ->
+                // Abajo entra directo a la primera opcion de la categoria (sin depender de la busqueda de foco).
+                if (e.type == KeyEventType.KeyDown && e.key == Key.DirectionDown) onEnter() else false
             }
             .onFocusChanged {
                 focused = it.isFocused
@@ -538,7 +542,7 @@ fun GlassPanelFrame(wide: Boolean = false, content: @Composable () -> Unit) {
         ) {
             androidx.compose.runtime.CompositionLocalProvider(
                 androidx.compose.ui.platform.LocalDensity provides
-                    androidx.compose.ui.unit.Density(dens.density * PANEL_SCALE, dens.fontScale)
+                    androidx.compose.ui.unit.Density(dens.density * (if (wide) 0.80f else PANEL_SCALE), dens.fontScale)
             ) { content() }
         }
     }
@@ -1199,9 +1203,16 @@ fun SettingsScreen(
     // Mientras no se toquen las pestañas, el foco cae solo en la primera opcion (o en la fila que abrio un sub-panel).
     var tabTouched by remember { mutableStateOf(false) }
     val tabFr = remember { List(CATS.size) { FocusRequester() } }
+    val firstFr = remember { FocusRequester() }
+    val lastFr = remember { FocusRequester() }
+    val hasReset = RESET_KEYS.containsKey(curCat) && curCat != ABOUT
+    val enterOptions: () -> Boolean = { runCatching { firstFr.requestFocus() }.isSuccess }
     val retItem: String? = if (retKey != null && !tabTouched) retKey else null
     val firstFocus = !tabTouched && retKey == null && curCat == startCat
     val firstLabel = shown.firstOrNull { it.focusable }?.label
+    val lastLabel = shown.lastOrNull { it.focusable }?.label
+    // Abajo en la ultima opcion se queda donde esta: el foco nunca sale hacia el dock del inicio.
+    val stopDown = Modifier.focusRequester(lastFr).focusProperties { down = lastFr }
     // Arriba desde la primera opcion siempre vuelve a la pestaña de la categoria abierta.
     val upMod = Modifier.focusProperties { up = tabFr[curCat] }
     DisposableEffect(Unit) { onDispose { onRightFocus(false) } }
@@ -1222,20 +1233,29 @@ fun SettingsScreen(
                 )
                 Spacer(Modifier.weight(1f))
                 Text(
-                    "‹ › cambiar  ·  Atrás cerrar", color = Color(0x80FFFFFF),
+                    "↓ entrar  ·  Atrás cerrar", color = Color(0x80FFFFFF),
                     fontSize = 12.sp, maxLines = 1
                 )
             }
             Spacer(Modifier.height(10.dp))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
                 CATS.forEachIndexed { i, c ->
                     TabChip(
-                        c.icon, i == curCat, Modifier.focusRequester(tabFr[i]),
+                        c.icon, i == curCat,
+                        Modifier.weight(1f).focusRequester(tabFr[i]).focusProperties {
+                            up = tabFr[i]
+                            if (i == 0) left = tabFr[i]
+                            if (i == CATS.lastIndex) right = tabFr[i]
+                        },
                         onFocus = {
                             tabTouched = true
                             if (i != curCat) onCat(i)
                         },
-                        onClick = { onCat(i) }
+                        onEnter = enterOptions,
+                        onClick = {
+                            onCat(i)
+                            enterOptions()
+                        }
                     )
                 }
             }
@@ -1265,7 +1285,7 @@ fun SettingsScreen(
                         updItems = shown.filter { it.sec == "Actualizaciones" },
                         bakItems = shown.filter { it.sec == "Copias de seguridad" },
                         toolItems = shown.filter { it.sec == "Uso y diagnóstico" },
-                        firstMod = if (firstFocus) upMod.autoFocus() else upMod
+                        firstMod = (if (firstFocus) upMod.autoFocus() else upMod).focusRequester(firstFr)
                     )
                 } else {
                     for ((group, list) in shown.groupBy { it.sec }) {
@@ -1274,12 +1294,13 @@ fun SettingsScreen(
                             for (si in list) {
                                 key(si.cat to si.label) {
                                     val isFirst = si.label == firstLabel
-                                    var m: Modifier = if (isFirst) upMod else Modifier
+                                    var m: Modifier = if (isFirst) upMod.focusRequester(firstFr) else Modifier
                                     if (si.focusable && si.label == retItem) {
                                         m = m.autoFocus()
                                     } else if (isFirst && firstFocus) {
                                         m = m.autoFocus()
                                     }
+                                    if (!hasReset && si.label == lastLabel) m = m.then(stopDown)
                                     si.content(m)
                                     val d = DESCS[si.label]
                                     if (d != null) {
@@ -1295,7 +1316,7 @@ fun SettingsScreen(
                     if (RESET_KEYS.containsKey(curCat)) {
                         SectionLabel("Restablecer")
                         SectionCard {
-                            ResetCategoryRow(title) { resetCategory(ctx, curCat) }
+                            ResetCategoryRow(title, stopDown) { resetCategory(ctx, curCat) }
                         }
                     }
                 }

@@ -1112,12 +1112,12 @@ fun HomeRoot(
                             modifier = Modifier.fillMaxSize(),
                             transitionSpec = { screenTransition(initialState, targetState, eAnim) },
                             label = "screen",
-                            contentKey = { if (it == "home" || it == "settings" || it == "edit") "homeLayer" else it }
+                            contentKey = { if (it == "home" || it == "settings" || it == "edit" || it == "wizard") "homeLayer" else it }
                         ) { s ->
                             when (s) {
-                                "home", "settings", "edit" -> Box(Modifier.fillMaxSize()) {
+                                "home", "settings", "edit", "wizard" -> Box(Modifier.fillMaxSize()) {
                                     // El inicio queda debajo de Configuracion: asi no se duplica al abrir o cerrar el panel.
-                                    val live = s == "home"
+                                    val live = s == "home" && screen == "home"
                                     Box(
                                         Modifier
                                             .fillMaxSize()
