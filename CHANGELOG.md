@@ -1,5 +1,9 @@
 # Novedades
 
+## 4.8
+- Cuatro temas nuevos: Aurora, Cereza, Hielo y Dorado.
+- Nueva opción «Iconos uniformes» para fichas cuadradas o circulares.
+
 ## 4.7
 - Configuración: un punto en la pestaña marca las categorías donde ya cambiaste ajustes, y «Restablecer» muestra cuántos.
 - Todas las apps: mensajes más claros cuando no hay resultados.
