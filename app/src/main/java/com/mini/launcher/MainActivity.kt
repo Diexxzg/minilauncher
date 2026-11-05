@@ -977,8 +977,9 @@ fun HomeRoot(
         if (eBlur && panelOpen && !preview && screen != "edit") 24.dp else 0.dp, tween(350), label = "blur"
     )
     // Fondo animado (video / GIF): se pausa con paneles, menus o cuando hay otra app abierta.
-    val wallPaused = cfg.pauseWall &&
-        (appPaused || (screen != "home" && !preview) || menuApp != null || showPower || showMore)
+    val wallPaused = (screen == "ambient" && (!cfg.ambAnim || cfg.saver)) ||
+        (cfg.pauseWall &&
+            (appPaused || (screen != "home" && screen != "ambient" && !preview) || menuApp != null || showPower || showMore))
     val bdApp: AppInfo? = when {
         screen == "home" -> backdropApp
         preview -> dock.firstOrNull()
@@ -1501,6 +1502,35 @@ fun HomeRoot(
                             cfg = cfg,
                             profile = profileSel,
                             onProfile = { applyProfile(it) },
+                            net = net,
+                            media = m,
+                            onWifi = {
+                                showQuick = false
+                                quickBack++
+                                openSystem(ctx, "wifi")
+                            },
+                            onAmbient = {
+                                showQuick = false
+                                quickBack++
+                                screen = "ambient"
+                            },
+                            onWalls = {
+                                showQuick = false
+                                quickBack++
+                                screen = "walls"
+                            },
+                            onInputs = {
+                                showQuick = false
+                                quickBack++
+                                inputs = listInputs(ctx)
+                                screen = "inputs"
+                            },
+                            onSearch = {
+                                showQuick = false
+                                quickBack++
+                                searchFocus = true
+                                screen = "all"
+                            },
                             onSettings = {
                                 showQuick = false
                                 quickBack++

@@ -446,8 +446,12 @@ fun AllApps(
         Modifier.fillMaxSize().padding(48.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        if (title != null) {
-            Text(title, color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Medium)
+        Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(title ?: "Todas las apps", color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.Medium)
+            Text(
+                list.size.toString() + (if (list.size == 1) " app" else " apps"),
+                color = Color(0x99FFFFFF), fontSize = 16.sp, modifier = Modifier.padding(bottom = 3.dp)
+            )
         }
         Row(
             verticalAlignment = Alignment.CenterVertically,

@@ -53,8 +53,9 @@ val RESET_KEYS: Map<Int, List<String>> = mapOf(
         "continueRow", "showRecents", "voiceMode", "hideBar", "hideBarSecs"
     ),
     3 to listOf(
-        "uiScale", "overscan", "saver", "saverHint", "night", "nightFrom", "nightTo",
-        "sounds", "panelSounds", "ambient", "burnIn", "sleepAction"
+        "uiScale", "overscan", "saver", "fluid", "saverHint", "night", "nightFrom", "nightTo",
+        "sounds", "panelSounds", "ambient", "burnIn", "sleepAction",
+        "ambDimOn", "ambDimLvl", "ambAnim", "ambPosTime", "ambPosDate", "ambPosMusic", "ambPosIcons"
     ),
     4 to listOf("showMusic", "musicSize", "musicPos"),
     6 to listOf("keyRed", "keyGreen", "keyYellow", "keyBlue", "bootEnabled", "bootApp"),
@@ -113,10 +114,13 @@ val DESCS: Map<String, String> = mapOf(
     "Desenfoque al abrir paneles" to "Difumina el inicio mientras hay un panel abierto.",
     "Tamaño de la interfaz" to "Agranda o reduce todo el launcher.",
     "Margen de seguridad" to "Aleja los elementos de los bordes si tu TV recorta la imagen.",
+    "Fluidez máxima" to "Apaga de una vez desenfoque, brillo, fondos animados y animaciones para ir más fluido.",
     "Modo ahorro" to "Desactiva efectos pesados. Útil en TV con poca memoria.",
     "Sugerir modo ahorro" to "Avisa cuando el launcher vaya lento.",
     "Modo noche automático" to "Atenúa la interfaz en el horario que elijas.",
     "Protección contra quemado" to "Mueve un poco los elementos fijos para cuidar la pantalla.",
+    "Fondo animado en reposo" to "Si tu fondo es GIF, WebP o video, se mueve también en reposo. Se pausa con fluidez máxima o modo ahorro.",
+    "Posición de la hora" to "Elige en qué parte de la pantalla va cada elemento; «Oculto» lo quita.",
     "Modo ambiente" to "Pantalla de reposo con reloj tras un rato sin usar el control.",
     "Tarjeta de la app enfocada" to "Muestra datos de la app seleccionada bajo el dock.",
     "Elementos de arriba" to "Cuánta información se ve en la parte superior.",
@@ -246,7 +250,8 @@ fun SetupWizard(
                         2 -> {
                             SliderRow("Tamaño de la interfaz", cfg.uiScale, 70, 130, 5, "%", first) { cfg.setUiScale(it) }
                             SliderRow("Margen de seguridad", cfg.overscan, 0, 60, 2, " dp") { cfg.setOverscan(it) }
-                            SwitchRow("Modo ahorro (TV modesta)", cfg.saver) { cfg.setSaver(it) }
+                            SwitchRow("Fluidez máxima", cfg.fluid) { cfg.setFluid(it) }
+                            SwitchRow("Modo ahorro (TV modesta)", cfg.saverOnly) { cfg.setSaver(it) }
                             SwitchRow("Sugerir modo ahorro si va lenta", cfg.saverHint) { cfg.setSaverHint(it) }
                         }
                         else -> {

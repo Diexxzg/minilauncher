@@ -51,10 +51,18 @@ class Cfg(private val p: Prefs) {
     // Paquete A: tarjeta de app enfocada, modo ahorro, modo noche y proteccion contra quemado.
     private var _focusCard by mutableStateOf(p.getInt("focusCard", 1) == 1)
     private var _saver by mutableStateOf(p.getInt("saver", 0) == 1)
+    private var _fluid by mutableStateOf(p.getInt("fluid", 0) == 1)
     private var _saverHint by mutableStateOf(p.getInt("saverHint", 1) == 1)
     private var _night by mutableStateOf(p.getInt("night", 0) == 1)
     private var _nightFrom by mutableStateOf(p.getInt("nightFrom", 22).coerceIn(0, 23))
     private var _nightTo by mutableStateOf(p.getInt("nightTo", 7).coerceIn(0, 23))
+    private var _ambDimOn by mutableStateOf(p.getInt("ambDimOn", 1) == 1)
+    private var _ambDimLvl by mutableStateOf(p.getInt("ambDimLvl", 53))
+    private var _ambAnim by mutableStateOf(p.getInt("ambAnim", 1) == 1)
+    private var _ambPosTime by mutableStateOf(p.getInt("ambPosTime", 1))
+    private var _ambPosDate by mutableStateOf(p.getInt("ambPosDate", 1))
+    private var _ambPosMusic by mutableStateOf(p.getInt("ambPosMusic", 4))
+    private var _ambPosIcons by mutableStateOf(p.getInt("ambPosIcons", 4))
     private var _burnIn by mutableStateOf(p.getInt("burnIn", 1) == 1)
     private var _updateCheck by mutableStateOf(p.getInt("updateCheck", 1) == 1)
     // Paquete 2: estilos de ficha y de foco, formato de fecha y barra superior que se oculta.
@@ -139,7 +147,10 @@ class Cfg(private val p: Prefs) {
     /** Texto bajo el dock con el nombre de la app enfocada, notificaciones y ultimo uso. */
     val focusCard: Boolean get() = _focusCard
     /** Modo ahorro: apaga desenfoque, animaciones, fondo dinamico y brillo de color. */
-    val saver: Boolean get() = _saver
+    /** Efectos pesados apagados: lo activan "Modo ahorro" o "Fluidez máxima". */
+    val saver: Boolean get() = _saver || _fluid
+    val saverOnly: Boolean get() = _saver
+    val fluid: Boolean get() = _fluid
     /** Sugerir el modo ahorro si los fotogramas por segundo bajan mucho. */
     val saverHint: Boolean get() = _saverHint
     /** Modo noche automatico entre dos horas. */
@@ -148,6 +159,14 @@ class Cfg(private val p: Prefs) {
     val nightTo: Int get() = _nightTo
     /** Mueve lentamente el reloj del modo ambiente. */
     val burnIn: Boolean get() = _burnIn
+    /** Modo ambiente: oscurecimiento, fondo animado y posicion (0-8 = cuadricula 3x3, 9 = oculto) de cada elemento. */
+    val ambDimOn: Boolean get() = _ambDimOn
+    val ambDimLvl: Int get() = _ambDimLvl
+    val ambAnim: Boolean get() = _ambAnim
+    val ambPosTime: Int get() = _ambPosTime
+    val ambPosDate: Int get() = _ambPosDate
+    val ambPosMusic: Int get() = _ambPosMusic
+    val ambPosIcons: Int get() = _ambPosIcons
 
     /** Avisar una vez al dia, al abrir el inicio, si hay una version nueva en GitHub. */
     val updateCheck: Boolean get() = _updateCheck
@@ -365,6 +384,11 @@ class Cfg(private val p: Prefs) {
         p.putInt("focusCard", if (v) 1 else 0)
     }
 
+    fun setFluid(v: Boolean) {
+        _fluid = v
+        p.putInt("fluid", if (v) 1 else 0)
+    }
+
     fun setSaver(v: Boolean) {
         _saver = v
         p.putInt("saver", if (v) 1 else 0)
@@ -429,6 +453,14 @@ class Cfg(private val p: Prefs) {
         _hideBarSecs = v.coerceIn(3, 60)
         p.putInt("hideBarSecs", _hideBarSecs)
     }
+
+    fun setAmbDimOn(v: Boolean) { _ambDimOn = v; p.putInt("ambDimOn", if (v) 1 else 0) }
+    fun setAmbDimLvl(v: Int) { _ambDimLvl = v; p.putInt("ambDimLvl", v) }
+    fun setAmbAnim(v: Boolean) { _ambAnim = v; p.putInt("ambAnim", if (v) 1 else 0) }
+    fun setAmbPosTime(v: Int) { _ambPosTime = v; p.putInt("ambPosTime", v) }
+    fun setAmbPosDate(v: Int) { _ambPosDate = v; p.putInt("ambPosDate", v) }
+    fun setAmbPosMusic(v: Int) { _ambPosMusic = v; p.putInt("ambPosMusic", v) }
+    fun setAmbPosIcons(v: Int) { _ambPosIcons = v; p.putInt("ambPosIcons", v) }
 
     fun setBurnIn(v: Boolean) {
         _burnIn = v

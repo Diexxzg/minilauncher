@@ -106,7 +106,7 @@ private val SEC_ORDER = mapOf(
     0 to listOf("Fondo", "Color"),
     1 to listOf("Perfil", "Fichas", "Información", "Filas extra", "Foco y efectos", "Compartir diseño"),
     2 to listOf("Parte superior", "Reloj y fecha", "Tarjetas junto al reloj", "Clima", "Contenido", "Barra superior"),
-    3 to listOf("Pantalla", "Rendimiento", "Noche", "Reposo", "Sonido"),
+    3 to listOf("Pantalla", "Rendimiento", "Noche", "Reposo", "Diseño del modo ambiente", "Sonido"),
     6 to listOf("Conexiones", "Sistema", "Celular", "Botones de color", "Arranque", "Asistente"),
     7 to listOf("Permisos")
 )
@@ -745,8 +745,11 @@ fun SettingsScreen(
         add(SItem(3, "Margen de seguridad", "Pantalla") { m ->
             SliderRow("Margen de seguridad", cfg.overscan, 0, 60, 2, " dp", m) { cfg.setOverscan(it) }
         })
+        add(SItem(3, "Fluidez máxima", "Rendimiento") { m ->
+            SwitchRow("Fluidez máxima", cfg.fluid, m) { cfg.setFluid(it) }
+        })
         add(SItem(3, "Modo ahorro", "Rendimiento") { m ->
-            SwitchRow("Modo ahorro (TV modesta)", cfg.saver, m) { cfg.setSaver(it) }
+            SwitchRow("Modo ahorro (TV modesta)", cfg.saverOnly, m) { cfg.setSaver(it) }
         })
         add(SItem(3, "Sugerir modo ahorro", "Rendimiento") { m ->
             SwitchRow("Sugerir modo ahorro si va lenta", cfg.saverHint, m) { cfg.setSaverHint(it) }
@@ -970,6 +973,29 @@ fun SettingsScreen(
         })
         add(SItem(3, "Protección contra quemado", "Reposo") { m ->
             SwitchRow("Mover el reloj en modo ambiente", cfg.burnIn, m) { cfg.setBurnIn(it) }
+        })
+        add(SItem(3, "Oscurecer en modo ambiente", "Diseño del modo ambiente") { m ->
+            SwitchRow("Oscurecer el fondo", cfg.ambDimOn, m) { cfg.setAmbDimOn(it) }
+        })
+        if (cfg.ambDimOn) {
+            add(SItem(3, "Nivel de oscurecimiento", "Diseño del modo ambiente") { m ->
+                SliderRow("Nivel de oscurecimiento", cfg.ambDimLvl, 10, 85, 5, "%", m) { cfg.setAmbDimLvl(it) }
+            })
+        }
+        add(SItem(3, "Fondo animado en reposo", "Diseño del modo ambiente") { m ->
+            SwitchRow("Mostrar el fondo animado", cfg.ambAnim, m) { cfg.setAmbAnim(it) }
+        })
+        add(SItem(3, "Posición de la hora", "Diseño del modo ambiente") { m ->
+            ChoiceRow("Hora", AMB_POS_OPTIONS, cfg.ambPosTime, m) { cfg.setAmbPosTime(it) }
+        })
+        add(SItem(3, "Posición de la fecha", "Diseño del modo ambiente") { m ->
+            ChoiceRow("Fecha y clima", AMB_POS_OPTIONS, cfg.ambPosDate, m) { cfg.setAmbPosDate(it) }
+        })
+        add(SItem(3, "Posición del reproductor", "Diseño del modo ambiente") { m ->
+            ChoiceRow("Reproductor", AMB_POS_OPTIONS, cfg.ambPosMusic, m) { cfg.setAmbPosMusic(it) }
+        })
+        add(SItem(3, "Posición de los iconos", "Diseño del modo ambiente") { m ->
+            ChoiceRow("Iconos", AMB_POS_OPTIONS, cfg.ambPosIcons, m) { cfg.setAmbPosIcons(it) }
         })
         add(SItem(3, "Temporizador de sueño", "Reposo") { m -> SleepRow(m) })
         add(SItem(3, "Al terminar el temporizador", "Reposo") { m ->

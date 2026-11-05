@@ -102,10 +102,14 @@ fun AmbientScreen(cfg: Cfg, media: MediaInfo?, onExit: () -> Unit) {
     val art = remember(media?.title, media?.artist, media?.bitmap != null) {
         media?.bitmap?.asImageBitmap()
     }
+    val dimAlpha = if (cfg.ambDimOn) cfg.ambDimLvl / 100f else 0f
+    val pos = intArrayOf(cfg.ambPosTime, cfg.ambPosDate, cfg.ambPosMusic, cfg.ambPosIcons)
+    val gx = (conf.screenWidthDp * 0.05f).dp
+    val gy = (h * 0.08f).dp
     Box(
         Modifier
             .fillMaxSize()
-            .background(Color(0x88000000))
+            .background(Color.Black.copy(alpha = dimAlpha))
             .onKeyEvent { e ->
                 if (e.type == KeyEventType.KeyDown) {
                     onExit()
@@ -117,57 +121,71 @@ fun AmbientScreen(cfg: Cfg, media: MediaInfo?, onExit: () -> Unit) {
             .autoFocus()
             .clickable { onExit() }
     ) {
-        Column(
-            Modifier
-                .align(Alignment.TopCenter)
-                .padding(top = (h * 0.15f).dp)
-                .graphicsLayer {
-                    translationX = moveX.dp.toPx()
-                    translationY = moveY.dp.toPx()
+        // Cada elemento (hora, fecha, reproductor, iconos) va en la celda de la cuadricula 3x3 que elijas.
+        for (cell in 0..8) {
+            val inCell = (0..3).filter { pos[it] == cell }
+            if (inCell.isEmpty()) continue
+            Column(
+                Modifier
+                    .align(AMB_ALIGN[cell])
+                    .padding(horizontal = gx, vertical = gy)
+                    .graphicsLayer {
+                        translationX = moveX.dp.toPx()
+                        translationY = moveY.dp.toPx()
+                    },
+                horizontalAlignment = when (cell % 3) {
+                    0 -> Alignment.Start
+                    1 -> Alignment.CenterHorizontally
+                    else -> Alignment.End
                 },
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-            Text(
-                timeText, color = Color(0xF2FFFFFF), fontSize = 40.sp,
-                fontWeight = FontWeight.Light, style = TextStyle(shadow = shadow)
-            )
-            Text(
-                dateText, color = Color(0xCCFFFFFF), fontSize = 16.sp,
-                fontWeight = FontWeight.Normal, style = TextStyle(shadow = shadow)
-            )
-        }
-        Column(
-            Modifier
-                .align(Alignment.TopCenter)
-                .padding(top = (h * 0.58f).dp)
-                .graphicsLayer {
-                    translationX = moveX.dp.toPx()
-                    translationY = moveY.dp.toPx()
-                },
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(14.dp)
-        ) {
-            if (media != null && cfg.showMusic) {
-                ScaledPill(media, art, 95)
-            }
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(18.dp),
-                verticalAlignment = Alignment.CenterVertically
+                verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                Box(Modifier.size(40.dp), contentAlignment = Alignment.Center) {
-                    PowerIcon(Color(0xE6FFFFFF), 20)
-                }
-                Box(Modifier.size(40.dp), contentAlignment = Alignment.Center) {
-                    WifiIcon(Color(0xE6FFFFFF), 20)
-                }
-                Box(
-                    Modifier.size(40.dp).clip(CircleShape).background(Color(0x33FFFFFF)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    GearIcon(Color.White, 20)
+                for (el in inCell) {
+                    when (el) {
+                        0 -> Text(
+                            timeText, color = Color(0xF2FFFFFF), fontSize = 40.sp,
+                            fontWeight = FontWeight.Light, style = TextStyle(shadow = shadow)
+                        )
+                        1 -> Text(
+                            dateText, color = Color(0xCCFFFFFF), fontSize = 16.sp,
+                            fontWeight = FontWeight.Normal, style = TextStyle(shadow = shadow)
+                        )
+                        2 -> if (media != null && cfg.showMusic) {
+                            ScaledPill(media, art, 95)
+                        }
+                        else -> Row(
+                            horizontalArrangement = Arrangement.spacedBy(18.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(Modifier.size(40.dp), contentAlignment = Alignment.Center) {
+                                PowerIcon(Color(0xE6FFFFFF), 20)
+                            }
+                            Box(Modifier.size(40.dp), contentAlignment = Alignment.Center) {
+                                WifiIcon(Color(0xE6FFFFFF), 20)
+                            }
+                            Box(
+                                Modifier.size(40.dp).clip(CircleShape).background(Color(0x33FFFFFF)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                GearIcon(Color.White, 20)
+                            }
+                        }
+                    }
                 }
             }
         }
     }
 }
+
+/** Opciones de posicion en el modo ambiente (indice 9 = oculto). */
+val AMB_POS_OPTIONS = listOf(
+    "Arriba izquierda", "Arriba centro", "Arriba derecha",
+    "Centro izquierda", "Centro", "Centro derecha",
+    "Abajo izquierda", "Abajo centro", "Abajo derecha", "Oculto"
+)
+
+private val AMB_ALIGN = listOf(
+    Alignment.TopStart, Alignment.TopCenter, Alignment.TopEnd,
+    Alignment.CenterStart, Alignment.Center, Alignment.CenterEnd,
+    Alignment.BottomStart, Alignment.BottomCenter, Alignment.BottomEnd
+)
