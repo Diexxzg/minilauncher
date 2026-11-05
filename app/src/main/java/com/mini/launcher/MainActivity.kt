@@ -933,6 +933,30 @@ fun HomeRoot(
         }
     }
 
+    // ---- Rutina diaria ----
+    fun runRoutine() {
+        if (cfg.routineAction == 0) {
+            if (prefs.getInt("sceneOn", 0) != 1) runScene()
+        } else {
+            AppCache.apps.firstOrNull { it.pkg == cfg.routineApp }?.let { openApp(it) }
+        }
+    }
+    LaunchedEffect(cfg.routineOn) {
+        while (cfg.routineOn) {
+            val cal = java.util.Calendar.getInstance()
+            val today = cal.get(java.util.Calendar.YEAR) * 1000 + cal.get(java.util.Calendar.DAY_OF_YEAR)
+            val nowM = cal.get(java.util.Calendar.HOUR_OF_DAY) * 60 + cal.get(java.util.Calendar.MINUTE)
+            val at = cfg.routineHour * 60 + cfg.routineMin
+            if (screen == "home" && !appPaused && nowM >= at && nowM <= at + 30 &&
+                prefs.getInt("routineLast", 0) != today
+            ) {
+                prefs.putInt("routineLast", today)
+                runRoutine()
+            }
+            delay(20_000)
+        }
+    }
+
     // ---- Botones de color (13) ----
     fun runColorAction(a: Int) {
         when (a) {

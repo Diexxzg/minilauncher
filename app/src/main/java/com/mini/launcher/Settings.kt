@@ -107,7 +107,7 @@ private val SEC_ORDER = mapOf(
     1 to listOf("Perfil", "Fichas", "Información", "Filas extra", "Foco y efectos", "Compartir diseño"),
     2 to listOf("Parte superior", "Reloj y fecha", "Tarjetas junto al reloj", "Clima", "Contenido", "Barra superior"),
     3 to listOf("Pantalla", "Rendimiento", "Noche", "Reposo", "Diseño del modo ambiente", "Sonido"),
-    6 to listOf("Conexiones", "Sistema", "Celular", "Botones de color", "Arranque", "Escena de cine", "Asistente"),
+    6 to listOf("Conexiones", "Sistema", "Celular", "Botones de color", "Arranque", "Escena de cine", "Rutina diaria", "Asistente"),
     7 to listOf("Permisos")
 )
 
@@ -1157,6 +1157,43 @@ fun SettingsScreen(
         add(SItem(6, "Temporizador de la escena", "Escena de cine") { m ->
             ChoiceRow("Temporizador de sueño", SLEEP_OPTIONS, cfg.sceneSleep, m) { cfg.setSceneSleep(it) }
         })
+        add(SItem(6, "Rutina diaria", "Rutina diaria") { m ->
+            SwitchRow("Rutina diaria", cfg.routineOn, m) { cfg.setRoutineOn(it) }
+        })
+        if (cfg.routineOn) {
+            add(SItem(6, "Hora de la rutina", "Rutina diaria") { m ->
+                SliderRow("Hora", cfg.routineHour, 0, 23, 1, " h", m) { cfg.setRoutineHour(it) }
+            })
+            add(SItem(6, "Minutos de la rutina", "Rutina diaria") { m ->
+                ChoiceRow(
+                    "Minutos", (0..11).map { (it * 5).toString().padStart(2, '0') },
+                    (cfg.routineMin / 5).coerceIn(0, 11), m
+                ) { cfg.setRoutineMin(it * 5) }
+            })
+            add(SItem(6, "Acción de la rutina", "Rutina diaria") { m ->
+                ChoiceRow(
+                    "Acción", listOf("Activar la escena de cine", "Abrir una app"),
+                    cfg.routineAction, m
+                ) { cfg.setRoutineAction(it) }
+            })
+            if (cfg.routineAction == 1) {
+                add(SItem(6, "App de la rutina", "Rutina diaria") { m ->
+                    val lbl = AppCache.apps.firstOrNull { it.pkg == cfg.routineApp }?.label
+                        ?: (if (cfg.routineApp.isEmpty()) "ninguna" else cfg.routineApp)
+                    DialogRow("App de la rutina: " + lbl, m) { close ->
+                        AppPickerDialog(
+                            title = "App de la rutina",
+                            current = cfg.routineApp,
+                            onPick = {
+                                cfg.setRoutineApp(it)
+                                close()
+                            },
+                            onClose = close
+                        )
+                    }
+                })
+            }
+        }
         add(SItem(6, "Asistente de configuración", "Asistente") { m ->
             ActionRow("Abrir el asistente de configuración", m) { onWizard() }
         })

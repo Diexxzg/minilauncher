@@ -60,7 +60,8 @@ val RESET_KEYS: Map<Int, List<String>> = mapOf(
     4 to listOf("showMusic", "musicSize", "musicPos"),
     6 to listOf(
         "keyRed", "keyGreen", "keyYellow", "keyBlue", "bootEnabled", "bootApp",
-        "sceneApp", "sceneNight", "sceneDim", "sceneSleep"
+        "sceneApp", "sceneNight", "sceneDim", "sceneSleep",
+        "routineOn", "routineHour", "routineMin", "routineAction", "routineApp"
     ),
     9 to listOf("bigText", "highContrast", "thickFocus")
 )
@@ -141,6 +142,7 @@ val DESCS: Map<String, String> = mapOf(
     "Margen de seguridad" to "Aleja los elementos de los bordes si tu TV recorta la imagen.",
     "Iconos uniformes" to "Muestra cada imagen completa sobre un fondo del color de la app, para que todas se vean igual.",
     "App de la escena" to "Se abre al activar la escena (botón de color o Panel rápido). Púlsala otra vez para volver a como estaba.",
+    "Rutina diaria" to "Una vez al día, si el launcher está en el inicio, hasta 30 minutos después de la hora elegida.",
     "Fluidez máxima" to "Apaga de una vez desenfoque, brillo, fondos animados y animaciones para ir más fluido.",
     "Modo ahorro" to "Desactiva efectos pesados. Útil en TV con poca memoria.",
     "Sugerir modo ahorro" to "Avisa cuando el launcher vaya lento.",

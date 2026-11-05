@@ -56,6 +56,11 @@ class Cfg(private val p: Prefs) {
     private var _sceneNight by mutableStateOf(p.getInt("sceneNight", 1) == 1)
     private var _sceneDim by mutableStateOf(p.getInt("sceneDim", 40))
     private var _sceneSleep by mutableStateOf(p.getInt("sceneSleep", 0))
+    private var _routineOn by mutableStateOf(p.getInt("routineOn", 0) == 1)
+    private var _routineHour by mutableStateOf(p.getInt("routineHour", 19).coerceIn(0, 23))
+    private var _routineMin by mutableStateOf(p.getInt("routineMin", 0).coerceIn(0, 59))
+    private var _routineAction by mutableStateOf(p.getInt("routineAction", 0))
+    private var _routineApp by mutableStateOf(p.getStr("routineApp", ""))
     private var _fluid by mutableStateOf(p.getInt("fluid", 0) == 1)
     private var _saverHint by mutableStateOf(p.getInt("saverHint", 1) == 1)
     private var _night by mutableStateOf(p.getInt("night", 0) == 1)
@@ -156,6 +161,12 @@ class Cfg(private val p: Prefs) {
     val saver: Boolean get() = _saver || _fluid
     val saverOnly: Boolean get() = _saver
     val fluid: Boolean get() = _fluid
+    /** Rutina diaria: a esta hora (una vez al dia) activa la escena de cine o abre una app. */
+    val routineOn: Boolean get() = _routineOn
+    val routineHour: Int get() = _routineHour
+    val routineMin: Int get() = _routineMin
+    val routineAction: Int get() = _routineAction
+    val routineApp: String get() = _routineApp
     /** Escena de cine: app a abrir, modo noche, oscurecimiento y temporizador de sueño (indice de SLEEP_MINS). */
     val sceneApp: String get() = _sceneApp
     val sceneNight: Boolean get() = _sceneNight
@@ -405,6 +416,12 @@ class Cfg(private val p: Prefs) {
     fun setSceneNight(v: Boolean) { _sceneNight = v; p.putInt("sceneNight", if (v) 1 else 0) }
     fun setSceneDim(v: Int) { _sceneDim = v; p.putInt("sceneDim", v) }
     fun setSceneSleep(v: Int) { _sceneSleep = v; p.putInt("sceneSleep", v) }
+
+    fun setRoutineOn(v: Boolean) { _routineOn = v; p.putInt("routineOn", if (v) 1 else 0) }
+    fun setRoutineHour(v: Int) { _routineHour = v.coerceIn(0, 23); p.putInt("routineHour", _routineHour) }
+    fun setRoutineMin(v: Int) { _routineMin = v.coerceIn(0, 59); p.putInt("routineMin", _routineMin) }
+    fun setRoutineAction(v: Int) { _routineAction = v; p.putInt("routineAction", v) }
+    fun setRoutineApp(v: String) { _routineApp = v; p.putStr("routineApp", v) }
 
     fun setFluid(v: Boolean) {
         _fluid = v
