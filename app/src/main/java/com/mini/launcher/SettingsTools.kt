@@ -92,6 +92,27 @@ fun toggleScene(cfg: Cfg, prefs: Prefs, sleep: SleepTimer): Boolean {
     return true
 }
 
+/** Perfiles de familia: cada uno guarda su dock, filas, tema, diseño y ajustes de inicio. */
+const val FAM_COUNT = 3
+val FAM_KEYS: List<String> =
+    (DESIGN_KEYS + (RESET_KEYS[2] ?: emptyList()) + listOf("favs", "rowApps0", "rowApps1", "rowApps2")).distinct()
+
+/** Cambia de perfil: guarda el actual, carga el otro (si es nuevo empieza como copia del actual) y reinicia la pantalla. */
+fun switchFamily(ctx: Context, to: Int, reopenCat: Int = -1) {
+    val prefs = Prefs(ctx)
+    val cur = prefs.getInt("famCur", 0)
+    if (to == cur || to !in 0 until FAM_COUNT) return
+    prefs.putStr("fam" + cur, prefs.exportKeysJson(FAM_KEYS))
+    val snap = prefs.getStr("fam" + to, "")
+    if (snap.isNotEmpty()) {
+        prefs.removeKeys(FAM_KEYS)
+        prefs.importKeysJson(snap, FAM_KEYS)
+    }
+    prefs.putInt("famCur", to)
+    if (reopenCat >= 0) prefs.putInt("reopenCat", reopenCat)
+    findActivity(ctx)?.recreate()
+}
+
 /** Borra los ajustes de la categoria y reinicia la pantalla; al volver se abre la misma categoria. */
 fun resetCategory(ctx: Context, cat: Int) {
     val keys = RESET_KEYS[cat] ?: return
@@ -143,6 +164,7 @@ val DESCS: Map<String, String> = mapOf(
     "Iconos uniformes" to "Muestra cada imagen completa sobre un fondo del color de la app, para que todas se vean igual.",
     "App de la escena" to "Se abre al activar la escena (botón de color o Panel rápido). Púlsala otra vez para volver a como estaba.",
     "Rutina diaria" to "Una vez al día, si el launcher está en el inicio, hasta 30 minutos después de la hora elegida.",
+    "Perfil activo" to "Cada perfil guarda su dock, filas, tema y diseño. Un perfil nuevo empieza como copia del actual.",
     "Fluidez máxima" to "Apaga de una vez desenfoque, brillo, fondos animados y animaciones para ir más fluido.",
     "Modo ahorro" to "Desactiva efectos pesados. Útil en TV con poca memoria.",
     "Sugerir modo ahorro" to "Avisa cuando el launcher vaya lento.",

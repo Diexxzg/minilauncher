@@ -13,7 +13,7 @@ val ROW_NAMES = listOf(
 /** Acciones de los botones de color (indice = codigo guardado). */
 val COLOR_ACTIONS = listOf(
     "Ninguno", "Todas las apps", "Ajustes", "Entradas", "Búsqueda",
-    "Menú de energía", "Editar apps", "Modo ambiente", "Pantalla negra", "Escena de cine"
+    "Menú de energía", "Editar apps", "Modo ambiente", "Pantalla negra", "Escena de cine", "Siguiente perfil"
 )
 
 /** Ajustes de inicio, fondo y musica (se guardan en Prefs). */

@@ -978,6 +978,11 @@ fun HomeRoot(
             7 -> screen = "ambient"
             8 -> screen = "black"
             9 -> runScene()
+            10 -> {
+                val next = (prefs.getInt("famCur", 0) + 1) % FAM_COUNT
+                toast(ctx, "Perfil " + (next + 1))
+                switchFamily(ctx, next)
+            }
         }
     }
 

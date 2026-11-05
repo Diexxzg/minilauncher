@@ -107,7 +107,7 @@ private val SEC_ORDER = mapOf(
     1 to listOf("Perfil", "Fichas", "Información", "Filas extra", "Foco y efectos", "Compartir diseño"),
     2 to listOf("Parte superior", "Reloj y fecha", "Tarjetas junto al reloj", "Clima", "Contenido", "Barra superior"),
     3 to listOf("Pantalla", "Rendimiento", "Noche", "Reposo", "Diseño del modo ambiente", "Sonido"),
-    6 to listOf("Conexiones", "Sistema", "Celular", "Botones de color", "Arranque", "Escena de cine", "Rutina diaria", "Asistente"),
+    6 to listOf("Conexiones", "Sistema", "Celular", "Botones de color", "Arranque", "Escena de cine", "Rutina diaria", "Perfiles de familia", "Asistente"),
     7 to listOf("Permisos")
 )
 
@@ -1194,6 +1194,12 @@ fun SettingsScreen(
                 })
             }
         }
+        add(SItem(6, "Perfil activo", "Perfiles de familia") { m ->
+            ChoiceRow(
+                "Perfil activo", (1..FAM_COUNT).map { "Perfil " + it },
+                prefs.getInt("famCur", 0).coerceIn(0, FAM_COUNT - 1), m
+            ) { switchFamily(ctx, it, 6) }
+        })
         add(SItem(6, "Asistente de configuración", "Asistente") { m ->
             ActionRow("Abrir el asistente de configuración", m) { onWizard() }
         })
