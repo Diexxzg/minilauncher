@@ -1,5 +1,9 @@
 # Novedades
 
+## 4.9
+- Nueva «Escena de cine»: con un botón activa modo noche, oscurece el fondo, pone el temporizador y abre tu app. Púlsalo otra vez y todo vuelve a como estaba.
+- Se activa con un botón de color (elígelo en Sistema) o desde el Panel rápido; se configura en Sistema → Escena de cine.
+
 ## 4.8
 - Cuatro temas nuevos: Aurora, Cereza, Hielo y Dorado.
 - Nueva opción «Iconos uniformes» para fichas cuadradas o circulares.
