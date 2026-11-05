@@ -259,7 +259,6 @@ fun GlassBox(
     )
 }
 
-@Composable
 /** Opciones visuales globales que leen las fichas (las pone MainActivity desde Cfg). */
 object UiPrefs {
     var uniform by androidx.compose.runtime.mutableStateOf(false)
