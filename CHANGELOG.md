@@ -1,5 +1,9 @@
 # Novedades
 
+## 4.7
+- Configuración: un punto en la pestaña marca las categorías donde ya cambiaste ajustes, y «Restablecer» muestra cuántos.
+- Todas las apps: mensajes más claros cuando no hay resultados.
+
 ## 4.6
 Modo ambiente, Todas las apps y Panel rápido
 - Modo ambiente: oscurecimiento con interruptor y nivel, fondo animado en reposo y posición elegible para hora, fecha, reproductor e iconos.
