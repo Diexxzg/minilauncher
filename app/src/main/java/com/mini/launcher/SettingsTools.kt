@@ -45,7 +45,7 @@ val RESET_KEYS: Map<Int, List<String>> = mapOf(
     ),
     1 to listOf(
         "scale", "spacing", "corner", "glow", "dynBg", "bigClock", "row0", "row1", "row2",
-        "focusStyle", "blur", "screenAnim", "openAnim", "bottom", "tileStyle", "focusCard"
+        "uniformIcons", "focusStyle", "blur", "screenAnim", "openAnim", "bottom", "tileStyle", "focusCard"
     ),
     2 to listOf(
         "topMode", "topScale", "bigClock", "clock24", "showDate", "dateFmt", "cardEvent",
@@ -114,6 +114,7 @@ val DESCS: Map<String, String> = mapOf(
     "Desenfoque al abrir paneles" to "Difumina el inicio mientras hay un panel abierto.",
     "Tamaño de la interfaz" to "Agranda o reduce todo el launcher.",
     "Margen de seguridad" to "Aleja los elementos de los bordes si tu TV recorta la imagen.",
+    "Iconos uniformes" to "Muestra cada imagen completa sobre un fondo del color de la app, para que todas se vean igual.",
     "Fluidez máxima" to "Apaga de una vez desenfoque, brillo, fondos animados y animaciones para ir más fluido.",
     "Modo ahorro" to "Desactiva efectos pesados. Útil en TV con poca memoria.",
     "Sugerir modo ahorro" to "Avisa cuando el launcher vaya lento.",

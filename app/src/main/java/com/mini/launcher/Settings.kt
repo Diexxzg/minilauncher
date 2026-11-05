@@ -796,6 +796,11 @@ fun SettingsScreen(
         add(SItem(1, "Estilo de ficha", "Fichas") { m ->
             ChoiceRow("Estilo de ficha", TILE_STYLES, cfg.tileStyle, m) { cfg.setTileStyle(it) }
         })
+        if (cfg.tileStyle >= 2) {
+            add(SItem(1, "Iconos uniformes", "Fichas") { m ->
+                SwitchRow("Iconos uniformes", cfg.uniformIcons, m) { cfg.setUniformIcons(it) }
+            })
+        }
         add(SItem(1, "Tarjeta de la app enfocada", "Información") { m ->
             SwitchRow("Tarjeta bajo el dock", cfg.focusCard, m) { cfg.setFocusCard(it) }
         })

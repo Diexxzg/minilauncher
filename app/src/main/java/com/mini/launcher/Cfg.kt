@@ -51,6 +51,7 @@ class Cfg(private val p: Prefs) {
     // Paquete A: tarjeta de app enfocada, modo ahorro, modo noche y proteccion contra quemado.
     private var _focusCard by mutableStateOf(p.getInt("focusCard", 1) == 1)
     private var _saver by mutableStateOf(p.getInt("saver", 0) == 1)
+    private var _uniformIcons by mutableStateOf(p.getInt("uniformIcons", 0) == 1)
     private var _fluid by mutableStateOf(p.getInt("fluid", 0) == 1)
     private var _saverHint by mutableStateOf(p.getInt("saverHint", 1) == 1)
     private var _night by mutableStateOf(p.getInt("night", 0) == 1)
@@ -151,6 +152,8 @@ class Cfg(private val p: Prefs) {
     val saver: Boolean get() = _saver || _fluid
     val saverOnly: Boolean get() = _saver
     val fluid: Boolean get() = _fluid
+    /** Fichas cuadradas o circulares: todas las imagenes se ven completas sobre un fondo del color de la app. */
+    val uniformIcons: Boolean get() = _uniformIcons
     /** Sugerir el modo ahorro si los fotogramas por segundo bajan mucho. */
     val saverHint: Boolean get() = _saverHint
     /** Modo noche automatico entre dos horas. */
@@ -382,6 +385,11 @@ class Cfg(private val p: Prefs) {
     fun setFocusCard(v: Boolean) {
         _focusCard = v
         p.putInt("focusCard", if (v) 1 else 0)
+    }
+
+    fun setUniformIcons(v: Boolean) {
+        _uniformIcons = v
+        p.putInt("uniformIcons", if (v) 1 else 0)
     }
 
     fun setFluid(v: Boolean) {

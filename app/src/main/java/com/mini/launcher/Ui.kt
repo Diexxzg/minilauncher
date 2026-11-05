@@ -260,6 +260,12 @@ fun GlassBox(
 }
 
 @Composable
+/** Opciones visuales globales que leen las fichas (las pone MainActivity desde Cfg). */
+object UiPrefs {
+    var uniform by androidx.compose.runtime.mutableStateOf(false)
+}
+
+@Composable
 fun AppTile(
     app: AppInfo,
     modifier: Modifier = Modifier,
@@ -301,8 +307,22 @@ fun AppTile(
     ) {
         if (tileStyle >= 2) {
             // Icono cuadrado o circulo: solo la imagen (el nombre sale en la tarjeta bajo el dock).
-            if (app.banner) {
+            if (app.banner && !UiPrefs.uniform) {
                 Image(app.art, app.label, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+            } else if (app.banner) {
+                // Iconos uniformes: la imagen completa sobre un fondo del color de la app.
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .background(Brush.linearGradient(listOf(Color(app.glow).copy(alpha = 0.55f), Color(0xE60B1020)))),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Image(
+                        app.art, app.label,
+                        Modifier.fillMaxSize().padding((8 * f).dp),
+                        contentScale = ContentScale.Fit
+                    )
+                }
             } else {
                 Image(
                     app.art, app.label,

@@ -486,6 +486,7 @@ fun HomeRoot(
     }
 
     // Codigo de clima real para la capa de clima del fondo (23). Apagado con el modo ahorro.
+    LaunchedEffect(cfg.uniformIcons) { UiPrefs.uniform = cfg.uniformIcons }
     LaunchedEffect(cfg.weatherFx, cfg.saver, cfg.city) {
         if (!cfg.weatherFx || cfg.saver) {
             wxCode = -1
