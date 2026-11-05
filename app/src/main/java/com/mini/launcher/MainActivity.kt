@@ -923,6 +923,16 @@ fun HomeRoot(
             else -> openSystem(ctx, "access")
         }
     }
+    // ---- Escena de cine ----
+    fun runScene() {
+        if (toggleScene(cfg, prefs, HomeBridge.sleep)) {
+            toast(ctx, "Escena de cine activada.")
+            AppCache.apps.firstOrNull { it.pkg == cfg.sceneApp }?.let { openApp(it) }
+        } else {
+            toast(ctx, "Escena de cine desactivada.")
+        }
+    }
+
     // ---- Botones de color (13) ----
     fun runColorAction(a: Int) {
         when (a) {
@@ -943,6 +953,7 @@ fun HomeRoot(
             6 -> guarded(cfg.lockSettings) { screen = "edit" }
             7 -> screen = "ambient"
             8 -> screen = "black"
+            9 -> runScene()
         }
     }
 
@@ -1531,6 +1542,12 @@ fun HomeRoot(
                                 quickBack++
                                 searchFocus = true
                                 screen = "all"
+                            },
+                            sceneOn = prefs.getInt("sceneOn", 0) == 1,
+                            onScene = {
+                                showQuick = false
+                                quickBack++
+                                runScene()
                             },
                             onSettings = {
                                 showQuick = false

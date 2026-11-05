@@ -107,7 +107,7 @@ private val SEC_ORDER = mapOf(
     1 to listOf("Perfil", "Fichas", "Información", "Filas extra", "Foco y efectos", "Compartir diseño"),
     2 to listOf("Parte superior", "Reloj y fecha", "Tarjetas junto al reloj", "Clima", "Contenido", "Barra superior"),
     3 to listOf("Pantalla", "Rendimiento", "Noche", "Reposo", "Diseño del modo ambiente", "Sonido"),
-    6 to listOf("Conexiones", "Sistema", "Celular", "Botones de color", "Arranque", "Asistente"),
+    6 to listOf("Conexiones", "Sistema", "Celular", "Botones de color", "Arranque", "Escena de cine", "Asistente"),
     7 to listOf("Permisos")
 )
 
@@ -1132,6 +1132,30 @@ fun SettingsScreen(
             ActionRow("Acceso a notificaciones (música): " + (if (ok) "activo" else "falta permitir"), m) {
                 tryStart(ctx, "android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS")
             }
+        })
+        add(SItem(6, "App de la escena", "Escena de cine") { m ->
+            val lbl = AppCache.apps.firstOrNull { it.pkg == cfg.sceneApp }?.label
+                ?: (if (cfg.sceneApp.isEmpty()) "ninguna" else cfg.sceneApp)
+            DialogRow("App de la escena: " + lbl, m) { close ->
+                AppPickerDialog(
+                    title = "App de la escena",
+                    current = cfg.sceneApp,
+                    onPick = {
+                        cfg.setSceneApp(it)
+                        close()
+                    },
+                    onClose = close
+                )
+            }
+        })
+        add(SItem(6, "Modo noche en la escena", "Escena de cine") { m ->
+            SwitchRow("Activar modo noche", cfg.sceneNight, m) { cfg.setSceneNight(it) }
+        })
+        add(SItem(6, "Oscurecimiento de la escena", "Escena de cine") { m ->
+            SliderRow("Oscurecer el fondo", cfg.sceneDim, 0, 80, 5, "%", m) { cfg.setSceneDim(it) }
+        })
+        add(SItem(6, "Temporizador de la escena", "Escena de cine") { m ->
+            ChoiceRow("Temporizador de sueño", SLEEP_OPTIONS, cfg.sceneSleep, m) { cfg.setSceneSleep(it) }
         })
         add(SItem(6, "Asistente de configuración", "Asistente") { m ->
             ActionRow("Abrir el asistente de configuración", m) { onWizard() }

@@ -13,7 +13,7 @@ val ROW_NAMES = listOf(
 /** Acciones de los botones de color (indice = codigo guardado). */
 val COLOR_ACTIONS = listOf(
     "Ninguno", "Todas las apps", "Ajustes", "Entradas", "Búsqueda",
-    "Menú de energía", "Editar apps", "Modo ambiente", "Pantalla negra"
+    "Menú de energía", "Editar apps", "Modo ambiente", "Pantalla negra", "Escena de cine"
 )
 
 /** Ajustes de inicio, fondo y musica (se guardan en Prefs). */
@@ -52,6 +52,10 @@ class Cfg(private val p: Prefs) {
     private var _focusCard by mutableStateOf(p.getInt("focusCard", 1) == 1)
     private var _saver by mutableStateOf(p.getInt("saver", 0) == 1)
     private var _uniformIcons by mutableStateOf(p.getInt("uniformIcons", 0) == 1)
+    private var _sceneApp by mutableStateOf(p.getStr("sceneApp", ""))
+    private var _sceneNight by mutableStateOf(p.getInt("sceneNight", 1) == 1)
+    private var _sceneDim by mutableStateOf(p.getInt("sceneDim", 40))
+    private var _sceneSleep by mutableStateOf(p.getInt("sceneSleep", 0))
     private var _fluid by mutableStateOf(p.getInt("fluid", 0) == 1)
     private var _saverHint by mutableStateOf(p.getInt("saverHint", 1) == 1)
     private var _night by mutableStateOf(p.getInt("night", 0) == 1)
@@ -152,6 +156,11 @@ class Cfg(private val p: Prefs) {
     val saver: Boolean get() = _saver || _fluid
     val saverOnly: Boolean get() = _saver
     val fluid: Boolean get() = _fluid
+    /** Escena de cine: app a abrir, modo noche, oscurecimiento y temporizador de sueño (indice de SLEEP_MINS). */
+    val sceneApp: String get() = _sceneApp
+    val sceneNight: Boolean get() = _sceneNight
+    val sceneDim: Int get() = _sceneDim
+    val sceneSleep: Int get() = _sceneSleep
     /** Fichas cuadradas o circulares: todas las imagenes se ven completas sobre un fondo del color de la app. */
     val uniformIcons: Boolean get() = _uniformIcons
     /** Sugerir el modo ahorro si los fotogramas por segundo bajan mucho. */
@@ -391,6 +400,11 @@ class Cfg(private val p: Prefs) {
         _uniformIcons = v
         p.putInt("uniformIcons", if (v) 1 else 0)
     }
+
+    fun setSceneApp(v: String) { _sceneApp = v; p.putStr("sceneApp", v) }
+    fun setSceneNight(v: Boolean) { _sceneNight = v; p.putInt("sceneNight", if (v) 1 else 0) }
+    fun setSceneDim(v: Int) { _sceneDim = v; p.putInt("sceneDim", v) }
+    fun setSceneSleep(v: Int) { _sceneSleep = v; p.putInt("sceneSleep", v) }
 
     fun setFluid(v: Boolean) {
         _fluid = v

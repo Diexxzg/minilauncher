@@ -58,13 +58,38 @@ val RESET_KEYS: Map<Int, List<String>> = mapOf(
         "ambDimOn", "ambDimLvl", "ambAnim", "ambPosTime", "ambPosDate", "ambPosMusic", "ambPosIcons"
     ),
     4 to listOf("showMusic", "musicSize", "musicPos"),
-    6 to listOf("keyRed", "keyGreen", "keyYellow", "keyBlue", "bootEnabled", "bootApp"),
+    6 to listOf(
+        "keyRed", "keyGreen", "keyYellow", "keyBlue", "bootEnabled", "bootApp",
+        "sceneApp", "sceneNight", "sceneDim", "sceneSleep"
+    ),
     9 to listOf("bigText", "highContrast", "thickFocus")
 )
 
 /** Solo el aspecto (Fondo y color + Dock y diseño): no incluye apps, PIN ni notas. */
 val DESIGN_KEYS: List<String> =
     ((RESET_KEYS[0] ?: emptyList()) + (RESET_KEYS[1] ?: emptyList())).distinct()
+
+/**
+ * Escena de cine: activa modo noche, oscurecimiento y temporizador. Si ya esta activa, restaura lo anterior.
+ * Devuelve true si quedo activada.
+ */
+fun toggleScene(cfg: Cfg, prefs: Prefs, sleep: SleepTimer): Boolean {
+    if (prefs.getInt("sceneOn", 0) == 1) {
+        cfg.setDim(prefs.getInt("scenePrevDim", 0))
+        cfg.setNight(prefs.getInt("scenePrevNight", 0) == 1)
+        sleep.cancel()
+        prefs.putInt("sceneOn", 0)
+        return false
+    }
+    prefs.putInt("scenePrevDim", cfg.dim)
+    prefs.putInt("scenePrevNight", if (cfg.night) 1 else 0)
+    cfg.setDim(cfg.sceneDim)
+    cfg.setNight(cfg.sceneNight)
+    val mins = SLEEP_MINS[cfg.sceneSleep.coerceIn(0, SLEEP_MINS.lastIndex)]
+    if (mins > 0) sleep.start(mins)
+    prefs.putInt("sceneOn", 1)
+    return true
+}
 
 /** Borra los ajustes de la categoria y reinicia la pantalla; al volver se abre la misma categoria. */
 fun resetCategory(ctx: Context, cat: Int) {
@@ -115,6 +140,7 @@ val DESCS: Map<String, String> = mapOf(
     "Tamaño de la interfaz" to "Agranda o reduce todo el launcher.",
     "Margen de seguridad" to "Aleja los elementos de los bordes si tu TV recorta la imagen.",
     "Iconos uniformes" to "Muestra cada imagen completa sobre un fondo del color de la app, para que todas se vean igual.",
+    "App de la escena" to "Se abre al activar la escena (botón de color o Panel rápido). Púlsala otra vez para volver a como estaba.",
     "Fluidez máxima" to "Apaga de una vez desenfoque, brillo, fondos animados y animaciones para ir más fluido.",
     "Modo ahorro" to "Desactiva efectos pesados. Útil en TV con poca memoria.",
     "Sugerir modo ahorro" to "Avisa cuando el launcher vaya lento.",

@@ -50,7 +50,9 @@ fun QuickPanel(
     onAmbient: () -> Unit = {},
     onWalls: () -> Unit = {},
     onInputs: () -> Unit = {},
-    onSearch: () -> Unit = {}
+    onSearch: () -> Unit = {},
+    sceneOn: Boolean = false,
+    onScene: () -> Unit = {}
 ) {
     val ctx = LocalContext.current
     val os = (LocalOverscan.current / LocalUiScale.current).dp
@@ -130,7 +132,7 @@ fun QuickPanel(
             // El brillo es lo contrario de "Oscurecer fondo": 100% = sin oscurecer.
             SliderRow("Brillo del fondo", 100 - cfg.dim, 20, 100, 5, "%") { cfg.setDim(100 - it) }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                SmallBtn("Fondo", Modifier.weight(1f)) { onWalls() }
+                SmallBtn(if (sceneOn) "Salir cine" else "Cine", Modifier.weight(1f)) { onScene() }
                 SmallBtn("Entradas", Modifier.weight(1f)) { onInputs() }
                 SmallBtn("Buscar", Modifier.weight(1f)) { onSearch() }
                 SmallBtn("Ajustes", Modifier.weight(1f)) { onSettings() }
