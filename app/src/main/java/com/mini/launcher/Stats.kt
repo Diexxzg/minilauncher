@@ -29,6 +29,17 @@ fun topWeek(prefs: Prefs, apps: List<AppInfo>, max: Int = 6): List<Pair<String, 
         .map { names.getValue(it.key) to it.value }
 }
 
+/** Apps instaladas que abriste alguna vez pero no en los ultimos `days` dias (las mas antiguas primero). */
+fun staleApps(prefs: Prefs, apps: List<AppInfo>, days: Int = 30, max: Int = 3): List<Pair<String, Int>> {
+    val now = System.currentTimeMillis()
+    val last = prefs.lastUsedMap()
+    return apps.mapNotNull { a ->
+        val t = last[a.pkg] ?: return@mapNotNull null
+        val d = ((now - t) / 86_400_000L).toInt()
+        if (d >= days) a.label to d else null
+    }.sortedByDescending { it.second }.take(max)
+}
+
 /** Grafica de barras horizontales sencilla; no recibe foco (es solo lectura). */
 @Composable
 fun UsageChart(items: List<Pair<String, Int>>, color: Color) {

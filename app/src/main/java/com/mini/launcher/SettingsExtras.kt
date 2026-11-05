@@ -153,8 +153,16 @@ fun SleepRow(modifier: Modifier = Modifier) {
 @Composable
 fun StatsDialog(prefs: Prefs, onClose: () -> Unit) {
     val items = remember { topWeek(prefs, AppCache.apps) }
+    val stale = remember { staleApps(prefs, AppCache.apps) }
     ExtraDialog(stringResource(R.string.stats_title), onClose) {
         UsageChart(items, Themes.current.acc)
+        if (stale.isNotEmpty()) {
+            Text(
+                "Sin abrir hace tiempo: " + stale.joinToString(", ") { it.first + " (" + it.second + " días)" } +
+                    ". Puedes ocultarlas o quitarlas desde Editar apps.",
+                color = Color(0xB3FFFFFF), fontSize = 13.sp
+            )
+        }
         ActionRow(stringResource(R.string.x_close), Modifier.autoFocus()) { onClose() }
     }
 }
