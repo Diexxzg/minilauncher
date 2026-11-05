@@ -360,6 +360,7 @@ private fun TabChip(
     icon: String,
     selected: Boolean,
     modifier: Modifier = Modifier,
+    dot: Boolean = false,
     onFocus: () -> Unit,
     onEnter: () -> Boolean,
     onClick: () -> Unit
@@ -379,6 +380,10 @@ private fun TabChip(
             )
             .then(if (focused) Modifier.border(1.dp, Color(0x66FFFFFF), shape) else Modifier)
             .drawBehind {
+                if (dot) {
+                    // Punto: esta categoria tiene ajustes que ya cambiaste.
+                    drawCircle(ACC, radius = 3.dp.toPx(), center = Offset(size.width - 8.dp.toPx(), 8.dp.toPx()))
+                }
                 if (selected) {
                     drawRoundRect(
                         color = ACC,
@@ -1273,6 +1278,7 @@ fun SettingsScreen(
                             if (i == 0) left = tabFr[i]
                             if (i == CATS.lastIndex) right = tabFr[i]
                         },
+                        dot = (RESET_KEYS[i]?.let { prefs.countKeys(it) } ?: 0) > 0,
                         onFocus = {
                             tabTouched = true
                             if (i != curCat) onCat(i)
@@ -1340,7 +1346,10 @@ fun SettingsScreen(
                         }
                     }
                     if (RESET_KEYS.containsKey(curCat)) {
-                        SectionLabel("Restablecer")
+                        SectionLabel(
+                            "Restablecer" + (RESET_KEYS[curCat]?.let { prefs.countKeys(it) }
+                                ?.takeIf { it > 0 }?.let { " · " + it + " ajustes cambiados" } ?: "")
+                        )
                         SectionCard {
                             ResetCategoryRow(title, stopDown) { resetCategory(ctx, curCat) }
                         }

@@ -513,7 +513,8 @@ fun AllApps(
             }
         } else if (list.isEmpty()) {
             Text(
-                "Sin resultados", color = Color(0x99FFFFFF), fontSize = 16.sp,
+                if (query.isNotBlank()) "Sin resultados para «" + query.trim() + "»" else "No hay apps para mostrar aquí",
+                color = Color(0x99FFFFFF), fontSize = 16.sp,
                 modifier = Modifier.padding(8.dp)
             )
         }

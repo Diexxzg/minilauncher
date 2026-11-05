@@ -95,6 +95,8 @@ class Prefs(ctx: Context) {
             false
         }
     }
+    /** Cuantas de estas claves ya fueron guardadas alguna vez (ajustes que tocaste). */
+    fun countKeys(keys: Collection<String>): Int = keys.count { sp.contains(it) }
     /** Borra solo estas claves (restablecer una categoria). */
     fun removeKeys(keys: Collection<String>) {
         val e = sp.edit()
