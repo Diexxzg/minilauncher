@@ -1,5 +1,15 @@
 # Novedades
 
+## 4.12
+- Perfiles de familia (Sistema): 3 perfiles con su propio dock, filas, tema y diseño. Un perfil nuevo empieza como copia del actual.
+- Nuevo botón de color «Siguiente perfil» para cambiar de perfil al instante.
+
+## 4.11
+- Estadísticas: ahora sugiere las apps que llevas más de 30 días sin abrir.
+
+## 4.10
+- Nueva «Rutina diaria» (Sistema): a la hora que elijas, una vez al día, activa la escena de cine o abre una app.
+
 ## 4.9
 - Nueva «Escena de cine»: con un botón activa modo noche, oscurece el fondo, pone el temporizador y abre tu app. Púlsalo otra vez y todo vuelve a como estaba.
 - Se activa con un botón de color (elígelo en Sistema) o desde el Panel rápido; se configura en Sistema → Escena de cine.
