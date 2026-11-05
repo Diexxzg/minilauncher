@@ -1,5 +1,15 @@
 # Novedades
 
+## 4.6
+Modo ambiente, Todas las apps y Panel rápido
+- Modo ambiente: oscurecimiento con interruptor y nivel, fondo animado en reposo y posición elegible para hora, fecha, reproductor e iconos.
+- Todas las apps con título y contador de apps.
+- Panel rápido renovado con fichas: música, Wi‑Fi, sonido, tema, perfil, fluidez, reposo, atajos y memoria libre.
+
+## 4.5
+Rendimiento
+- Nuevo interruptor «Fluidez máxima» en Pantalla y energía: apaga de una vez los efectos pesados.
+
 ## 4.4
 Configuración
 - El panel de Configuración es más pequeño y ya no ocupa la mitad de la pantalla.
