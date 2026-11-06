@@ -559,8 +559,7 @@ fun RemapDialog(onClose: () -> Unit) {
     var needApp by remember { mutableStateOf(false) }
     ExtraDialog("Remapear botones", onClose, maxWidth = 600, scroll = true) {
         Text(
-            if (PowerService.instance != null) "Funciona en cualquier app (accesibilidad activa)."
-            else "Sin accesibilidad solo funciona dentro del launcher. Activa «One Piece - energía». Si ya estaba activa, apágala y vuelve a encenderla.",
+            "Los botones remapeados funcionan dentro del launcher.",
             color = Color(0xB3FFFFFF), fontSize = 13.sp
         )
         for ((code, v) in m) {
