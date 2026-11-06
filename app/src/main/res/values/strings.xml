@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="power_service_desc">Permite abrir el menú de energía del sistema (reiniciar, apagar) y suspender la TV desde el launcher. No lee el contenido de la pantalla.</string>
+    <string name="power_service_desc">Permite abrir el menú de energía del sistema (reiniciar, apagar) y suspender la TV desde el launcher, y remapear botones del mando. Solo ve las pulsaciones de las teclas que tú configures; no lee el contenido de la pantalla.</string>
 
     <!-- Comunes -->
     <string name="x_close">Cerrar</string>
