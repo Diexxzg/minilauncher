@@ -327,9 +327,12 @@ object Perf {
         }
         val cur = m[pkg] ?: longArrayOf(0L, 0L)
         // Ventana movil: a las 20 medidas se reduce a la mitad para que pese lo reciente.
-        if (cur[1] >= 20) { cur[0] /= 2; cur[1] /= 2 }
-        cur[0] += ms
-        cur[1] += 1
+        if (cur[1] >= 20L) {
+            cur[0] = cur[0] / 2L
+            cur[1] = cur[1] / 2L
+        }
+        cur[0] = cur[0] + ms
+        cur[1] = cur[1] + 1L
         m[pkg] = cur
         p.putStr("pfLaunchT", m.entries.joinToString(",") { it.key + ":" + it.value[0] + ":" + it.value[1] })
     }
