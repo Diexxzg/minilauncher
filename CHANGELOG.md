@@ -1,5 +1,10 @@
 # Novedades
 
+## 4.15
+- Nuevo diálogo «Inicio» (Sistema y primer arranque): guarda tu Home anterior y permite restaurarlo.
+- Prueba temporal de 1 h o 24 h: si no confirmas o falla 3 veces, te lleva de vuelta al Home anterior.
+- Lista de permisos con semáforo: superposición, accesibilidad, notificaciones y WRITE_SECURE_SETTINGS.
+
 ## 4.14
 - Todas las apps: la ficha enfocada crece un poco más y su nombre se resalta.
 - Los avisos y las apps nuevas se marcan con un punto (rojo o verde) en lugar de una etiqueta.
