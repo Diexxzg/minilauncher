@@ -29,8 +29,8 @@ android {
         applicationId = "com.mini.launcher"
         minSdk = 26
         targetSdk = 34
-        versionCode = 29
-        versionName = "4.15"
+        versionCode = 30
+        versionName = "4.16"
     }
     signingConfigs {
         if (hasOwnKey) {
@@ -81,4 +81,5 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     implementation("androidx.activity:activity-compose:1.9.2")
     implementation("androidx.core:core-ktx:1.13.1")
+    implementation("androidx.profileinstaller:profileinstaller:1.3.1")
 }
