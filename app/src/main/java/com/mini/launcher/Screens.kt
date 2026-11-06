@@ -87,6 +87,7 @@ fun HomeScreen(
     onFocusApp: (AppInfo, Boolean) -> Unit = { _, _ -> },
     dockState: LazyListState? = null,
     focusTick: Int = 0,
+    restorePkg: String? = null,
     loading: Boolean = false,
     previewDock: Boolean = false,
     onQuick: () -> Unit = {},
@@ -260,7 +261,7 @@ fun HomeScreen(
                     ) {
                         itemsIndexed(dock, key = { _, app -> app.pkg }) { i, app ->
                             AppTile(
-                                app, if (i == 0) Modifier.autoFocusOn(focusTick, dockFr) else Modifier,
+                                app, if (if (restorePkg != null && dock.any { it.pkg == restorePkg }) app.pkg == restorePkg else i == 0) Modifier.autoFocusOn(focusTick, dockFr) else Modifier,
                                 onLongClick = { onMenu(app) },
                                 onFocusChange = { onFocusApp(app, it) },
                                 tileStyle = tileStyle,
@@ -525,20 +526,24 @@ fun AllApps(
             contentPadding = PaddingValues(8.dp)
         ) {
             gridItems(list, key = { it.pkg }) { app ->
+                var foc by remember { mutableStateOf(false) }
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     AppTile(
                         app,
                         if (!focusSearch && query.isEmpty() && app.pkg == firstPkg) Modifier.autoFocus() else Modifier,
                         useSize = false,
-                        onLongClick = { onMenu(app) }
+                        onLongClick = { onMenu(app) },
+                        onFocusChange = { foc = it },
+                        samsung = true
                     ) {
                         if (query.isNotBlank()) onSearched(query.trim())
                         onLaunch(app)
                     }
                     Text(
-                        app.label, color = Color.White, fontSize = 14.sp, maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.padding(top = 6.dp)
+                        app.label, color = if (foc) Color.White else Color(0xB3FFFFFF), fontSize = 14.sp,
+                        fontWeight = if (foc) androidx.compose.ui.text.font.FontWeight.SemiBold else null,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(top = 8.dp)
                     )
                 }
             }

@@ -182,6 +182,7 @@ fun GlassBox(
     cornerDp: Dp = 18.dp,
     onFocusChange: ((Boolean) -> Unit)? = null,
     preview: Boolean = false,
+    extraScale: Float = 0f,
     content: @Composable BoxScope.() -> Unit
 ) {
     var focused by remember { mutableStateOf(false) }
@@ -198,7 +199,7 @@ fun GlassBox(
     val fs = if (glow != null) (if (thick) 1 else LocalFocusStyle.current) else 0
     // Sin rebote ni pulso: todo se mueve con curvas suaves y sin parpadeo.
     val sc = animateFloatAsState(
-        if (lit) (when (fs) { 2 -> 1f; 3 -> 1.09f; else -> 1.05f }) else 1f,
+        if (lit) (when (fs) { 2 -> 1f; 3 -> 1.09f; else -> 1.05f }) + extraScale else 1f,
         tween(220, easing = FastOutSlowInEasing),
         label = "scale"
     )
@@ -275,6 +276,7 @@ fun AppTile(
     onLongClick: (() -> Unit)? = null,
     onFocusChange: ((Boolean) -> Unit)? = null,
     preview: Boolean = false,
+    samsung: Boolean = false,
     onClick: () -> Unit
 ) {
     val st = LocalDock.current
@@ -302,7 +304,8 @@ fun AppTile(
         glowLevel = st.glow,
         cornerDp = if (round) (dims.second * f / 2f).dp else st.corner.dp,
         onFocusChange = onFocusChange,
-        preview = preview
+        preview = preview,
+        extraScale = if (samsung) 0.04f else 0f
     ) {
         if (tileStyle >= 2) {
             // Icono cuadrado o circulo: solo la imagen (el nombre sale en la tarjeta bajo el dock).
@@ -362,7 +365,17 @@ fun AppTile(
                 )
             }
         }
-        if (unread > 0) {
+        if (samsung && (unread > 0 || isNew)) {
+            // Punto de novedades: rojo si hay avisos, verde si la app es nueva.
+            Box(
+                Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(8.dp)
+                    .size(12.dp)
+                    .clip(CircleShape)
+                    .background(if (unread > 0) Color(0xFFE5484D) else Color(0xFF3DD68C))
+            )
+        } else if (unread > 0) {
             Box(
                 Modifier
                     .align(Alignment.TopEnd)

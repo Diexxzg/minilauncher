@@ -249,5 +249,10 @@ fun WeatherText(
             modifier.width((size.value * 7f).dp).height((size.value * 1.15f).dp),
             corner = 6.dp
         )
+    } else {
+        Text(
+            "Clima no disponible", color = Color(0x80FFFFFF), fontSize = size * 0.75f,
+            maxLines = 1, modifier = modifier
+        )
     }
 }

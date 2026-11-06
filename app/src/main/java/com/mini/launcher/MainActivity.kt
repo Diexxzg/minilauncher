@@ -251,6 +251,7 @@ fun HomeRoot(
     var showPower by remember { mutableStateOf(false) }
     var searchFocus by remember { mutableStateOf(false) }
     var focusTick by remember { mutableIntStateOf(0) }
+    var lastDockPkg by remember { mutableStateOf<String?>(null) }
     var showMore by remember { mutableStateOf(false) }
     var moreBack by remember { mutableIntStateOf(0) }
     // Accesos rapidos (pulsacion larga en ajustes), carga inicial y categoria abierta en Configuracion.
@@ -370,6 +371,7 @@ fun HomeRoot(
         showSaverHint = false
         openFolder = null
         if (homeTick > 0) {
+            lastDockPkg = null
             dockState.animateScrollToItem(0)
             focusTick++
         }
@@ -1194,12 +1196,14 @@ fun HomeRoot(
                                             onFocusApp = { a, f ->
                                                 if (f) {
                                                     focusedApp = a
+                                                    lastDockPkg = a.pkg
                                                 } else if (focusedApp?.pkg == a.pkg) {
                                                     focusedApp = null
                                                 }
                                             },
                                             dockState = dockState,
                                             focusTick = focusTick,
+                                            restorePkg = lastDockPkg,
                                             loading = !appsLoaded,
                                             previewDock = preview,
                                             onQuick = { if (live) showQuick = true },
