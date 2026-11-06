@@ -1,5 +1,13 @@
 # Novedades
 
+## 4.14
+- Todas las apps: la ficha enfocada crece un poco más y su nombre se resalta.
+- Los avisos y las apps nuevas se marcan con un punto (rojo o verde) en lugar de una etiqueta.
+
+## 4.13
+- Al volver a Inicio desde otra pantalla, el foco regresa a la última app en la que estabas.
+- Si no hay datos del clima, ahora se muestra «Clima no disponible» en lugar de un hueco.
+
 ## 4.12
 - Perfiles de familia (Sistema): 3 perfiles con su propio dock, filas, tema y diseño. Un perfil nuevo empieza como copia del actual.
 - Nuevo botón de color «Siguiente perfil» para cambiar de perfil al instante.
