@@ -18,7 +18,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -60,6 +63,8 @@ fun QuickPanel(
     val sounds = listOf("Apagado", "Suave", "Medio")
     val themes = Themes.list
     val status = remember { memoryLine(ctx) }
+    var health by remember { mutableStateOf(false) }
+    if (health) HealthDialog { health = false }
     Box(
         Modifier
             .fillMaxSize()
@@ -136,6 +141,10 @@ fun QuickPanel(
                 SmallBtn("Entradas", Modifier.weight(1f)) { onInputs() }
                 SmallBtn("Buscar", Modifier.weight(1f)) { onSearch() }
                 SmallBtn("Ajustes", Modifier.weight(1f)) { onSettings() }
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                SmallBtn("Limpiar RAM", Modifier.weight(1f)) { Perf.cleanAsync(ctx) }
+                SmallBtn("Salud de la TV", Modifier.weight(1f)) { health = true }
             }
             if (status.isNotEmpty()) {
                 Text(

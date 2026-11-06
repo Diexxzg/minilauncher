@@ -759,6 +759,9 @@ fun SettingsScreen(
         add(SItem(3, "Sugerir modo ahorro", "Rendimiento") { m ->
             SwitchRow("Sugerir modo ahorro si va lenta", cfg.saverHint, m) { cfg.setSaverHint(it) }
         })
+        add(SItem(3, "Rendimiento: salud, red, almacenamiento y más", "Rendimiento") { m ->
+            DialogRow("Rendimiento: salud, red, almacenamiento y más", m) { close -> PerfDialog(close) }
+        })
         add(SItem(3, "Modo noche automático", "Noche") { m ->
             SwitchRow("Modo noche automático", cfg.night, m) { cfg.setNight(it) }
         })

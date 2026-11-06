@@ -129,7 +129,7 @@ object Home1 {
 
 @Composable
 private fun Light(label: String, ok: Boolean) {
-    InfoRow(label, if (ok) "🟢 Listo" else "🔴 Falta")
+    SemRow(label, if (ok) "Listo" else "Falta", if (ok) 0 else 2)
 }
 
 @Composable
@@ -139,7 +139,7 @@ fun HomeDialog(onClose: () -> Unit, onSetHome: () -> Unit) {
     @Suppress("UNUSED_EXPRESSION") t
     val def = Home1.isDefault(c)
     val prev = Home1.previous(c)
-    ExtraDialog("Inicio predeterminado", onClose) {
+    ExtraDialog("Inicio predeterminado", onClose, scroll = true) {
         Text(
             if (def) "One Piece es tu inicio." else "One Piece aún no es tu inicio.",
             color = Color(0xE6FFFFFF), fontSize = 15.sp,
@@ -148,12 +148,12 @@ fun HomeDialog(onClose: () -> Unit, onSetHome: () -> Unit) {
         if (prev.isNotEmpty()) InfoRow("Home anterior", Home1.label(c, prev))
         if (Home1.trialActive(c)) {
             InfoRow("Prueba", "quedan " + Home1.trialLeftMin(c) + " min")
-            ActionRow("Confirmar: quedarme con One Piece", Modifier.autoFocus()) {
+            ActionRow("Confirmar: quedarme con One Piece") {
                 Home1.confirm(c); t++
             }
         }
         if (!def) {
-            ActionRow("Hacer One Piece predeterminado", Modifier.autoFocus()) {
+            ActionRow("Hacer One Piece predeterminado") {
                 Home1.saveBefore(c); onSetHome(); t++
             }
             ActionRow("Probar 1 hora (vuelve solo)") {

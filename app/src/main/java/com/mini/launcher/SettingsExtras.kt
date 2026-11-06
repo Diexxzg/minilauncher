@@ -16,6 +16,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -51,8 +52,10 @@ fun ExtraDialog(
     title: String,
     onClose: () -> Unit,
     maxWidth: Int = 520,
+    scroll: Boolean = false,
     content: @Composable ColumnScope.() -> Unit
 ) {
+    val scrollState = androidx.compose.foundation.rememberScrollState()
     val shape = RoundedCornerShape(26.dp)
     Dialog(onDismissRequest = onClose, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         // Sin esto el primer OK solo "entraba" al cuadro: ahora el foco cae en el primer boton solo.
@@ -68,6 +71,7 @@ fun ExtraDialog(
                 .clip(shape)
                 .background(Color(0xF0101624))
                 .border(1.dp, Color(0x33FFFFFF), shape)
+                .then(if (scroll) Modifier.verticalScroll(scrollState) else Modifier)
                 .padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {

@@ -189,6 +189,7 @@ class MainActivity : ComponentActivity() {
         super.onResume()
         appPaused = false
         resumeTick++
+        Perf.resolveLaunch(this)
     }
 
     override fun onPause() {
@@ -801,12 +802,14 @@ fun HomeRoot(
     }
 
     val homeLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { }
+    remember { Perf.load(ctx); 0 }
     var home1Open by remember { mutableStateOf(Home1.firstRunPending(ctx)) }
     if (home1Open) HomeDialog({ home1Open = false }) { requestHome(ctx) { homeLauncher.launch(it) } }
 
     fun openApp(a: AppInfo) {
         recents = prefs.pushRecent(a.pkg)
         usage = prefs.bumpUsage(a.pkg)
+        Perf.noteLaunch(a.pkg)
         prefs.bumpDay(a.pkg)
         lastUsed = prefs.markUsed(a.pkg)
         seen = prefs.markSeen(a.pkg)
@@ -962,6 +965,37 @@ fun HomeRoot(
         }
     }
 
+    // ---- Rendimiento: ahorro automatico, limpieza nocturna y pre-calentado ----
+    LaunchedEffect(Perf.autoSaver) {
+        if (!Perf.autoSaver) {
+            cfg.lowRam = false
+            return@LaunchedEffect
+        }
+        while (true) {
+            cfg.lowRam = Perf.ramLow(ctx)
+            delay(30_000)
+        }
+    }
+    LaunchedEffect(Perf.nightClean, Perf.warmOn) {
+        while (Perf.nightClean || Perf.warmOn) {
+            val cal = java.util.Calendar.getInstance()
+            val today = cal.get(java.util.Calendar.YEAR) * 1000 + cal.get(java.util.Calendar.DAY_OF_YEAR)
+            val nowM = cal.get(java.util.Calendar.HOUR_OF_DAY) * 60 + cal.get(java.util.Calendar.MINUTE)
+            if (Perf.nightClean && nowM in 180..210 && prefs.getInt("cleanLast", 0) != today) {
+                prefs.putInt("cleanLast", today)
+                Perf.cleanAsync(ctx, true)
+            }
+            val at = Perf.warmHour * 60
+            if (Perf.warmOn && Perf.warmPkg.isNotEmpty() && screen == "home" && !appPaused &&
+                nowM >= at && nowM <= at + 30 && prefs.getInt("warmLast", 0) != today
+            ) {
+                prefs.putInt("warmLast", today)
+                Perf.warm(ctx)
+            }
+            delay(30_000)
+        }
+    }
+
     // ---- Botones de color (13) ----
     fun runColorAction(a: Int) {
         when (a) {
@@ -1033,9 +1067,17 @@ fun HomeRoot(
     }
     // Si el control va muy lento varias veces seguidas, se sugiere el modo ahorro.
         SlowWatch(
-        active = homeFree && !cfg.saver && cfg.saverHint && !saverSkip,
+        active = homeFree && !cfg.saver && (cfg.saverHint || Perf.autoFluid) && !saverSkip,
         lastInputMs = { lastInput.longValue },
-        onSlow = { showSaverHint = true }
+        onSlow = {
+            if (Perf.autoFluid) {
+                cfg.setFluid(true)
+                saverSkip = true
+                toast(ctx, "Fluidez máxima activada automáticamente.")
+            } else {
+                showSaverHint = true
+            }
+        }
     )
         Box(
         Modifier

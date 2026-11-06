@@ -61,6 +61,8 @@ class Cfg(private val p: Prefs) {
     private var _routineMin by mutableStateOf(p.getInt("routineMin", 0).coerceIn(0, 59))
     private var _routineAction by mutableStateOf(p.getInt("routineAction", 0))
     private var _routineApp by mutableStateOf(p.getStr("routineApp", ""))
+    /** Lo activa Perf cuando hay poca RAM libre (modo ahorro automatico). */
+    var lowRam by mutableStateOf(false)
     private var _fluid by mutableStateOf(p.getInt("fluid", 0) == 1)
     private var _saverHint by mutableStateOf(p.getInt("saverHint", 1) == 1)
     private var _night by mutableStateOf(p.getInt("night", 0) == 1)
@@ -158,7 +160,7 @@ class Cfg(private val p: Prefs) {
     val focusCard: Boolean get() = _focusCard
     /** Modo ahorro: apaga desenfoque, animaciones, fondo dinamico y brillo de color. */
     /** Efectos pesados apagados: lo activan "Modo ahorro" o "Fluidez máxima". */
-    val saver: Boolean get() = _saver || _fluid
+    val saver: Boolean get() = _saver || _fluid || lowRam
     val saverOnly: Boolean get() = _saver
     val fluid: Boolean get() = _fluid
     /** Rutina diaria: a esta hora (una vez al dia) activa la escena de cine o abre una app. */
