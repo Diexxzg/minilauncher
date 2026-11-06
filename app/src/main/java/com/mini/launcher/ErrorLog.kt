@@ -44,6 +44,7 @@ object ErrorLog {
         Thread.setDefaultUncaughtExceptionHandler { t, e ->
             try {
                 add("Cierre inesperado en " + t.name, e)
+                OnePieceApp.instance?.let { Home1.noteCrash(it) }
             } catch (x: Throwable) {
             }
             prev?.uncaughtException(t, e)

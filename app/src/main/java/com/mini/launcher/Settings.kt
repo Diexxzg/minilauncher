@@ -1068,6 +1068,9 @@ fun SettingsScreen(
         add(SItem(6, "Establecer como inicio predeterminado", "Sistema") { m ->
             ActionRow("Establecer como inicio predeterminado", m) { onSetHome() }
         })
+        add(SItem(6, "Inicio: prueba, restaurar y permisos", "Sistema") { m ->
+            DialogRow("Inicio: prueba, restaurar y permisos", m) { close -> HomeDialog(close) { onSetHome() } }
+        })
         add(SItem(6, "Conexión con el celular", "Celular") { m ->
             DialogRow("Conexión con el celular (fondos, texto, copia)", m) { close -> PhoneDialog(close) }
         })

@@ -173,6 +173,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         runBootApp(this)
+        Home1.checkTrial(this)
         val f = IntentFilter().apply {
             addAction(Intent.ACTION_PACKAGE_ADDED)
             addAction(Intent.ACTION_PACKAGE_REMOVED)
@@ -800,6 +801,8 @@ fun HomeRoot(
     }
 
     val homeLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { }
+    var home1Open by remember { mutableStateOf(Home1.firstRunPending(ctx)) }
+    if (home1Open) HomeDialog({ home1Open = false }) { requestHome(ctx) { homeLauncher.launch(it) } }
 
     fun openApp(a: AppInfo) {
         recents = prefs.pushRecent(a.pkg)
