@@ -107,7 +107,7 @@ private val SEC_ORDER = mapOf(
     1 to listOf("Perfil", "Fichas", "Información", "Filas extra", "Foco y efectos", "Compartir diseño"),
     2 to listOf("Parte superior", "Reloj y fecha", "Tarjetas junto al reloj", "Clima", "Contenido", "Barra superior"),
     3 to listOf("Pantalla", "Rendimiento", "Noche", "Reposo", "Diseño del modo ambiente", "Sonido"),
-    6 to listOf("Conexiones", "Sistema", "Celular", "Botones de color", "Arranque", "Escena de cine", "Rutina diaria", "Perfiles de familia", "Asistente"),
+    6 to listOf("Conexiones", "Sistema", "Celular", "Botones de color", "Mando y uso diario", "Arranque", "Escena de cine", "Rutina diaria", "Perfiles de familia", "Asistente"),
     7 to listOf("Permisos")
 )
 
@@ -1090,6 +1090,12 @@ fun SettingsScreen(
                 }
             })
         }
+        add(SItem(6, "Remapear botones del mando", "Mando y uso diario") { m ->
+            DialogRow("Remapear cualquier botón del mando", m) { close -> RemapDialog(close) }
+        })
+        add(SItem(6, "Uso diario", "Mando y uso diario") { m ->
+            DialogRow("Uso diario: doble Inicio, hábitos, al encender y más", m) { close -> DailyDialog(close) }
+        })
         add(SItem(6, "Abrir app al encender", "Arranque") { m ->
             SwitchRow("Abrir una app al encender la TV", cfg.bootEnabled, m) { on ->
                 cfg.setBootEnabled(on)

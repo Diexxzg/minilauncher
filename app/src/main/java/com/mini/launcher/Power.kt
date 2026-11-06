@@ -37,14 +37,67 @@ import androidx.compose.ui.unit.sp
  * energia del sistema (reiniciar / apagar) y suspender. El usuario lo activa a mano.
  */
 class PowerService : AccessibilityService() {
+    private val h = android.os.Handler(android.os.Looper.getMainLooper())
+    private val screenOn = object : android.content.BroadcastReceiver() {
+        override fun onReceive(c: Context?, i: Intent?) {
+            Remap.lastKeyMs = android.os.SystemClock.elapsedRealtime()
+        }
+    }
+    private val smartCheck = object : Runnable {
+        override fun run() {
+            val hrs = Daily.smartHours(this@PowerService)
+            val idle = android.os.SystemClock.elapsedRealtime() - Remap.lastKeyMs
+            if (hrs > 0 && idle > hrs * 3_600_000L) {
+                Remap.lastKeyMs = android.os.SystemClock.elapsedRealtime()
+                try {
+                    startActivity(
+                        Intent(this@PowerService, MainActivity::class.java).putExtra("dAct", 99)
+                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                    )
+                } catch (e: Exception) {
+                }
+            }
+            h.postDelayed(this, 60_000L)
+        }
+    }
+
     override fun onServiceConnected() {
         super.onServiceConnected()
         instance = this
+        Remap.load(this)
+        Remap.lastKeyMs = android.os.SystemClock.elapsedRealtime()
+        try {
+            registerReceiver(screenOn, android.content.IntentFilter(Intent.ACTION_SCREEN_ON))
+        } catch (e: Exception) {
+        }
+        h.removeCallbacks(smartCheck)
+        h.postDelayed(smartCheck, 60_000L)
     }
 
     override fun onUnbind(intent: Intent?): Boolean {
         if (instance === this) instance = null
+        h.removeCallbacks(smartCheck)
+        try {
+            unregisterReceiver(screenOn)
+        } catch (e: Exception) {
+        }
         return super.onUnbind(intent)
+    }
+
+    /** Remapeo de botones: ve las teclas de todas las apps. Solo consume las que tienen accion. */
+    override fun onKeyEvent(event: android.view.KeyEvent): Boolean {
+        Remap.lastKeyMs = android.os.SystemClock.elapsedRealtime()
+        val code = event.keyCode
+        if (Remap.blocked(code)) return false
+        val down = event.action == android.view.KeyEvent.ACTION_DOWN && event.repeatCount == 0
+        val lr = Remap.learn
+        if (lr != null) {
+            if (down) h.post { lr(code) }
+            return true
+        }
+        val v = Remap.map[code] ?: return false
+        if (down) Remap.run(this, this, v)
+        return true
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {}

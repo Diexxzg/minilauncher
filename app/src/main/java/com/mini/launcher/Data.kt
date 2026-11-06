@@ -29,10 +29,16 @@ object AppCache {
 
 class Prefs(ctx: Context) {
     private val sp = ctx.getSharedPreferences("home", Context.MODE_PRIVATE)
-    fun favs(): List<String> =
-        (sp.getString("favs", "") ?: "").split(",").filter { it.isNotEmpty() }
+    // Dock por franja horaria (opcional): cada franja guarda su propia lista.
+    private fun favsKey(): String =
+        if (sp.getInt("dSlots", 0) == 1) "favs" + Daily.dayPart() else "favs"
+    fun favs(): List<String> {
+        val k = favsKey()
+        val v = if (sp.contains(k)) sp.getString(k, "") else sp.getString("favs", "")
+        return (v ?: "").split(",").filter { it.isNotEmpty() }
+    }
     fun saveFavs(l: List<String>) {
-        sp.edit().putString("favs", l.joinToString(",")).apply()
+        sp.edit().putString(favsKey(), l.joinToString(",")).apply()
     }
     fun hidden(): Set<String> = (sp.getStringSet("hidden", emptySet()) ?: emptySet()).toSet()
     fun saveHidden(s: Set<String>) {

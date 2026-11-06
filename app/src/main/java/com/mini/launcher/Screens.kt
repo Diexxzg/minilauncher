@@ -21,6 +21,13 @@ import androidx.compose.foundation.lazy.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items as gridItems
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
+import androidx.compose.runtime.produceState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
@@ -443,8 +450,51 @@ fun AllApps(
         }
     }
     val firstPkg = remember { list.firstOrNull()?.pkg }
+    val actx = LocalContext.current
+    // Paleta de comandos: «timer 10», «alarma 7:00», «15 usd a eur», «12*3+4».
+    val cmd by produceState<Daily.Cmd?>(null, query) {
+        value = null
+        if (query.isNotBlank()) {
+            delay(350)
+            value = withContext(Dispatchers.IO) { Daily.command(actx, query) }
+        }
+    }
+    // Salto por letra: rojo = letra anterior, verde = siguiente (solo en orden A-Z y sin busqueda).
+    val gridState = rememberLazyGridState()
+    val jumpFr = remember { FocusRequester() }
+    var jumpPkg by remember { mutableStateOf<String?>(null) }
+    var jumpTick by remember { mutableIntStateOf(0) }
+    var letter by remember { mutableStateOf("") }
+    val letters = remember(list) { list.map { it.label.firstOrNull()?.uppercaseChar()?.toString() ?: "#" }.distinct() }
+    LaunchedEffect(jumpTick) {
+        val pk = jumpPkg ?: return@LaunchedEffect
+        val i = list.indexOfFirst { it.pkg == pk }
+        if (i >= 0) {
+            gridState.scrollToItem(i)
+            delay(80)
+            runCatching { jumpFr.requestFocus() }
+        }
+    }
+    fun jump(dir: Int) {
+        if (letters.size < 2) return
+        val cur = letters.indexOf(letter).let { if (it < 0) (if (dir > 0) -1 else letters.size) else it }
+        val n = (cur + dir).coerceIn(0, letters.lastIndex)
+        letter = letters[n]
+        jumpPkg = list.firstOrNull { (it.label.firstOrNull()?.uppercaseChar()?.toString() ?: "#") == letter }?.pkg
+        jumpTick++
+    }
     Column(
-        Modifier.fillMaxSize().padding(48.dp),
+        Modifier.fillMaxSize().padding(48.dp)
+            .onPreviewKeyEvent { e ->
+                if (sort == 0 && query.isEmpty() && e.type == KeyEventType.KeyDown &&
+                    (e.key == Key(183) || e.key == Key(184))
+                ) {
+                    jump(if (e.key == Key(184)) 1 else -1)
+                    true
+                } else {
+                    false
+                }
+            },
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -453,7 +503,11 @@ fun AllApps(
                 list.size.toString() + (if (list.size == 1) " app" else " apps"),
                 color = Color(0x99FFFFFF), fontSize = 16.sp, modifier = Modifier.padding(bottom = 3.dp)
             )
+            if (letter.isNotEmpty() && query.isEmpty()) {
+                Text("· " + letter + "   (rojo ◀ ▶ verde)", color = Color(0xB3FFFFFF), fontSize = 16.sp, modifier = Modifier.padding(bottom = 3.dp))
+            }
         }
+        cmd?.let { c -> CatChip(c.text, true) { c.run() } }
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(14.dp)
@@ -521,6 +575,7 @@ fun AllApps(
         }
         LazyVerticalGrid(
             columns = GridCells.Adaptive(168.dp),
+            state = gridState,
             horizontalArrangement = Arrangement.spacedBy(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
             contentPadding = PaddingValues(8.dp)
@@ -530,7 +585,8 @@ fun AllApps(
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     AppTile(
                         app,
-                        if (!focusSearch && query.isEmpty() && app.pkg == firstPkg) Modifier.autoFocus() else Modifier,
+                        (if (!focusSearch && query.isEmpty() && app.pkg == firstPkg && jumpPkg == null) Modifier.autoFocus() else Modifier)
+                            .then(if (app.pkg == jumpPkg) Modifier.focusRequester(jumpFr) else Modifier),
                         useSize = false,
                         onLongClick = { onMenu(app) },
                         onFocusChange = { foc = it },

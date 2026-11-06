@@ -13,7 +13,8 @@ val ROW_NAMES = listOf(
 /** Acciones de los botones de color (indice = codigo guardado). */
 val COLOR_ACTIONS = listOf(
     "Ninguno", "Todas las apps", "Ajustes", "Entradas", "Búsqueda",
-    "Menú de energía", "Editar apps", "Modo ambiente", "Pantalla negra", "Escena de cine", "Siguiente perfil"
+    "Menú de energía", "Editar apps", "Modo ambiente", "Pantalla negra", "Escena de cine", "Siguiente perfil",
+    "Intermedio de cine", "Limpiar RAM"
 )
 
 /** Ajustes de inicio, fondo y musica (se guardan en Prefs). */
@@ -104,10 +105,10 @@ class Cfg(private val p: Prefs) {
     private var _kids by mutableStateOf(p.getInt("kids", 0) == 1)
     private var _bootEnabled by mutableStateOf(p.getInt("bootEnabled", 0) == 1)
     private var _wizardDone by mutableStateOf(p.getInt("wizardDone", 0) == 1)
-    private var _keyRed by mutableStateOf(p.getInt("keyRed", 1).coerceIn(0, 8))
-    private var _keyGreen by mutableStateOf(p.getInt("keyGreen", 2).coerceIn(0, 8))
-    private var _keyYellow by mutableStateOf(p.getInt("keyYellow", 4).coerceIn(0, 8))
-    private var _keyBlue by mutableStateOf(p.getInt("keyBlue", 3).coerceIn(0, 8))
+    private var _keyRed by mutableStateOf(p.getInt("keyRed", 1).coerceIn(0, COLOR_ACTIONS.lastIndex))
+    private var _keyGreen by mutableStateOf(p.getInt("keyGreen", 2).coerceIn(0, COLOR_ACTIONS.lastIndex))
+    private var _keyYellow by mutableStateOf(p.getInt("keyYellow", 4).coerceIn(0, COLOR_ACTIONS.lastIndex))
+    private var _keyBlue by mutableStateOf(p.getInt("keyBlue", 3).coerceIn(0, COLOR_ACTIONS.lastIndex))
     private var _wallShowMins by mutableStateOf(p.getInt("wallShowMins", 5).coerceIn(1, 120))
     private var _accentCustom by mutableStateOf(p.getInt("accentCustom", 0))
     private var _sleepAction by mutableStateOf(p.getInt("sleepAction", 0).coerceIn(0, 1))
@@ -600,22 +601,22 @@ class Cfg(private val p: Prefs) {
     }
 
     fun setKeyRed(v: Int) {
-        _keyRed = v.coerceIn(0, 8)
+        _keyRed = v.coerceIn(0, COLOR_ACTIONS.lastIndex)
         p.putInt("keyRed", _keyRed)
     }
 
     fun setKeyGreen(v: Int) {
-        _keyGreen = v.coerceIn(0, 8)
+        _keyGreen = v.coerceIn(0, COLOR_ACTIONS.lastIndex)
         p.putInt("keyGreen", _keyGreen)
     }
 
     fun setKeyYellow(v: Int) {
-        _keyYellow = v.coerceIn(0, 8)
+        _keyYellow = v.coerceIn(0, COLOR_ACTIONS.lastIndex)
         p.putInt("keyYellow", _keyYellow)
     }
 
     fun setKeyBlue(v: Int) {
-        _keyBlue = v.coerceIn(0, 8)
+        _keyBlue = v.coerceIn(0, COLOR_ACTIONS.lastIndex)
         p.putInt("keyBlue", _keyBlue)
     }
 

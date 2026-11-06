@@ -181,8 +181,19 @@ class MainActivity : ComponentActivity() {
             addDataScheme("package")
         }
         ContextCompat.registerReceiver(this, pkgReceiver, f, ContextCompat.RECEIVER_EXPORTED)
-        addOnNewIntentListener { homeTick++ }
+        Remap.load(this)
+        addOnNewIntentListener { i ->
+            Daily.homeFromApp = appPaused
+            homeTick++
+            if (i.getIntExtra("dAct", 0) == 0) Daily.doubleHome(this) else route(i)
+        }
+        if (savedInstanceState == null) route(intent)
         setContent { HomeRoot(tick, homeTick, resumeTick, appPaused, addedPkg) { addedPkg = "" } }
+    }
+
+    private fun route(i: Intent?) {
+        val a = i?.getIntExtra("dAct", 0) ?: 0
+        if (a == 98) Daily.ring(this, i?.getStringExtra("dMsg") ?: "") else if (a != 0) ActBus.post(a)
     }
 
     override fun onResume() {
@@ -225,6 +236,7 @@ fun HomeRoot(
     var apps by remember { mutableStateOf(applyOverrides(ctx, prefs, AppCache.apps)) }
     var ovTick by remember { mutableIntStateOf(0) }
     var favs by remember { mutableStateOf(prefs.favs()) }
+    var habitTick by remember { mutableIntStateOf(0) }
     var hidden by remember { mutableStateOf(prefs.hidden()) }
     var walls by remember { mutableStateOf<List<File>>(emptyList()) }
     var wallName by remember { mutableStateOf(prefs.wallpaper) }
@@ -372,10 +384,29 @@ fun HomeRoot(
         showQuick = false
         showSaverHint = false
         openFolder = null
-        if (homeTick > 0) {
+        if (homeTick > 0 && !(Daily.homeFromApp && Daily.on(ctx, "dKeepPos"))) {
             lastDockPkg = null
             dockState.animateScrollToItem(0)
             focusTick++
+        }
+    }
+    // Dock por franja horaria: al cambiar de franja se recarga el dock.
+    LaunchedEffect(Unit) {
+        var part = Daily.dayPart()
+        while (true) {
+            delay(60_000)
+            if (Daily.dayPart() != part) {
+                part = Daily.dayPart()
+                favs = prefs.favs()
+                habitTick++
+            }
+        }
+    }
+    LaunchedEffect(screen) {
+        if (screen == "home") {
+            favs = prefs.favs()
+            groupMap = prefs.groups()
+            habitTick++
         }
     }
 
@@ -455,6 +486,7 @@ fun HomeRoot(
         val srv = PhoneServer(
             ctx.applicationContext, prefs,
             onText = { t ->
+                Daily.pushClip(ctx, t)
                 ui.post {
                     extQuery = t
                     if (screen == "home" || screen == "all") {
@@ -752,12 +784,12 @@ fun HomeRoot(
     val inFolders = remember(groupMap, folderNames) {
         folderNames.flatMap { groupMap[it] ?: emptyList() }.toSet()
     }
-    val dock = remember(visible, favs, cfg.kids, inFolders) {
+    val dock = remember(visible, favs, cfg.kids, inFolders, habitTick) {
         if (cfg.kids) {
             visible
         } else {
             val byPkg = visible.associateBy { it.pkg }
-            favs.filter { it !in inFolders }.mapNotNull { byPkg[it] }
+            Daily.habitSort(ctx, favs.filter { it !in inFolders }).mapNotNull { byPkg[it] }
         }
     }
     val groupList = remember(groupMap, folderNames, visible, cfg.kids) {
@@ -805,17 +837,34 @@ fun HomeRoot(
     remember { Perf.load(ctx); 0 }
     var home1Open by remember { mutableStateOf(Home1.firstRunPending(ctx)) }
     if (home1Open) HomeDialog({ home1Open = false }) { requestHome(ctx) { homeLauncher.launch(it) } }
+    if (bootAsk && !home1Open) BootDialog { bootAsk = false }
+    if (showStill) StillThereDialog { timeout ->
+        showStill = false
+        if (timeout) systemPower(ctx, 2) else Daily.resumeMedia(ctx, prefs.recents().firstOrNull() ?: "")
+    }
+    if (showInter.isNotEmpty()) CountdownDialog("Intermedio", 600, "Pulsa cualquier botón para reanudar") {
+        Daily.resumeMedia(ctx, if (showInter == "-") "" else showInter)
+        showInter = ""
+    }
 
+    val trigRef = remember { arrayOf<(Int) -> Unit>({}) }
+    var bootAsk by remember { mutableStateOf(Daily.bootPending(ctx)) }
+    var showStill by remember { mutableStateOf(false) }
+    var showInter by remember { mutableStateOf("") }
     fun openApp(a: AppInfo) {
         recents = prefs.pushRecent(a.pkg)
         usage = prefs.bumpUsage(a.pkg)
         Perf.noteLaunch(a.pkg)
         prefs.bumpDay(a.pkg)
+        Daily.noteOpen(ctx, a.pkg)
+        Daily.applyVolume(ctx, a.pkg)
+        trigRef[0](Daily.trigFor(ctx, a.pkg))
+        habitTick++
         lastUsed = prefs.markUsed(a.pkg)
         seen = prefs.markSeen(a.pkg)
         val b = TileBounds.last
         TileBounds.last = null
-        startNow(a, b)
+        startNow(Daily.deep(ctx, a), b)
     }
         // Carpetas (17): una app esta en una sola carpeta a la vez.
     fun toggleFolder(p: String, i: Int) {
@@ -1022,7 +1071,28 @@ fun HomeRoot(
                 toast(ctx, "Perfil " + (next + 1))
                 switchFamily(ctx, next)
             }
+            11 -> {
+                val pk = Daily.pauseMedia(ctx)
+                showInter = pk.ifEmpty { prefs.recents().firstOrNull() ?: "-" }
+            }
+            12 -> {
+                Perf.cleanAsync(ctx)
+            }
         }
+    }
+    trigRef[0] = { c ->
+        when (c) {
+            1 -> if (prefs.getInt("sceneOn", 0) != 1) runScene()
+            2 -> Perf.cleanAsync(ctx, true)
+            3 -> cfg.setSaver(true)
+        }
+    }
+    // Acciones pedidas desde fuera (remapeo, apagado inteligente).
+    LaunchedEffect(ActBus.n) {
+        val a = ActBus.act
+        if (a == 0) return@LaunchedEffect
+        ActBus.act = 0
+        if (a == 99) showStill = true else runColorAction(a)
     }
 
     val uiScale = cfg.uiScale / 100f
@@ -1102,6 +1172,24 @@ fun HomeRoot(
                     if (act != null) {
                         if (act != 0) runColorAction(act)
                         return@onPreviewKeyEvent act != 0
+                    }
+                }
+                // Remapeo de botones cuando la accesibilidad no esta activa (solo dentro del launcher).
+                if (it.type == KeyEventType.KeyDown && it.nativeKeyEvent.repeatCount == 0 &&
+                    Remap.learn == null && PowerService.instance == null && screen != "settings" &&
+                    !Remap.blocked(it.nativeKeyEvent.keyCode)
+                ) {
+                    val rv = Remap.map[it.nativeKeyEvent.keyCode]
+                    if (rv != null) {
+                        if (rv.startsWith("p:")) {
+                            AppCache.apps.firstOrNull { a -> a.pkg == rv.substring(2) }?.let { a -> openApp(a) }
+                            return@onPreviewKeyEvent true
+                        }
+                        val rn = rv.removePrefix("a:").toIntOrNull() ?: 0
+                        if (rn in 1..12) {
+                            runColorAction(rn)
+                            return@onPreviewKeyEvent true
+                        }
                     }
                 }
                 // Arriba con la barra oculta: la muestra (la tecla sigue su camino normal).
@@ -1448,6 +1536,7 @@ fun HomeRoot(
                                     items = inputs,
                                     onPick = {
                                         openInput(ctx, it)
+                                        trigRef[0](prefs.getInt("dTrigHdmi", 0))
                                         screen = "home"
                                     },
                                     onClose = { screen = "home" },
