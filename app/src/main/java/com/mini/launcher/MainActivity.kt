@@ -837,6 +837,10 @@ fun HomeRoot(
     remember { Perf.load(ctx); 0 }
     var home1Open by remember { mutableStateOf(Home1.firstRunPending(ctx)) }
     if (home1Open) HomeDialog({ home1Open = false }) { requestHome(ctx) { homeLauncher.launch(it) } }
+    val trigRef = remember { arrayOf<(Int) -> Unit>({}) }
+    var bootAsk by remember { mutableStateOf(Daily.bootPending(ctx)) }
+    var showStill by remember { mutableStateOf(false) }
+    var showInter by remember { mutableStateOf("") }
     if (bootAsk && !home1Open) BootDialog { bootAsk = false }
     if (showStill) StillThereDialog { timeout ->
         showStill = false
@@ -847,10 +851,6 @@ fun HomeRoot(
         showInter = ""
     }
 
-    val trigRef = remember { arrayOf<(Int) -> Unit>({}) }
-    var bootAsk by remember { mutableStateOf(Daily.bootPending(ctx)) }
-    var showStill by remember { mutableStateOf(false) }
-    var showInter by remember { mutableStateOf("") }
     fun openApp(a: AppInfo) {
         recents = prefs.pushRecent(a.pkg)
         usage = prefs.bumpUsage(a.pkg)
