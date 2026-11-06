@@ -1,5 +1,11 @@
 # Novedades
 
+## 4.17
+- Nuevo «Remapear botones del mando» (Sistema): elige cualquier botón y asígnale una acción o una app; funciona en cualquier app con la accesibilidad activa.
+- «Uso diario»: doble Inicio vuelve a la última app, dock por franja horaria, hábitos, tarjeta del día y perfil al encender, y apagado inteligente («¿sigues ahí?»).
+- Volumen y atajo profundo por app, disparadores al abrir una app o entrada, carpetas por categoría y portapapeles del celular.
+- Búsqueda con comandos («timer 10», «alarma 7:00», «15 usd a eur», cuentas) y salto por letra con rojo/verde. Nuevo «Intermedio de cine».
+
 ## 4.16
 - Nuevo «Rendimiento» (Configuración y Panel rápido): salud de la TV con semáforo y botón de arreglo, prueba de red, mapa de almacenamiento, apps lentas y apps zombi.
 - Botón «Limpiar RAM» en el Panel rápido y limpieza automática cada noche (opcional).
