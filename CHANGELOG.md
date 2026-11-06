@@ -1,5 +1,11 @@
 # Novedades
 
+## 4.16
+- Nuevo «Rendimiento» (Configuración y Panel rápido): salud de la TV con semáforo y botón de arreglo, prueba de red, mapa de almacenamiento, apps lentas y apps zombi.
+- Botón «Limpiar RAM» en el Panel rápido y limpieza automática cada noche (opcional).
+- Fluidez máxima automática y modo ahorro automático con poca RAM (opcionales); pre-calentado de una app a su hora.
+- Arranque y desplazamiento más fluidos con un perfil de arranque (Baseline Profile).
+
 ## 4.15
 - Nuevo diálogo «Inicio» (Sistema y primer arranque): guarda tu Home anterior y permite restaurarlo.
 - Prueba temporal de 1 h o 24 h: si no confirmas o falla 3 veces, te lleva de vuelta al Home anterior.
