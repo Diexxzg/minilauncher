@@ -1,5 +1,9 @@
 # Novedades
 
+## 4.41
+- Familia y control (Configuración › Sistema): tiempo por app y bloqueo por horario para el perfil Niños, con «Pedir más tiempo» por PIN.
+- Apps que piden PIN al abrir, aprobación de apps nuevas para Niños y registro de actividad.
+
 ## 4.40
 - Tema y fondo con el color de la carátula de lo que suena, temas por fechas especiales (Halloween, Navidad, Año nuevo, San Valentín) y hasta 5 cuentas regresivas.
 - Noche: baja el volumen poco a poco, despertador con rampa de brillo y volumen, filtro de luz cálida y tarjeta de hora y clima sobre otras apps (necesitan el permiso de Superposición).
