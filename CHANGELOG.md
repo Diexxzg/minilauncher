@@ -1,5 +1,9 @@
 # Novedades
 
+## 4.33
+- Configuración más pequeña, con la barra lateral como tarjeta de contorno luminoso (categoría activa en pastilla con brillo) y el botón de actualizar fijo abajo.
+- El foco ya no puede salir de Configuración hacia el dock. Izquierda o Atrás desde las opciones vuelven a las categorías; Atrás otra vez cierra.
+
 ## 4.32
 - Configuración: ventana oscura casi opaca, barra superior con versión y hora, categoría activa como pastilla de color y botón fijo «Buscar actualizaciones» en la barra lateral.
 - Al abrir Configuración el foco ya no se queda en el dock.
