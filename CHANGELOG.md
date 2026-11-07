@@ -1,5 +1,8 @@
 # Novedades
 
+## 4.28
+- Nueva opción «Botón Inicio abre One Piece» en Uso diario: el botón Inicio del mando abre tu launcher (necesita «One Piece - energía» activo).
+
 ## 4.26
 - La actualización desde el launcher ahora se instala por sesión de Android, para que la accesibilidad no se apague al actualizar.
 
