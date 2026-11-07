@@ -10,6 +10,18 @@ import android.content.Intent
  */
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(c: Context, i: Intent) {
+        if (i.action == Intent.ACTION_MY_PACKAGE_REPLACED) {
+            // Tras instalar una version nueva: espera unos segundos y reactiva la accesibilidad si quedo apagada.
+            val pr = goAsync()
+            android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                try {
+                    Home1.ensureAccess(c)
+                } finally {
+                    pr.finish()
+                }
+            }, 6000L)
+            return
+        }
         if (i.action != Intent.ACTION_BOOT_COMPLETED) return
         val p = Prefs(c)
         if (p.getInt("bootEnabled", 0) == 1 && p.getStr("bootApp", "").isNotEmpty()) {
