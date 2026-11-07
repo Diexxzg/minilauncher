@@ -1,5 +1,12 @@
 # Novedades
 
+## 4.38
+- Casa y avisos (Configuración › Sistema): recordatorios en pantalla (OK = hecho, Derecha = en 10 min), Ambilight casero hacia un WLED y cámara IP en una esquina.
+- Panel rápido: hasta 4 atajos que llaman a una web, encienden un equipo o abren la cámara.
+
+## 4.37
+- Los botones de color del control ahora pueden llamar a una dirección web o encender un equipo (Wake-on-LAN): Configuración › Sistema › Botones de color.
+
 ## 4.36
 - Nueva sección «Efectos visuales» en Configuración › Pantalla y energía: desenfoque del fondo, brillos y resplandor, y animaciones de ventanas.
 - Todo viene apagado (más fluidez) y se aplica al momento. «Efectos recomendados» lo deja todo apagado.
