@@ -1,5 +1,9 @@
 # Novedades
 
+## 4.40
+- Tema y fondo con el color de la carátula de lo que suena, temas por fechas especiales (Halloween, Navidad, Año nuevo, San Valentín) y hasta 5 cuentas regresivas.
+- Noche: baja el volumen poco a poco, despertador con rampa de brillo y volumen, filtro de luz cálida y tarjeta de hora y clima sobre otras apps (necesitan el permiso de Superposición).
+
 ## 4.39
 - Modo ambiente: marco de fotos desde una carpeta, hora atenuada al llegar una notificación, fondo vivo según la hora, movimiento anti-quemado más amplio y opción de pantalla negra.
 - Margen de seguridad guiado con vista previa (Pantalla).
