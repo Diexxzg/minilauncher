@@ -1,5 +1,11 @@
 # Novedades
 
+## 4.29
+- Modo seguro: si el launcher se cierra 3 veces seguidas al abrir, arranca con ajustes mínimos y avisa (guarda tu copia).
+- Copia automática semanal opcional en Acerca de, con restauración.
+- Código QR de ayuda para reportar un problema con tus datos ya escritos.
+- Herramientas de técnico: test de pantalla, de sonido y del mando.
+
 ## 4.28
 - Nueva opción «Botón Inicio abre One Piece» en Uso diario: el botón Inicio del mando abre tu launcher (necesita «One Piece - energía» activo).
 
