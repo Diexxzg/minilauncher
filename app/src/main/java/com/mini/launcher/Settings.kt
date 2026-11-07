@@ -1274,6 +1274,30 @@ fun SettingsScreen(
         add(SItem(ABOUT, "Visor de errores", "Uso y diagnóstico") { m ->
             DialogRow("Visor de errores", m) { close -> ErrorsDialog(close) }
         })
+        add(SItem(ABOUT, "Ayuda y reporte (QR)", "Uso y diagnóstico") { m ->
+            DialogRow("Ayuda y reporte (código QR)", m) { close -> HelpQrDialog(close) }
+        })
+        add(SItem(ABOUT, "Test de pantalla", "Uso y diagnóstico") { m ->
+            DialogRow("Test de pantalla", m) { close -> ScreenTestDialog(close) }
+        })
+        add(SItem(ABOUT, "Test de sonido", "Uso y diagnóstico") { m ->
+            DialogRow("Test de sonido", m) { close -> SoundTestDialog(close) }
+        })
+        add(SItem(ABOUT, "Test del mando", "Uso y diagnóstico") { m ->
+            DialogRow("Test del mando", m) { close -> RemoteTestDialog(close) }
+        })
+        add(SItem(ABOUT, "Copia automática semanal", "Copias de seguridad") { m ->
+            val c2 = LocalContext.current
+            var on by remember { mutableStateOf(AutoBackup.enabled(c2)) }
+            SwitchRow("Copia automática semanal", on, m) {
+                on = it
+                AutoBackup.setEnabled(c2, it)
+                if (it) AutoBackup.runIfDue(c2)
+            }
+        })
+        add(SItem(ABOUT, "Restaurar copia automática", "Copias de seguridad") { m ->
+            DialogRow("Restaurar copia automática", m) { close -> AutoRestoreDialog(close) }
+        })
         add(SItem(ABOUT, "Guardar copia de seguridad", "Copias de seguridad") { m ->
             ActionRow("Guardar copia de seguridad", m) { onBackup() }
         })

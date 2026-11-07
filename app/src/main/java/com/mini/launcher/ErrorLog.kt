@@ -18,6 +18,7 @@ class OnePieceApp : Application() {
         super.onCreate()
         instance = this
         ErrorLog.install(this)
+        Safe.check(this)
         val p = Prefs(this)
         WeatherOpts.forecast = p.getInt("forecast", 0)
         WeatherOpts.autoLoc = p.getInt("autoLoc", 0)
@@ -44,7 +45,7 @@ object ErrorLog {
         Thread.setDefaultUncaughtExceptionHandler { t, e ->
             try {
                 add("Cierre inesperado en " + t.name, e)
-                OnePieceApp.instance?.let { Home1.noteCrash(it) }
+                OnePieceApp.instance?.let { Home1.noteCrash(it); Safe.onCrash(it) }
             } catch (x: Throwable) {
             }
             prev?.uncaughtException(t, e)

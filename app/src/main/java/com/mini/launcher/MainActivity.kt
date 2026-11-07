@@ -174,6 +174,9 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         runBootApp(this)
         Home1.checkTrial(this)
+        Safe.armReset(this)
+        AutoBackup.runIfDue(this)
+        if (Safe.takeNotice(this)) toast(this, "Modo seguro: el launcher falló 3 veces al abrir y volvió a ajustes mínimos. Tu copia está en Acerca de › Restaurar copia automática.")
         val f = IntentFilter().apply {
             addAction(Intent.ACTION_PACKAGE_ADDED)
             addAction(Intent.ACTION_PACKAGE_REMOVED)
