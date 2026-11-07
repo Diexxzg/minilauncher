@@ -1,5 +1,9 @@
 # Novedades
 
+## 4.42
+- Hogar y utilidades (Configuración › Sistema): tarjeta de visitas con el QR del Wi-Fi y lista de compras que también se maneja desde el celular.
+- Ruido para dormir (lluvia, marrón o blanco) con temporizador y modo fácil con tres botones enormes.
+
 ## 4.41
 - Familia y control (Configuración › Sistema): tiempo por app y bloqueo por horario para el perfil Niños, con «Pedir más tiempo» por PIN.
 - Apps que piden PIN al abrir, aprobación de apps nuevas para Niños y registro de actividad.
