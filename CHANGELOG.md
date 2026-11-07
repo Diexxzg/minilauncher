@@ -1,5 +1,9 @@
 # Novedades
 
+## 4.30
+- Configuración rediseñada: paneles de cristal con resplandor del acento, interruptores y deslizadores con brillo, selector de tema con círculos de color.
+- La página del celular (subir fondo, texto, copias) tiene un diseño nuevo, oscuro y con tarjetas.
+
 ## 4.29
 - Modo seguro: si el launcher se cierra 3 veces seguidas al abrir, arranca con ajustes mínimos y avisa (guarda tu copia).
 - Copia automática semanal opcional en Acerca de, con restauración.
