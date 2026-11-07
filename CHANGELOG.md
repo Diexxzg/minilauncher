@@ -1,5 +1,8 @@
 # Novedades
 
+## 4.31
+- Configuración ahora es una ventana horizontal centrada: categorías a la izquierda (con nombre) y opciones a la derecha. Derecha entra a las opciones, izquierda vuelve a las categorías.
+
 ## 4.30
 - Configuración rediseñada: paneles de cristal con resplandor del acento, interruptores y deslizadores con brillo, selector de tema con círculos de color.
 - La página del celular (subir fondo, texto, copias) tiene un diseño nuevo, oscuro y con tarjetas.
