@@ -362,7 +362,7 @@ fun HomeRoot(
 
     // Limpia un APK viejo y, al volver del permiso de instalar, sigue con la instalacion.
     LaunchedEffect(Unit) { withContext(Dispatchers.IO) { upd.cleanOld() } }
-    LaunchedEffect(resumeTick) { upd.onResume() }
+    LaunchedEffect(resumeTick) { upd.onResume(); Fam.returned(cfg) }
 
     // Aviso diario: una consulta al dia, unos segundos despues de abrir el inicio. Si en ese
     // momento hay un panel o menu abierto no se muestra nada (queda para "Buscar actualizaciones").
@@ -544,6 +544,7 @@ fun HomeRoot(
     LaunchedEffect(addedPkg, apps) {
         if (addedPkg.isEmpty()) return@LaunchedEffect
         val a = apps.firstOrNull { it.pkg == addedPkg } ?: return@LaunchedEffect
+        if (cfg.ex("famApprove") == "1" && a.pkg !in kidsSet) Fam.addPending(cfg, a.pkg)
         if (cfg.newAppAlert && !cfg.kids && a.pkg !in favs) newAppAsk = a
         onAddedHandled()
     }
@@ -857,7 +858,11 @@ fun HomeRoot(
         showInter = ""
     }
 
-    fun openApp(a: AppInfo) {
+    var famBlock by remember { mutableStateOf<Pair<FamBlock, AppInfo>?>(null) }
+    val askRef = remember { arrayOfNulls<(() -> Unit) -> Unit>(1) }
+
+    fun openAppNow(a: AppInfo) {
+        Fam.opened(cfg, a.pkg)
         recents = prefs.pushRecent(a.pkg)
         usage = prefs.bumpUsage(a.pkg)
         Perf.noteLaunch(a.pkg)
@@ -872,6 +877,17 @@ fun HomeRoot(
         TileBounds.last = null
         startNow(Daily.deep(ctx, a), b)
     }
+
+    fun openApp(a: AppInfo) {
+        val fb = Fam.blockFor(cfg, a.pkg, a.label)
+        if (fb != null) { famBlock = fb to a; return }
+        if (a.pkg in Fam.locked(cfg) && cfg.pinSet) {
+            askRef[0]?.invoke { openAppNow(a) }
+            return
+        }
+        openAppNow(a)
+    }
+
         // Carpetas (17): una app esta en una sola carpeta a la vez.
     fun toggleFolder(p: String, i: Int) {
         val n = folderNames.getOrNull(i) ?: return
@@ -952,6 +968,7 @@ fun HomeRoot(
             }
         }
     }
+    askRef[0] = { t -> askVerify(t) }
         fun guarded(on: Boolean, then: () -> Unit) {
         if (on && cfg.pinSet) askVerify(then) else then()
         }
@@ -1687,6 +1704,12 @@ fun HomeRoot(
                                 moreBack++
                             }
                         )
+                    }
+                    famBlock?.let { fbp ->
+                        FamBlockDialog(fbp.first, cfg.pinSet, {
+                            famBlock = null
+                            askVerify { Fam.grant(cfg, fbp.first); openAppNow(fbp.second) }
+                        }, { famBlock = null })
                     }
                     HomeOverlays(cfg, m, screen == "home", { if (screen == "ambient" || screen == "black") screen = "home" })
                     if (showQuick) {

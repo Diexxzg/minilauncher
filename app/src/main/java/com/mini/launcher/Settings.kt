@@ -1351,6 +1351,39 @@ fun SettingsScreen(
                 }
             })
         }
+        add(SItem(6, "Tiempo por app", "Familia y control") { m ->
+            SwitchRow("Tiempo por app (perfil Niños)", cfg.ex("famTime") == "1", m) { cfg.setEx("famTime", if (it) "1" else "0") }
+        })
+        add(SItem(6, "Apps con límite", "Familia y control") { m ->
+            DialogRow("Elegir apps con límite de tiempo…", m) { close -> FamLimitsDialog(cfg, close) }
+        })
+        add(SItem(6, "Bloqueo por horario", "Familia y control") { m ->
+            SwitchRow("Bloqueo por horario (perfil Niños)", cfg.ex("famSched") == "1", m) { cfg.setEx("famSched", if (it) "1" else "0") }
+        })
+        add(SItem(6, "Horario del bloqueo", "Familia y control") { m ->
+            DialogRow("Horario del bloqueo: " + cfg.ex("famRange", "21:00-07:00"), m) { close ->
+                TextEditDialog("Horario del bloqueo", cfg.ex("famRange", "21:00-07:00"), "Formato 24 h: 21:00-07:00", 11, { t ->
+                    val v = Fam.validRange(t)
+                    if (v == null) toast(ctx, "Horario no válido.") else cfg.setEx("famRange", v)
+                    close()
+                }, close)
+            }
+        })
+        add(SItem(6, "Apps con PIN", "Familia y control") { m ->
+            DialogRow("Apps que piden PIN al abrir…", m) { close -> FamLockDialog(cfg, close) }
+        })
+        add(SItem(6, "Aprobar instalaciones", "Familia y control") { m ->
+            SwitchRow("Aprobar instalaciones nuevas (quedan ocultas a Niños)", cfg.ex("famApprove") == "1", m) { cfg.setEx("famApprove", if (it) "1" else "0") }
+        })
+        add(SItem(6, "Apps pendientes", "Familia y control") { m ->
+            DialogRow("Apps pendientes de aprobar (" + Fam.pending(cfg).size + ")", m) { close -> FamPendingDialog(cfg, close) }
+        })
+        add(SItem(6, "Registro de actividad", "Familia y control") { m ->
+            SwitchRow("Registro de actividad del perfil Niños", cfg.ex("famLog") == "1", m) { cfg.setEx("famLog", if (it) "1" else "0") }
+        })
+        add(SItem(6, "Ver registro", "Familia y control") { m ->
+            DialogRow("Ver registro de actividad", m) { close -> FamLogDialog(cfg, close) }
+        })
         add(SItem(6, "Remapear botones del mando", "Mando y uso diario") { m ->
             DialogRow("Remapear cualquier botón del mando", m) { close -> RemapDialog(close) }
         })
