@@ -534,19 +534,20 @@ private fun RailItem(
     Row(
         modifier
             .fillMaxWidth()
-            .clip(shape)
-            .background(
-                when {
-                    focused -> Color(0x2BFFFFFF)
-                    selected -> ACC.copy(alpha = 0.22f)
-                    else -> Color.Transparent
+            .drawBehind {
+                if (selected) {
+                    for (i in 1..3) {
+                        val g = i * 3.dp.toPx()
+                        drawRoundRect(
+                            ACC.copy(alpha = 0.07f), topLeft = Offset(-g, -g),
+                            size = Size(size.width + 2 * g, size.height + 2 * g), cornerRadius = CornerRadius(12.dp.toPx() + g)
+                        )
+                    }
                 }
-            )
-            .then(
-                if (focused) Modifier.border(1.5.dp, ACC.copy(alpha = 0.9f), shape)
-                else if (selected) Modifier.border(1.dp, ACC.copy(alpha = 0.5f), shape)
-                else Modifier
-            )
+            }
+            .clip(shape)
+            .background(if (selected) ACCENT else SolidColor(if (focused) Color(0x26FFFFFF) else Color.Transparent))
+            .then(if (focused) Modifier.border(1.5.dp, if (selected) Color.White else ACC, shape) else Modifier)
             .onFocusChanged {
                 focused = it.isFocused
                 if (it.isFocused) onFocus()
@@ -569,15 +570,15 @@ private fun RailItem(
             Modifier
                 .size(30.dp)
                 .clip(RoundedCornerShape(10.dp))
-                .background(if (focused || selected) ACC.copy(alpha = 0.22f) else Color(0x14FFFFFF)),
+                .background(if (selected) Color(0x26000000) else if (focused) ACC.copy(alpha = 0.22f) else Color(0x14FFFFFF)),
             contentAlignment = Alignment.Center
         ) {
-            LineIcon(icon, if (focused || selected) ACC else TAB_IDLE, 20)
+            LineIcon(icon, if (selected) Color(0xFF0B0B12) else if (focused) ACC else TAB_IDLE, 20)
         }
         Spacer(Modifier.width(12.dp))
         Text(
             name,
-            color = if (focused || selected) Color.White else Color(0xCCFFFFFF),
+            color = if (selected) Color(0xFF0B0B12) else if (focused) Color.White else Color(0xCCFFFFFF),
             fontSize = 17.sp, maxLines = 1, overflow = TextOverflow.Ellipsis
         )
     }
@@ -603,14 +604,15 @@ fun GlassPanelFrame(wide: Boolean = false, compact: Boolean = false, content: @C
     val availH = conf.screenHeightDp.toFloat() / us - 2f * ov
     // Configuración (wide): ventana horizontal centrada. En Fondo y Dock se hace más baja y se sube
     // para que el inicio siga viéndose debajo con los cambios en vivo.
-    val pw = if (wide) (availW * 0.90f).coerceIn(560f, 1180f) else sidePanelWidth(availW, false)
-    val winFrac by animateFloatAsState(if (!wide) 1f else if (compact) 0.60f else 0.90f, tween(300), label = "winH")
+    val pw = if (wide) (availW * 0.95f).coerceIn(560f, 1280f) else sidePanelWidth(availW, false)
+    val winFrac by animateFloatAsState(if (!wide) 1f else if (compact) 0.62f else 0.92f, tween(300), label = "winH")
     val topPad by androidx.compose.animation.core.animateDpAsState(
-        if (!wide) 8.dp else if (compact) 14.dp else (availH * 0.05f).dp, tween(300), label = "winTop"
+        if (!wide) 8.dp else if (compact) 14.dp else (availH * 0.04f).dp, tween(300), label = "winTop"
     )
     val shape = RoundedCornerShape(if (wide) 28.dp else 22.dp)
-    val panelBg = Brush.verticalGradient(listOf(Themes.current.panelTop, Themes.current.panelBottom))
-    val panelBorder = Brush.verticalGradient(listOf(ACC.copy(alpha = 0.55f), Color(0x1AFFFFFF)))
+    val panelBg = if (wide) Brush.verticalGradient(listOf(Color(0xFA10101A), Color(0xFA08080E)))
+    else Brush.verticalGradient(listOf(Themes.current.panelTop, Themes.current.panelBottom))
+    val panelBorder = Brush.verticalGradient(listOf(ACC.copy(alpha = 0.8f), ACC.copy(alpha = 0.25f)))
     Box(Modifier.fillMaxSize()) {
         Box(
             Modifier
@@ -625,10 +627,10 @@ fun GlassPanelFrame(wide: Boolean = false, compact: Boolean = false, content: @C
                 .drawBehind {
                     // Resplandor del acento alrededor de la ventana (capas suaves, sin desenfoque).
                     val cr = if (wide) 28.dp.toPx() else 22.dp.toPx()
-                    for (i in 1..5) {
-                        val g = i * 7.dp.toPx()
+                    for (i in 1..3) {
+                        val g = i * 5.dp.toPx()
                         drawRoundRect(
-                            ACC.copy(alpha = 0.035f),
+                            ACC.copy(alpha = 0.06f),
                             topLeft = Offset(-g, -g),
                             size = Size(size.width + 2 * g, size.height + 2 * g),
                             cornerRadius = CornerRadius(cr + g)
@@ -1457,6 +1459,7 @@ fun SettingsScreen(
     var tabTouched by remember { mutableStateOf(false) }
     val tabFr = remember { List(CATS.size) { FocusRequester() } }
     val firstFr = remember { FocusRequester() }
+    val updFr = remember { FocusRequester() }
     val lastFr = remember { FocusRequester() }
     val hasReset = RESET_KEYS.containsKey(curCat) && curCat != ABOUT
     val enterOptions: () -> Boolean = { runCatching { firstFr.requestFocus() }.isSuccess }
@@ -1469,13 +1472,25 @@ fun SettingsScreen(
     // Arriba desde la primera opcion siempre vuelve a la pestaña de la categoria abierta.
     val upMod = Modifier.focusProperties { up = tabFr[curCat] }
     DisposableEffect(Unit) { onDispose { onRightFocus(false) } }
+    val focusMgr = androidx.compose.ui.platform.LocalFocusManager.current
+    LaunchedEffect(Unit) {
+        // Al abrir Configuración el foco podía quedarse en el dock: se suelta y se entra a la ventana.
+        runCatching { focusMgr.clearFocus(force = true) }
+        delay(450)
+        if (firstFocus) {
+            val ok = runCatching { firstFr.requestFocus() }.isSuccess
+            if (!ok) runCatching { tabFr[curCat].requestFocus() }
+        }
+    }
 
     GlassPanelFrame(wide = true, compact = settingsPreviewCat(curCat)) {
-        Row(
+        Column(
             Modifier
                 .fillMaxSize()
                 .focusProperties { canFocus = !blocked }
         ) {
+            SettingsTopBar()
+            Row(Modifier.weight(1f).fillMaxWidth()) {
             // Barra lateral de categorías (arriba/abajo cambia de categoría, derecha entra a las opciones).
             Column(
                 Modifier
@@ -1499,7 +1514,6 @@ fun SettingsScreen(
                         c.icon, c.name, i == curCat,
                         Modifier.focusRequester(tabFr[i]).focusProperties {
                             if (i == 0) up = tabFr[i]
-                            if (i == CATS.lastIndex) down = tabFr[i]
                             right = firstFr
                         },
                         onFocus = {
@@ -1512,10 +1526,8 @@ fun SettingsScreen(
                         }
                     )
                 }
-                Text(
-                    "→ entrar  ·  Atrás cerrar", color = Color(0x80FFFFFF), fontSize = 12.sp,
-                    modifier = Modifier.padding(start = 8.dp, top = 10.dp)
-                )
+                Spacer(Modifier.height(10.dp))
+                UpdateButton(Modifier.focusRequester(updFr).focusProperties { down = updFr; right = firstFr }) { onUpdate() }
             }
             Box(Modifier.width(1.dp).fillMaxHeight().background(Color(0x1FFFFFFF)))
             Column(
@@ -1591,7 +1603,90 @@ fun SettingsScreen(
                 Spacer(Modifier.height(12.dp))
             }
             }
+            }
         }
+    }
+}
+
+/** Barra superior de la ventana: logo, nombre, versión y hora (como en las referencias). */
+@Composable
+private fun SettingsTopBar() {
+    val ctx = LocalContext.current
+    val version = remember {
+        runCatching { ctx.packageManager.getPackageInfo(ctx.packageName, 0).versionName }.getOrNull() ?: "?"
+    }
+    var clock by remember { mutableStateOf("") }
+    LaunchedEffect(Unit) {
+        val f = java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault())
+        while (true) {
+            clock = f.format(java.util.Date())
+            delay(20_000)
+        }
+    }
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .background(Color(0x14FFFFFF))
+            .padding(horizontal = 18.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            Modifier.size(34.dp).clip(RoundedCornerShape(11.dp)).background(ACCENT),
+            contentAlignment = Alignment.Center
+        ) { GearIcon(Color(0xFF0B0B12), 20) }
+        Spacer(Modifier.width(12.dp))
+        Column {
+            Text("One Piece", color = Color.White, fontSize = 19.sp, fontWeight = FontWeight.Bold)
+            Text("Configuración", color = ACC, fontSize = 12.sp)
+        }
+        Spacer(Modifier.weight(1f))
+        TopChip("v$version")
+        Spacer(Modifier.width(8.dp))
+        TopChip(clock)
+        Spacer(Modifier.width(8.dp))
+        TopChip("Atrás: cerrar")
+    }
+    Box(Modifier.fillMaxWidth().height(1.dp).background(ACC.copy(alpha = 0.35f)))
+}
+
+@Composable
+private fun TopChip(text: String) {
+    val shape = RoundedCornerShape(50)
+    Text(
+        text, color = Color(0xE6FFFFFF), fontSize = 13.sp, maxLines = 1,
+        modifier = Modifier
+            .clip(shape)
+            .background(Color(0x14FFFFFF))
+            .border(1.dp, Color(0x26FFFFFF), shape)
+            .padding(horizontal = 14.dp, vertical = 6.dp)
+    )
+}
+
+/** Botón fijo de la barra lateral: abre la búsqueda de actualizaciones desde cualquier categoría. */
+@Composable
+private fun UpdateButton(modifier: Modifier = Modifier, onClick: () -> Unit) {
+    var focused by remember { mutableStateOf(false) }
+    val shape = RoundedCornerShape(18.dp)
+    Row(
+        modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .background(
+                if (focused) ACCENT
+                else SolidColor(ACC.copy(alpha = 0.14f))
+            )
+            .border(1.5.dp, ACC.copy(alpha = if (focused) 1f else 0.6f), shape)
+            .onFocusChanged { focused = it.isFocused }
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text("⟳", color = if (focused) Color(0xFF0B0B12) else ACC, fontSize = 20.sp)
+        Spacer(Modifier.width(10.dp))
+        Text(
+            "Buscar actualizaciones", color = if (focused) Color(0xFF0B0B12) else ACC,
+            fontSize = 15.sp, fontWeight = FontWeight.Bold, maxLines = 2
+        )
     }
 }
 // ---------- Acerca de ----------
