@@ -31,6 +31,16 @@ class Cfg(private val p: Prefs) {
         Fx.glow = p.getInt("fxGlow", 0) == 1
         Fx.anim = p.getInt("fxAnim", 0) == 1
     }
+    private val _ex = androidx.compose.runtime.mutableStateMapOf<String, String>()
+    /** Ajustes de texto sueltos (recordatorios, Ambilight, camara, atajos del panel). */
+    fun ex(k: String, d: String = ""): String = _ex[k] ?: p.getStr(k, d)
+    fun setEx(k: String, v: String) { _ex[k] = v; p.putStr(k, v) }
+    private val _colorX = androidx.compose.runtime.mutableStateListOf(
+        p.getStr("colorX0", ""), p.getStr("colorX1", ""), p.getStr("colorX2", ""), p.getStr("colorX3", "")
+    )
+    /** Accion extra del boton de color i: "w:url" (web), "l:MAC" (Wake-on-LAN) o vacio. */
+    fun colorExtra(i: Int): String = _colorX[i]
+    fun setColorExtra(i: Int, v: String) { _colorX[i] = v; p.putStr("colorX$i", v) }
     fun setFxBlur(v: Boolean) { Fx.blur = v; p.putInt("fxBlur", if (v) 1 else 0) }
     fun setFxGlow(v: Boolean) { Fx.glow = v; p.putInt("fxGlow", if (v) 1 else 0) }
     fun setFxAnim(v: Boolean) { Fx.anim = v; p.putInt("fxAnim", if (v) 1 else 0) }

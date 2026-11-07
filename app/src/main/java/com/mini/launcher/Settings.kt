@@ -1173,6 +1173,90 @@ fun SettingsScreen(
                     }
                 }
             })
+            add(SItem(6, "Botón " + colorNames[ci] + ": web o Wake-on-LAN", "Botones de color") { m ->
+                val cur = cfg.colorExtra(ci)
+                val txt = if (cur.isEmpty()) "Botón " + colorNames[ci] + ": web o Wake-on-LAN…"
+                    else "Botón " + colorNames[ci] + ": " + cur.substring(2)
+                DialogRow(txt, m) { close ->
+                    TextEditDialog(
+                        "Botón " + colorNames[ci],
+                        cur.drop(2),
+                        "Dirección web (http://…) o MAC (AA:BB:CC:DD:EE:FF). Vacío = quitar. Tiene prioridad sobre la acción.",
+                        200,
+                        { t0 ->
+                            val t = t0.trim()
+                            if (t.isEmpty()) cfg.setColorExtra(ci, "")
+                            else {
+                                val b = Remap.parseMac(t)
+                                if (b != null) cfg.setColorExtra(ci, "l:" + b.joinToString(":") { "%02X".format(it) })
+                                else cfg.setColorExtra(ci, "w:" + (if (t.startsWith("http://") || t.startsWith("https://")) t else "http://$t"))
+                            }
+                            close()
+                        },
+                        close
+                    )
+                }
+            })
+        }
+        add(SItem(6, "Recordatorios en pantalla", "Casa y avisos") { m ->
+            SwitchRow("Recordatorios en pantalla", cfg.ex("remOn") == "1", m) { cfg.setEx("remOn", if (it) "1" else "0") }
+        })
+        add(SItem(6, "Nuevo recordatorio", "Casa y avisos") { m ->
+            DialogRow("Nuevo recordatorio (" + cfg.ex("remList").split("\n").count { it.isNotBlank() } + ")", m) { close ->
+                TextEditDialog("Nuevo recordatorio", "", "Formato: 21:45 Sacar la basura. Con * al inicio se repite cada día.", 80, { t ->
+                    val l = Remind.parse(t)
+                    if (l == null) toast(ctx, "Formato no válido. Ejemplo: 21:45 Sacar la basura")
+                    else { Remind.add(cfg, l); cfg.setEx("remOn", "1") }
+                    close()
+                }, close)
+            }
+        })
+        add(SItem(6, "Borrar recordatorios", "Casa y avisos") { m ->
+            ActionRow("Borrar todos los recordatorios", m) { cfg.setEx("remList", "") }
+        })
+        add(SItem(6, "Ambilight", "Casa y avisos") { m ->
+            SwitchRow("Ambilight casero (WLED)", cfg.ex("ambiOn") == "1", m) { cfg.setEx("ambiOn", if (it) "1" else "0") }
+        })
+        add(SItem(6, "Dirección del WLED", "Casa y avisos") { m ->
+            DialogRow("WLED: " + cfg.ex("ambiIp").ifEmpty { "sin dirección" }, m) { close ->
+                TextEditDialog("Dirección del WLED", cfg.ex("ambiIp"), "Ejemplo: 192.168.1.40. Envía el color del acento del tema.", 60, { t ->
+                    cfg.setEx("ambiIp", t.trim()); close()
+                }, close)
+            }
+        })
+        add(SItem(6, "Intensidad Ambilight", "Casa y avisos") { m ->
+            SliderRow("Intensidad del Ambilight", cfg.ex("ambiLvl", "70").toIntOrNull() ?: 70, 10, 100, 10, "%", m) { cfg.setEx("ambiLvl", it.toString()) }
+        })
+        add(SItem(6, "Probar Ambilight", "Casa y avisos") { m ->
+            ActionRow("Probar color ahora", m) {
+                Ambi.send(ctx, cfg.ex("ambiIp"), Themes.current.acc, cfg.ex("ambiLvl", "70").toIntOrNull() ?: 70, true)
+            }
+        })
+        add(SItem(6, "Dirección de la cámara", "Casa y avisos") { m ->
+            DialogRow("Cámara: " + cfg.ex("camUrl").ifEmpty { "sin dirección" }, m) { close ->
+                TextEditDialog("Dirección de la cámara", cfg.ex("camUrl"), "Video MJPEG, ej.: http://192.168.1.50:8080/video", 200, { t ->
+                    val u = t.trim()
+                    cfg.setEx("camUrl", if (u.isEmpty() || u.startsWith("http")) u else "http://$u"); close()
+                }, close)
+            }
+        })
+        add(SItem(6, "Esquina de la cámara", "Casa y avisos") { m ->
+            ChoiceRow("Esquina de la cámara", listOf("Abajo derecha", "Abajo izquierda", "Arriba derecha", "Arriba izquierda"),
+                cfg.ex("camCorner", "0").toIntOrNull() ?: 0, m) { cfg.setEx("camCorner", it.toString()) }
+        })
+        add(SItem(6, "Ver cámara", "Casa y avisos") { m ->
+            ActionRow("Ver la cámara ahora (Atrás la cierra)", m) { Cam.show = true }
+        })
+        for (qi in 0..3) {
+            add(SItem(6, "Atajo " + (qi + 1) + " del panel", "Casa y avisos") { m ->
+                val q = QS.parse(cfg.ex("qs$qi"))
+                DialogRow("Atajo " + (qi + 1) + " del Panel rápido: " + (q?.first ?: "vacío"), m) { close ->
+                    TextEditDialog("Atajo " + (qi + 1), cfg.ex("qs$qi"), "Nombre;destino. Destino: dirección web, MAC o la palabra camara. Vacío = quitar.", 200, { t ->
+                        if (t.isBlank() || QS.parse(t) != null) cfg.setEx("qs$qi", t.trim()) else toast(ctx, "Formato: Nombre;destino")
+                        close()
+                    }, close)
+                }
+            })
         }
         add(SItem(6, "Remapear botones del mando", "Mando y uso diario") { m ->
             DialogRow("Remapear cualquier botón del mando", m) { close -> RemapDialog(close) }

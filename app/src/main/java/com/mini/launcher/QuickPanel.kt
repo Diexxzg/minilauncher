@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
@@ -133,6 +134,13 @@ fun QuickPanel(
                 }
                 QTile("Fluidez máxima", if (cfg.fluid) "Activada" else "Apagada", Modifier.weight(1f)) { cfg.setFluid(!cfg.fluid) }
                 QTile("Reposo", "Modo ambiente", Modifier.weight(1f)) { onAmbient() }
+            }
+            val qsl = (0..3).mapNotNull { i -> QS.parse(cfg.ex("qs$i")) }
+            for (pair in qsl.chunked(3)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    for ((nm, v, kind) in pair) QTile(nm, kind, Modifier.weight(1f)) { QS.run(ctx, v) }
+                    repeat(3 - pair.size) { Spacer(Modifier.weight(1f)) }
+                }
             }
             // El brillo es lo contrario de "Oscurecer fondo": 100% = sin oscurecer.
             SliderRow("Brillo del fondo", 100 - cfg.dim, 20, 100, 5, "%") { cfg.setDim(100 - it) }

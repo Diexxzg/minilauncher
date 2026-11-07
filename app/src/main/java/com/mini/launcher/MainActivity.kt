@@ -1161,6 +1161,7 @@ fun HomeRoot(
             .onPreviewKeyEvent {
                 lastInput.longValue = SystemClock.elapsedRealtime()
                 val k = it.key
+                if (HomeFx.handleKey(cfg, it)) return@onPreviewKeyEvent true
                 // Atras en Configuracion se atiende aqui, antes que cualquier otra cosa: una
                 // pulsacion = un nivel. Se ignoran las repeticiones al mantener la tecla.
                 if (k == Key.Back && screen == "settings") {
@@ -1174,6 +1175,8 @@ fun HomeRoot(
                     homeFree && !cfg.kids
                 ) {
                     val act = colorKeyAction(cfg, k)
+                    val cx = colorKeyIndex(k)?.let { ci -> cfg.colorExtra(ci) } ?: ""
+                    if (cx.isNotEmpty() && Remap.runExtra(ctx, cx)) return@onPreviewKeyEvent true
                     if (act != null) {
                         if (act != 0) runColorAction(act)
                         return@onPreviewKeyEvent act != 0
@@ -1682,6 +1685,7 @@ fun HomeRoot(
                             }
                         )
                     }
+                    HomeOverlays(cfg)
                     if (showQuick) {
                         QuickPanel(
                             cfg = cfg,
