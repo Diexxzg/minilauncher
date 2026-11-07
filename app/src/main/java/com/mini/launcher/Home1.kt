@@ -125,6 +125,28 @@ object Home1 {
     fun secureOk(c: Context) =
         c.checkSelfPermission("android.permission.WRITE_SECURE_SETTINGS") ==
             PackageManager.PERMISSION_GRANTED
+
+    @Volatile private var lastEnsure = 0L
+
+    /** Si tiene WRITE_SECURE_SETTINGS y el servicio de accesibilidad esta apagado, lo vuelve a encender. */
+    fun ensureAccess(c: Context) {
+        if (PowerService.instance != null || !secureOk(c)) return
+        val now = android.os.SystemClock.elapsedRealtime()
+        if (lastEnsure != 0L && now - lastEnsure < 15_000L) return
+        lastEnsure = now
+        try {
+            val cn = android.content.ComponentName(c, PowerService::class.java).flattenToString()
+            val cr = c.contentResolver
+            val cur = Settings.Secure.getString(cr, "enabled_accessibility_services") ?: ""
+            val items = cur.split(":").filter { it.isNotEmpty() }
+            if (items.contains(cn)) {
+                Settings.Secure.putString(cr, "enabled_accessibility_services", (items - cn).joinToString(":"))
+            }
+            Settings.Secure.putString(cr, "enabled_accessibility_services", (items - cn + cn).joinToString(":"))
+            Settings.Secure.putString(cr, "accessibility_enabled", "1")
+        } catch (e: Exception) {
+        }
+    }
 }
 
 @Composable
