@@ -44,7 +44,11 @@ object Remap {
     }
 
     fun label(c: Context, v: String): String =
-        if (v.startsWith("p:")) {
+        if (v.startsWith("w:")) {
+            "Llamar a " + v.substring(2).removePrefix("https://").removePrefix("http://").take(40)
+        } else if (v.startsWith("l:")) {
+            "Encender equipo (" + v.substring(2) + ")"
+        } else if (v.startsWith("p:")) {
             "Abrir " + (AppCache.apps.firstOrNull { it.pkg == v.substring(2) }?.label ?: v.substring(2))
         } else {
             REMAP_ACTIONS.getOrElse(v.removePrefix("a:").toIntOrNull() ?: 0) { "?" }
@@ -53,6 +57,7 @@ object Remap {
     /** Ejecuta la accion desde el servicio de accesibilidad (funciona en cualquier app). */
     fun run(c: Context, svc: AccessibilityService, v: String) {
         try {
+            if (runExtra(c, v)) return
             if (v.startsWith("p:")) {
                 c.packageManager.getLaunchIntentForPackage(v.substring(2))?.let {
                     c.startActivity(it.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
@@ -76,5 +81,57 @@ object Remap {
             }
         } catch (e: Exception) {
         }
+    }
+
+    private fun say(c: Context, s: String) {
+        android.os.Handler(android.os.Looper.getMainLooper()).post { toast(c, s) }
+    }
+
+    /** Acciones de casa: «w:url» llama a una direccion web, «l:MAC» envia Wake-on-LAN. */
+    fun runExtra(c: Context, v: String): Boolean {
+        if (v.startsWith("w:")) {
+            val u = v.substring(2)
+            Thread {
+                try {
+                    val k = java.net.URL(u).openConnection() as java.net.HttpURLConnection
+                    k.connectTimeout = 4000
+                    k.readTimeout = 4000
+                    val code = k.responseCode
+                    k.disconnect()
+                    say(c, if (code in 200..299) "Listo." else "La dirección respondió $code.")
+                } catch (e: Exception) {
+                    say(c, "No se pudo llamar a la dirección.")
+                }
+            }.start()
+            return true
+        }
+        if (v.startsWith("l:")) {
+            val mac = parseMac(v.substring(2))
+            if (mac == null) {
+                say(c, "Dirección MAC no válida.")
+                return true
+            }
+            Thread {
+                try {
+                    val data = ByteArray(6) { 0xFF.toByte() } + (1..16).flatMap { mac.toList() }.toByteArray()
+                    java.net.DatagramSocket().use { sk ->
+                        sk.broadcast = true
+                        sk.send(java.net.DatagramPacket(data, data.size, java.net.InetAddress.getByName("255.255.255.255"), 9))
+                    }
+                    say(c, "Señal de encendido enviada.")
+                } catch (e: Exception) {
+                    say(c, "No se pudo enviar la señal de encendido.")
+                }
+            }.start()
+            return true
+        }
+        return false
+    }
+
+    /** Devuelve la MAC como 6 bytes, o null si no es valida. */
+    fun parseMac(s: String): ByteArray? {
+        val h = s.filter { it.isLetterOrDigit() }
+        if (h.length != 12 || !h.all { it in '0'..'9' || it in 'a'..'f' || it in 'A'..'F' }) return null
+        return ByteArray(6) { h.substring(it * 2, it * 2 + 2).toInt(16).toByte() }
     }
 }

@@ -557,6 +557,7 @@ fun RemapDialog(onClose: () -> Unit) {
     var learning by remember { mutableStateOf(false) }
     var key by remember { mutableIntStateOf(0) }
     var needApp by remember { mutableStateOf(false) }
+    var ask by remember { mutableIntStateOf(0) }
     ExtraDialog("Remapear botones", onClose, maxWidth = 600, scroll = true) {
         Text(
             "Los botones remapeados funcionan dentro del launcher.",
@@ -590,7 +591,7 @@ fun RemapDialog(onClose: () -> Unit) {
             }
         }
     }
-    if (key != 0 && !needApp) {
+    if (key != 0 && !needApp && ask == 0) {
         ExtraDialog(keyLabel(key) + " hará…", { key = 0 }, scroll = true) {
             for (i in 1 until REMAP_ACTIONS.size) {
                 ActionRow(REMAP_ACTIONS[i], if (i == 1) Modifier.autoFocus() else Modifier) {
@@ -598,8 +599,30 @@ fun RemapDialog(onClose: () -> Unit) {
                 }
             }
             ActionRow("Abrir una app…") { needApp = true }
+            ActionRow("Llamar a una dirección web…") { ask = 1 }
+            ActionRow("Encender un equipo (Wake-on-LAN)…") { ask = 2 }
             ActionRow("Cancelar") { key = 0 }
         }
+    }
+    if (key != 0 && ask != 0) {
+        TextEditDialog(
+            if (ask == 1) "Dirección web" else "Dirección MAC del equipo",
+            "",
+            if (ask == 1) "Ejemplo: http://192.168.1.20:8123/api/webhook/luz" else "Ejemplo: AA:BB:CC:DD:EE:FF",
+            200,
+            { t0 ->
+                if (ask == 1 && t0.isNotEmpty()) {
+                    val u = if (t0.startsWith("http://") || t0.startsWith("https://")) t0 else "http://$t0"
+                    Remap.save(c, m + (key to "w:$u"))
+                } else if (ask == 2 && t0.isNotEmpty()) {
+                    val b = Remap.parseMac(t0)
+                    if (b == null) toast(c, "Dirección MAC no válida.")
+                    else Remap.save(c, m + (key to "l:" + b.joinToString(":") { "%02X".format(it) }))
+                }
+                key = 0; ask = 0; t++
+            },
+            { ask = 0 }
+        )
     }
     if (key != 0 && needApp) {
         AppPickerDialog("Abrir con " + keyLabel(key), "", {
