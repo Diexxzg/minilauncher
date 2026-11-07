@@ -1,5 +1,8 @@
 # Novedades
 
+## 4.44
+- Corregido: al pulsar Inicio o volver al inicio desde el protector de pantalla, ya no se corta la música; el fondo en video no toma más el foco de audio.
+
 ## 4.43
 - Herramientas del sistema (Configuración › Sistema): modo juego (libera RAM, pausa el fondo animado y silencia avisos), volumen adaptable con tope y piso, y centro de notificaciones con historial por app (apagado por defecto).
 - Instalar APK desde USB con comprobación de paquete, versión y firma (necesita el permiso «Acceso a todos los archivos»).
