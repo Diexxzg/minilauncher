@@ -167,6 +167,12 @@ class UpdaterState(private val ctx: Context, private val prefs: Prefs) {
             phase = 7
             return
         }
+        // Instalacion por sesion: Android no marca la app como "restringida" y la accesibilidad sobrevive.
+        try {
+            installSession(f)
+            return
+        } catch (e: Exception) {
+        }
         try {
             val uri = FileProvider.getUriForFile(ctx, ctx.packageName + ".files", f)
             val i = Intent(Intent.ACTION_VIEW)
@@ -176,6 +182,28 @@ class UpdaterState(private val ctx: Context, private val prefs: Prefs) {
         } catch (e: Exception) {
             phase = 6
             error = "Esta TV no tiene instalador de paquetes."
+        }
+    }
+
+    private fun installSession(f: java.io.File) {
+        val pi = ctx.packageManager.packageInstaller
+        val params = android.content.pm.PackageInstaller.SessionParams(
+            android.content.pm.PackageInstaller.SessionParams.MODE_FULL_INSTALL
+        )
+        params.setAppPackageName(ctx.packageName)
+        val id = pi.createSession(params)
+        pi.openSession(id).use { ss ->
+            f.inputStream().use { inp ->
+                ss.openWrite("app.apk", 0, f.length()).use { out ->
+                    inp.copyTo(out)
+                    ss.fsync(out)
+                }
+            }
+            val it = Intent(ctx, InstallReceiver::class.java).setAction("com.mini.launcher.INSTALL_DONE")
+            val flags = android.app.PendingIntent.FLAG_UPDATE_CURRENT or
+                (if (Build.VERSION.SDK_INT >= 31) android.app.PendingIntent.FLAG_MUTABLE else 0)
+            val pend = android.app.PendingIntent.getBroadcast(ctx, id, it, flags)
+            ss.commit(pend.intentSender)
         }
     }
 
