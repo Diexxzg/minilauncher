@@ -135,7 +135,7 @@ object Amb2 {
             else -> 0
         }
         filter(c, cfg.ex("warmOn") == "1", cfg.ex("warmPct", "20").toIntOrNull() ?: 20)
-        card(c, cfg.ex("cornerOn") == "1", cfg.ex("cornerPos", "0").toIntOrNull() ?: 0)
+        card(c, cfg.ex("cornerOn") == "1" && !Game.quiet(cfg), cfg.ex("cornerPos", "0").toIntOrNull() ?: 0)
         // Modo noche por contenido: cada minuto baja un paso el volumen mientras suena algo.
         minuteTick = (minuteTick + 1) % 4
         if (minuteTick == 0 && cfg.ex("nightOn") == "1" && (hour >= 22 || hour < 6) && media?.playing == true) {

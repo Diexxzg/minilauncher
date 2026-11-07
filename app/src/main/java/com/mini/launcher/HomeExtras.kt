@@ -165,7 +165,7 @@ fun HomeOverlays(cfg: Cfg, media: MediaInfo?, onHome: Boolean, onWake: () -> Uni
     LaunchedEffect(Unit) {
         while (true) {
             delay(15000)
-            if (cfg.ex("remOn") == "1") Remind.check(cfg)
+            if (cfg.ex("remOn") == "1" && !Game.quiet(cfg)) Remind.check(cfg)
             Amb2.tick(ctx, cfg, mediaNow, wakeNow)
         }
     }

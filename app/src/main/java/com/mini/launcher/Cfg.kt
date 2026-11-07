@@ -187,7 +187,7 @@ class Cfg(private val p: Prefs) {
     val focusCard: Boolean get() = _focusCard
     /** Modo ahorro: apaga desenfoque, animaciones, fondo dinamico y brillo de color. */
     /** Efectos pesados apagados: lo activan "Modo ahorro" o "Fluidez máxima". */
-    val saver: Boolean get() = _saver || _fluid || lowRam
+    val saver: Boolean get() = _saver || _fluid || lowRam || Game.pauseBg(this)
     val saverOnly: Boolean get() = _saver
     val fluid: Boolean get() = _fluid
     /** Rutina diaria: a esta hora (una vez al dia) activa la escena de cine o abre una app. */

@@ -22,6 +22,7 @@ class OnePieceApp : Application() {
         val p = Prefs(this)
         WeatherOpts.forecast = p.getInt("forecast", 0)
         WeatherOpts.autoLoc = p.getInt("autoLoc", 0)
+        VolGuard.apply(this)
     }
 
     companion object {

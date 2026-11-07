@@ -51,6 +51,19 @@ class MediaListener : NotificationListenerService() {
 
     override fun onNotificationPosted(sbn: android.service.notification.StatusBarNotification?) {
         if (sbn != null && sbn.packageName != packageName && sbn.isClearable) Notif.at = SystemClock.elapsedRealtime()
+        if (sbn != null && sbn.packageName != packageName && !sbn.isOngoing &&
+            (sbn.notification.flags and Notification.FLAG_GROUP_SUMMARY) == 0 && Prefs(this).getInt("nlOn", 0) == 1
+        ) {
+            try {
+                val ex = sbn.notification.extras
+                NotifLog.add(
+                    this, sbn.packageName,
+                    ex.getCharSequence(Notification.EXTRA_TITLE)?.toString() ?: "",
+                    ex.getCharSequence(Notification.EXTRA_TEXT)?.toString() ?: ""
+                )
+            } catch (e: Exception) {
+            }
+        }
     }
 
     override fun onListenerDisconnected() {

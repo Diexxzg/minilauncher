@@ -108,7 +108,7 @@ private val SEC_ORDER = mapOf(
     1 to listOf("Perfil", "Fichas", "Información", "Filas extra", "Foco y efectos", "Compartir diseño"),
     2 to listOf("Parte superior", "Reloj y fecha", "Tarjetas junto al reloj", "Clima", "Contenido", "Barra superior"),
     3 to listOf("Pantalla", "Rendimiento", "Efectos visuales", "Noche", "Reposo", "Diseño del modo ambiente", "Sonido"),
-    6 to listOf("Conexiones", "Sistema", "Celular", "Botones de color", "Mando y uso diario", "Arranque", "Escena de cine", "Rutina diaria", "Perfiles de familia", "Asistente", "Hogar y utilidades"),
+    6 to listOf("Conexiones", "Sistema", "Celular", "Botones de color", "Mando y uso diario", "Arranque", "Escena de cine", "Rutina diaria", "Perfiles de familia", "Asistente", "Hogar y utilidades", "Herramientas del sistema"),
     7 to listOf("Permisos")
 )
 
@@ -1570,6 +1570,19 @@ fun SettingsScreen(
         })
         add(SItem(6, "Modo fácil", "Hogar y utilidades") { m ->
             DialogRow("Modo fácil (tres botones enormes)", m) { close -> EasyModeDialog(prefs, close) }
+        })
+        // ---- Herramientas del sistema ----
+        add(SItem(6, "Modo juego", "Herramientas del sistema") { m ->
+            DialogRow("Modo juego", m) { close -> GameModeDialog(cfg, close) }
+        })
+        add(SItem(6, "Instalar APK desde USB", "Herramientas del sistema") { m ->
+            DialogRow("Instalar APK desde USB", m) { close -> UsbInstallDialog(close) }
+        })
+        add(SItem(6, "Volumen adaptable", "Herramientas del sistema") { m ->
+            DialogRow("Volumen adaptable (tope y piso)", m) { close -> VolumeGuardDialog(prefs, close) }
+        })
+        add(SItem(6, "Centro de notificaciones", "Herramientas del sistema") { m ->
+            DialogRow("Centro de notificaciones", m) { close -> NotifCenterDialog(prefs, close) }
         })
         // ---- Acerca de ----
         add(SItem(ABOUT, "Estadísticas de uso", "Uso y diagnóstico") { m ->

@@ -67,7 +67,7 @@ private fun QrBox(text: String, sizeDp: Int) {
 
 /** Boton redondeado con foco visible (contorno grueso), sin animaciones. */
 @Composable
-private fun Pill(text: String, sel: Boolean, mod: Modifier = Modifier, onClick: () -> Unit) {
+internal fun Pill(text: String, sel: Boolean, mod: Modifier = Modifier, onClick: () -> Unit) {
     var f by remember { mutableStateOf(false) }
     val acc = Themes.current.acc
     val shape = RoundedCornerShape(22.dp)
