@@ -144,7 +144,10 @@ object Home1 {
             }
             Settings.Secure.putString(cr, "enabled_accessibility_services", (items - cn + cn).joinToString(":"))
             Settings.Secure.putString(cr, "accessibility_enabled", "1")
+            val now2 = Settings.Secure.getString(cr, "enabled_accessibility_services") ?: ""
+            if (!now2.contains(cn)) toast(c, "Accesibilidad: el sistema no guardó el cambio.")
         } catch (e: Exception) {
+            toast(c, "Accesibilidad: " + (e.message ?: e.javaClass.simpleName).take(120))
         }
     }
 }
