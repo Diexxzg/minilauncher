@@ -1429,6 +1429,13 @@ fun SettingsScreen(
     // Arriba desde la primera opcion siempre vuelve a la pestaña de la categoria abierta.
     val upMod = Modifier.focusProperties { up = tabFr[curCat] }
     DisposableEffect(Unit) { onDispose { onRightFocus(false) } }
+    LaunchedEffect(updBack) {
+        // Al cerrar el cuadro de actualización, el foco vuelve al botón de la barra lateral.
+        if (updBack > 0) {
+            delay(120)
+            runCatching { updFr.requestFocus() }
+        }
+    }
     LaunchedEffect(railBack) {
         if (railBack > 0) runCatching { tabFr[curCat].requestFocus() }
     }
@@ -1447,7 +1454,18 @@ fun SettingsScreen(
         Column(
             Modifier
                 .fillMaxSize()
-                .focusProperties { exit = { androidx.compose.ui.focus.FocusRequester.Cancel } }
+                .focusProperties {
+                    // Solo se bloquean las flechas del mando. Con un cuadro encima (p. ej. actualizaciones)
+                    // el foco debe poder salir de la ventana.
+                    exit = { d ->
+                        val dir = androidx.compose.ui.focus.FocusDirection
+                        if (!blocked && (d == dir.Up || d == dir.Down || d == dir.Left || d == dir.Right)) {
+                            androidx.compose.ui.focus.FocusRequester.Cancel
+                        } else {
+                            androidx.compose.ui.focus.FocusRequester.Default
+                        }
+                    }
+                }
                 .focusGroup()
                 .focusProperties { canFocus = !blocked }
         ) {
