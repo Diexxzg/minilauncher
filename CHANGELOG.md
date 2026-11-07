@@ -1,5 +1,13 @@
 # Novedades
 
+## 4.22
+- La accesibilidad «One Piece - energía» se vuelve a encender sola al abrir el launcher tras actualizar (requiere conceder WRITE_SECURE_SETTINGS una sola vez).
+
+## 4.21
+- Remapear botones: nueva acción «Llamar a una dirección web» (Home Assistant, IFTTT, WLED).
+- Nueva acción «Encender un equipo (Wake-on-LAN)» para despertar tu PC o consola con un botón.
+- Se permiten direcciones http de tu red local.
+
 ## 4.20
 - El remapeo de botones vuelve a funcionar en cualquier app, no solo en el launcher.
 - El apagado inteligente («¿sigues ahí?») vuelve a ver tus botones y funciona de verdad.
