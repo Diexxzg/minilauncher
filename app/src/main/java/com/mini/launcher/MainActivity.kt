@@ -1254,7 +1254,9 @@ fun HomeRoot(
                 Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = eDim / 100f)))
             }
         }
-        if (screen == "ambient") {
+        if (screen == "ambient" && cfg.ex("ambBlack") == "1") {
+            BlackScreen { screen = "home" }
+        } else if (screen == "ambient") {
             AmbientScreen(cfg, m) { screen = "home" }
         } else if (screen == "black") {
             BlackScreen { screen = "home" }

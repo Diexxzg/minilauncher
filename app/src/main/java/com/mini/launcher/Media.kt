@@ -49,6 +49,10 @@ class MediaListener : NotificationListenerService() {
         instance = this
     }
 
+    override fun onNotificationPosted(sbn: android.service.notification.StatusBarNotification?) {
+        if (sbn != null && sbn.packageName != packageName && sbn.isClearable) Notif.at = SystemClock.elapsedRealtime()
+    }
+
     override fun onListenerDisconnected() {
         if (instance === this) instance = null
         super.onListenerDisconnected()

@@ -4,6 +4,8 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.runtime.produceState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -93,8 +95,9 @@ fun AmbientScreen(cfg: Cfg, media: MediaInfo?, onExit: () -> Unit) {
     // dp por una trayectoria lenta (ciclo de varios minutos). Solo se anima unos segundos por
     // minuto, asi que no gasta recursos. Se puede apagar en Configuracion > Inicio.
     val tmin = drift.toDouble()
-    val ampX = conf.screenWidthDp * 0.12f
-    val ampY = conf.screenHeightDp * 0.07f
+    val mv = when (cfg.ex("ambMove")) { "1" -> 1.5f; "2" -> 2f; else -> 1f }
+    val ampX = conf.screenWidthDp * 0.12f * mv
+    val ampY = conf.screenHeightDp * 0.07f * mv
     val targetX = if (cfg.burnIn) (sin(tmin / 3.0) * ampX).toFloat() else 0f
     val targetY = if (cfg.burnIn) (cos(tmin / 4.2) * ampY).toFloat() else 0f
     val moveX by animateFloatAsState(targetX, tween(4000, easing = FastOutSlowInEasing), label = "burnX")
@@ -102,6 +105,18 @@ fun AmbientScreen(cfg: Cfg, media: MediaInfo?, onExit: () -> Unit) {
     val art = remember(media?.title, media?.artist, media?.bitmap != null) {
         media?.bitmap?.asImageBitmap()
     }
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    val frameOn = cfg.ex("frameOn") == "1" && cfg.ex("frameUri").isNotEmpty()
+    var pidx by remember { mutableStateOf((0..999).random()) }
+    LaunchedEffect(frameOn) { while (frameOn) { delay(30_000); pidx++ } }
+    val photo by produceState<androidx.compose.ui.graphics.ImageBitmap?>(null, pidx, frameOn) {
+        value = if (!frameOn) null else withContext(Dispatchers.IO) {
+            FramePhotos.load(ctx, cfg.ex("frameUri")); FramePhotos.bitmap(ctx, pidx)
+        }
+    }
+    val liveBg = cfg.ex("liveBg") == "1" && !frameOn
+    val notifDim = Notif.recent() && now.time > 0L
+    val timeCol = if (notifDim) Color(0x66FFFFFF) else Color(0xF2FFFFFF)
     val dimAlpha = if (cfg.ambDimOn) cfg.ambDimLvl / 100f else 0f
     val pos = intArrayOf(cfg.ambPosTime, cfg.ambPosDate, cfg.ambPosMusic, cfg.ambPosIcons)
     val gx = (conf.screenWidthDp * 0.05f).dp
@@ -121,6 +136,14 @@ fun AmbientScreen(cfg: Cfg, media: MediaInfo?, onExit: () -> Unit) {
             .autoFocus()
             .clickable { onExit() }
     ) {
+        if (liveBg) Box(Modifier.fillMaxSize().background(liveBgBrush()))
+        photo?.let { ph ->
+            androidx.compose.foundation.Image(ph, null, Modifier.fillMaxSize(), contentScale = androidx.compose.ui.layout.ContentScale.Crop)
+        }
+        if (frameOn) Box(
+            Modifier.fillMaxSize()
+                .border(14.dp, Color(0xFF2B2B2B)).padding(14.dp).border(2.dp, Color(0x66000000))
+        )
         // Cada elemento (hora, fecha, reproductor, iconos) va en la celda de la cuadricula 3x3 que elijas.
         for (cell in 0..8) {
             val inCell = (0..3).filter { pos[it] == cell }
@@ -143,7 +166,7 @@ fun AmbientScreen(cfg: Cfg, media: MediaInfo?, onExit: () -> Unit) {
                 for (el in inCell) {
                     when (el) {
                         0 -> Text(
-                            timeText, color = Color(0xF2FFFFFF), fontSize = 40.sp,
+                            timeText, color = timeCol, fontSize = 40.sp,
                             fontWeight = FontWeight.Light, style = TextStyle(shadow = shadow)
                         )
                         1 -> Text(

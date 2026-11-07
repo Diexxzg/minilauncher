@@ -822,6 +822,36 @@ fun SettingsScreen(
         add(SItem(3, "Margen de seguridad", "Pantalla") { m ->
             SliderRow("Margen de seguridad", cfg.overscan, 0, 60, 2, " dp", m) { cfg.setOverscan(it) }
         })
+        add(SItem(3, "Margen guiado", "Pantalla") { m ->
+            DialogRow("Margen de seguridad guiado (con vista previa)", m) { close -> OverscanGuide(cfg, close) }
+        })
+        add(SItem(3, "Marco de fotos", "Diseño del modo ambiente") { m ->
+            SwitchRow("Marco de fotos en modo ambiente", cfg.ex("frameOn") == "1", m) { cfg.setEx("frameOn", if (it) "1" else "0") }
+        })
+        add(SItem(3, "Carpeta del marco", "Diseño del modo ambiente") { m ->
+            val pick = androidx.activity.compose.rememberLauncherForActivityResult(
+                androidx.activity.result.contract.ActivityResultContracts.OpenDocumentTree()
+            ) { uri: android.net.Uri? ->
+                if (uri != null) {
+                    try {
+                        ctx.contentResolver.takePersistableUriPermission(uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    } catch (e: Exception) { }
+                    cfg.setEx("frameUri", uri.toString()); cfg.setEx("frameOn", "1")
+                }
+            }
+            ActionRow(if (cfg.ex("frameUri").isEmpty()) "Elegir carpeta de fotos…" else "Cambiar carpeta de fotos…", m) {
+                try { pick.launch(null) } catch (e: Exception) { toast(ctx, "Esta TV no tiene selector de carpetas.") }
+            }
+        })
+        add(SItem(3, "Fondo vivo según la hora", "Diseño del modo ambiente") { m ->
+            SwitchRow("Fondo vivo según la hora", cfg.ex("liveBg") == "1", m) { cfg.setEx("liveBg", if (it) "1" else "0") }
+        })
+        add(SItem(3, "Amplitud del movimiento", "Diseño del modo ambiente") { m ->
+            ChoiceRow("Amplitud anti-quemado", listOf("Normal", "Amplia", "Muy amplia"), cfg.ex("ambMove", "0").toIntOrNull() ?: 0, m) { cfg.setEx("ambMove", it.toString()) }
+        })
+        add(SItem(3, "Pantalla negra al entrar", "Diseño del modo ambiente") { m ->
+            SwitchRow("Modo ambiente = pantalla negra (el audio sigue)", cfg.ex("ambBlack") == "1", m) { cfg.setEx("ambBlack", if (it) "1" else "0") }
+        })
         add(SItem(3, "Fluidez máxima", "Rendimiento") { m ->
             SwitchRow("Fluidez máxima", cfg.fluid, m) { cfg.setFluid(it) }
         })
