@@ -1,5 +1,9 @@
 # Novedades
 
+## 4.36
+- Nueva sección «Efectos visuales» en Configuración › Pantalla y energía: desenfoque del fondo, brillos y resplandor, y animaciones de ventanas.
+- Todo viene apagado (más fluidez) y se aplica al momento. «Efectos recomendados» lo deja todo apagado.
+
 ## 4.35
 - Arreglado: al pulsar «Buscar actualizaciones» el cuadro de actualización ya recibe el foco y se puede actualizar desde el launcher.
 
