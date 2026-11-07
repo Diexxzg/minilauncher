@@ -153,18 +153,32 @@ fun FocusRow(
     content: @Composable RowScope.(Boolean) -> Unit
 ) {
     var focused by remember { mutableStateOf(false) }
-    val shape = RoundedCornerShape(12.dp)
+    val shape = RoundedCornerShape(16.dp)
     val base = modifier
         .fillMaxWidth()
         .clip(shape)
-        .background(if (focused) Color(0x2BFFFFFF) else Color.Transparent)
-        .then(if (focused) Modifier.border(1.dp, Color(0x66FFFFFF), shape) else Modifier)
+        .background(
+            if (focused) Brush.horizontalGradient(listOf(ACC.copy(alpha = 0.30f), ACC.copy(alpha = 0.08f)))
+            else Brush.horizontalGradient(listOf(Color(0x12FFFFFF), Color(0x07FFFFFF)))
+        )
+        .border(
+            if (focused) 1.5.dp else 1.dp,
+            if (focused) SolidColor(ACC.copy(alpha = 0.9f)) else SolidColor(Color(0x0FFFFFFF)),
+            shape
+        )
         .drawBehind {
             if (focused) {
+                // Brillo del acento que nace en el borde izquierdo.
+                drawRect(
+                    Brush.horizontalGradient(
+                        listOf(ACC.copy(alpha = 0.35f), Color.Transparent),
+                        endX = 70.dp.toPx()
+                    )
+                )
                 drawRoundRect(
                     color = ACC,
-                    topLeft = Offset(6.dp.toPx(), size.height * 0.28f),
-                    size = Size(3.dp.toPx(), size.height * 0.44f),
+                    topLeft = Offset(7.dp.toPx(), size.height * 0.26f),
+                    size = Size(3.5.dp.toPx(), size.height * 0.48f),
                     cornerRadius = CornerRadius(2.dp.toPx())
                 )
             }
@@ -211,29 +225,37 @@ fun SliderRow(
     ) { focused ->
         Text(label, color = Color(0xF2FFFFFF), fontSize = 17.sp, modifier = Modifier.weight(1f))
         val frac = ((value - min).toFloat() / (max - min).toFloat()).coerceIn(0f, 1f)
-        Box(Modifier.width(150.dp).height(16.dp)) {
+        Box(Modifier.width(170.dp).height(24.dp)) {
             Box(
                 Modifier
                     .align(Alignment.CenterStart)
                     .fillMaxWidth()
-                    .height(4.dp)
-                    .clip(RoundedCornerShape(2.dp))
-                    .background(Color(0x40FFFFFF))
+                    .height(6.dp)
+                    .clip(RoundedCornerShape(3.dp))
+                    .background(Color(0x33FFFFFF))
             ) {
                 Box(
                     Modifier
                         .fillMaxHeight()
                         .fillMaxWidth(frac)
-                        .background(if (focused) ACC else Color(0x99FFFFFF))
+                        .background(if (focused) ACCENT else SolidColor(Color(0x99FFFFFF)))
                 )
             }
             Box(
                 Modifier
                     .align(Alignment.CenterStart)
-                    .offset(x = (136f * frac).dp)
-                    .size(14.dp)
+                    .offset(x = (152f * frac).dp)
+                    .size(18.dp)
+                    .drawBehind {
+                        if (focused) {
+                            drawCircle(
+                                Brush.radialGradient(listOf(ACC.copy(alpha = 0.65f), Color.Transparent), radius = size.width * 1.15f),
+                                radius = size.width * 1.15f
+                            )
+                        }
+                    }
                     .clip(CircleShape)
-                    .background(Color.White)
+                    .background(if (focused) ACC else Color.White)
             )
         }
         Text(
@@ -261,14 +283,22 @@ fun SwitchRow(
         Text(label, color = Color(0xF2FFFFFF), fontSize = 17.sp, modifier = Modifier.weight(1f))
         Box(
             Modifier
-                .width(46.dp)
-                .height(26.dp)
-                .clip(RoundedCornerShape(13.dp))
-                .background(if (checked) ACCENT else SolidColor(Color(0x40FFFFFF)))
+                .drawBehind {
+                    if (checked) {
+                        drawCircle(
+                            Brush.radialGradient(listOf(ACC.copy(alpha = 0.5f), Color.Transparent), radius = size.width * 0.8f),
+                            radius = size.width * 0.8f
+                        )
+                    }
+                }
+                .width(52.dp)
+                .height(30.dp)
+                .clip(RoundedCornerShape(15.dp))
+                .background(if (checked) ACCENT else SolidColor(Color(0x33FFFFFF)))
                 .padding(3.dp),
             contentAlignment = if (checked) Alignment.CenterEnd else Alignment.CenterStart
         ) {
-            Box(Modifier.size(20.dp).clip(CircleShape).background(Color.White))
+            Box(Modifier.size(24.dp).clip(CircleShape).background(Color.White))
         }
     }
 }
@@ -294,15 +324,59 @@ fun ChoiceRow(
         Text(label, color = Color(0xF2FFFFFF), fontSize = 17.sp, modifier = Modifier.weight(1f))
         Box(
             Modifier
-                .clip(RoundedCornerShape(10.dp))
-                .background(if (focused) ACC.copy(alpha = 0.22f) else Color(0x14FFFFFF))
-                .padding(horizontal = 12.dp, vertical = 5.dp)
+                .clip(RoundedCornerShape(14.dp))
+                .background(if (focused) ACC.copy(alpha = 0.26f) else Color(0x14FFFFFF))
+                .border(1.dp, if (focused) ACC.copy(alpha = 0.8f) else Color(0x1FFFFFFF), RoundedCornerShape(14.dp))
+                .padding(horizontal = 14.dp, vertical = 6.dp)
         ) {
             Text(
                 (if (focused) "‹  " else "") + options[sel] + (if (focused) "  ›" else ""),
                 color = if (focused) Color.White else Color(0xCCFFFFFF),
                 fontSize = 16.sp, fontWeight = FontWeight.Normal, maxLines = 1
             )
+        }
+    }
+}
+
+/** Selector de tema con círculos de color (el elegido lleva anillo y brillo). */
+@Composable
+private fun ThemeSwatchRow(selected: Int, modifier: Modifier = Modifier, onSelect: (Int) -> Unit) {
+    val n = Themes.list.size
+    val sel = selected.coerceIn(0, n - 1)
+    FocusRow(
+        modifier = modifier,
+        onKey = { d ->
+            val nn = (sel + d).coerceIn(0, n - 1)
+            if (nn != sel) onSelect(nn)
+            true
+        },
+        onClick = { onSelect((sel + 1) % n) }
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text("Tema de color", color = Color(0xF2FFFFFF), fontSize = 17.sp)
+            Spacer(Modifier.height(8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(9.dp), verticalAlignment = Alignment.CenterVertically) {
+                for ((i, t) in Themes.list.withIndex()) {
+                    val on = i == sel
+                    Box(
+                        Modifier
+                            .size(if (on) 28.dp else 21.dp)
+                            .drawBehind {
+                                if (on) {
+                                    drawCircle(
+                                        Brush.radialGradient(listOf(t.acc.copy(alpha = 0.7f), Color.Transparent), radius = size.width),
+                                        radius = size.width
+                                    )
+                                }
+                            }
+                            .clip(CircleShape)
+                            .background(t.acc)
+                            .then(if (on) Modifier.border(2.dp, Color.White, CircleShape) else Modifier)
+                    )
+                }
+            }
+            Spacer(Modifier.height(4.dp))
+            Text(Themes.list[sel].name, color = ACC, fontSize = 13.sp)
         }
     }
 }
@@ -333,7 +407,9 @@ private fun SectionLabel(text: String) {
         Modifier.fillMaxWidth().padding(start = 8.dp, end = 4.dp, top = 16.dp, bottom = 6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(text.uppercase(), color = ACC, fontSize = 12.sp, letterSpacing = 1.2.sp, maxLines = 1)
+        Box(Modifier.width(3.dp).height(13.dp).clip(RoundedCornerShape(2.dp)).background(ACCENT))
+        Spacer(Modifier.width(8.dp))
+        Text(text.uppercase(), color = ACC, fontSize = 12.sp, letterSpacing = 1.4.sp, maxLines = 1)
         Spacer(Modifier.width(10.dp))
         Box(Modifier.weight(1f).height(1.dp).background(Color(0x1AFFFFFF)))
     }
@@ -342,13 +418,13 @@ private fun SectionLabel(text: String) {
 /** Tarjeta de cristal que agrupa las filas de una seccion. */
 @Composable
 private fun SectionCard(content: @Composable () -> Unit) {
-    val shape = RoundedCornerShape(16.dp)
+    val shape = RoundedCornerShape(20.dp)
     Column(
         Modifier
             .fillMaxWidth()
             .clip(shape)
-            .background(Color(0x0DFFFFFF))
-            .border(1.dp, Color(0x14FFFFFF), shape)
+            .background(Brush.verticalGradient(listOf(Color(0x14FFFFFF), Color(0x08FFFFFF))))
+            .border(1.dp, Brush.verticalGradient(listOf(Color(0x33FFFFFF), Color(0x0AFFFFFF))), shape)
             .padding(vertical = 4.dp, horizontal = 2.dp),
         verticalArrangement = Arrangement.spacedBy(2.dp)
     ) { content() }
@@ -374,11 +450,15 @@ private fun TabChip(
             .background(
                 when {
                     focused -> Color(0x2BFFFFFF)
-                    selected -> ACC.copy(alpha = 0.18f)
+                    selected -> ACC.copy(alpha = 0.24f)
                     else -> Color.Transparent
                 }
             )
-            .then(if (focused) Modifier.border(1.dp, Color(0x66FFFFFF), shape) else Modifier)
+            .then(
+                if (focused) Modifier.border(1.5.dp, ACC.copy(alpha = 0.9f), shape)
+                else if (selected) Modifier.border(1.dp, ACC.copy(alpha = 0.5f), shape)
+                else Modifier
+            )
             .drawBehind {
                 if (dot) {
                     // Punto: esta categoria tiene ajustes que ya cambiaste.
@@ -458,11 +538,15 @@ private fun RailItem(
             .background(
                 when {
                     focused -> Color(0x2BFFFFFF)
-                    selected -> ACC.copy(alpha = 0.16f)
+                    selected -> ACC.copy(alpha = 0.22f)
                     else -> Color.Transparent
                 }
             )
-            .then(if (focused) Modifier.border(1.dp, Color(0x66FFFFFF), shape) else Modifier)
+            .then(
+                if (focused) Modifier.border(1.5.dp, ACC.copy(alpha = 0.9f), shape)
+                else if (selected) Modifier.border(1.dp, ACC.copy(alpha = 0.5f), shape)
+                else Modifier
+            )
             .onFocusChanged {
                 focused = it.isFocused
                 if (it.isFocused) onFocus()
@@ -519,7 +603,7 @@ fun GlassPanelFrame(wide: Boolean = false, content: @Composable () -> Unit) {
     val pw = sidePanelWidth(availW, wide)
     val shape = RoundedCornerShape(22.dp)
     val panelBg = Brush.verticalGradient(listOf(Themes.current.panelTop, Themes.current.panelBottom))
-    val panelBorder = Brush.verticalGradient(listOf(Color(0x55FFFFFF), Color(0x1AFFFFFF)))
+    val panelBorder = Brush.verticalGradient(listOf(ACC.copy(alpha = 0.55f), Color(0x1AFFFFFF)))
     Box(Modifier.fillMaxSize()) {
         Box(
             Modifier
@@ -541,6 +625,16 @@ fun GlassPanelFrame(wide: Boolean = false, content: @Composable () -> Unit) {
                             startY = 0f,
                             endY = size.height * 0.4f
                         )
+                    )
+                    // Resplandor del acento en las esquinas, como en las referencias.
+                    val r = size.width * 0.95f
+                    drawCircle(
+                        Brush.radialGradient(listOf(ACC.copy(alpha = 0.20f), Color.Transparent), center = Offset(0f, 0f), radius = r),
+                        radius = r, center = Offset(0f, 0f)
+                    )
+                    drawCircle(
+                        Brush.radialGradient(listOf(ACC.copy(alpha = 0.12f), Color.Transparent), center = Offset(size.width, size.height), radius = r),
+                        radius = r, center = Offset(size.width, size.height)
                     )
                 }
                 .border(1.dp, panelBorder, shape)
@@ -695,7 +789,7 @@ fun SettingsScreen(
             }
         })
         add(SItem(0, "Tema de color", "Color") { m ->
-            ChoiceRow("Tema de color", Themes.list.map { it.name }, cfg.theme, m) { cfg.setTheme(it) }
+            ThemeSwatchRow(cfg.theme, m) { cfg.setTheme(it) }
         })
         add(SItem(0, "Tema automático", "Color") { m ->
             SwitchRow("Tema automático (día y noche)", cfg.autoTheme, m) { cfg.setAutoTheme(it) }
@@ -1618,13 +1712,21 @@ private fun readAboutSnap(ctx: Context): AboutSnap {
 @Composable
 private fun InfoCard(lines: List<Pair<String, String>>, modifier: Modifier = Modifier) {
     var focused by remember { mutableStateOf(false) }
-    val shape = RoundedCornerShape(14.dp)
+    val shape = RoundedCornerShape(18.dp)
     Column(
         modifier
             .fillMaxWidth()
             .clip(shape)
-            .background(if (focused) Color(0x2BFFFFFF) else Color(0x0DFFFFFF))
-            .then(if (focused) Modifier.border(1.dp, Color(0x66FFFFFF), shape) else Modifier)
+            .background(
+                if (focused) Brush.horizontalGradient(listOf(ACC.copy(alpha = 0.22f), ACC.copy(alpha = 0.06f)))
+                else Brush.verticalGradient(listOf(Color(0x14FFFFFF), Color(0x08FFFFFF)))
+            )
+            .border(
+                if (focused) 1.5.dp else 1.dp,
+                if (focused) SolidColor(ACC.copy(alpha = 0.85f))
+                else Brush.verticalGradient(listOf(Color(0x33FFFFFF), Color(0x0AFFFFFF))),
+                shape
+            )
             .onFocusChanged { focused = it.isFocused }
             .focusable()
             .padding(horizontal = 18.dp, vertical = 8.dp)

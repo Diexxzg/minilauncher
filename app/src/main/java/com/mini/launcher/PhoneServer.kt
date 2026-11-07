@@ -203,21 +203,64 @@ class PhoneServer(
     }
 
     private val PAGE = """<!doctype html><html lang="es"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1"><title>One Piece</title>
-<style>body{font-family:sans-serif;background:#10131a;color:#eee;margin:0;padding:16px;max-width:520px}
-h2{margin:18px 0 6px}input,textarea,button{width:100%;box-sizing:border-box;font-size:16px;padding:12px;margin:6px 0;border-radius:10px;border:0}
-button{background:#9fb4ff;color:#10131a;font-weight:bold}#m{color:#8fe3a8;min-height:20px}</style></head><body>
-<h1>One Piece</h1><p>Escribe el código que se ve en la TV:</p><input id="k" inputmode="numeric" maxlength="4" placeholder="Código">
-<h2>Subir fondo</h2><input id="f" type="file" accept="image/*,video/*"><button onclick="up()">Subir</button>
-<h2>Escribir en la búsqueda</h2><textarea id="t" rows="2"></textarea><button onclick="tx()">Enviar</button>
-<h2>Configuración</h2><a href="#" onclick="ex();return false" style="color:#9fb4ff">Descargar copia</a>
-<input id="c" type="file" accept=".json,application/json"><button onclick="im()">Importar copia</button>
-<p id="m"></p><script>
-const K=()=>encodeURIComponent(document.getElementById('k').value),M=s=>document.getElementById('m').textContent=s;
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#0b0b14"><title>One Piece</title>
+<style>
+:root{--a:#a78bfa;--a2:#7c5cf0;--bg:#0b0b14;--card:#161626;--tx:#f2f1fb;--mu:#9b98b8;--ok:#5eead4}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;min-height:100vh;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--tx);
+background:radial-gradient(120% 60% at 85% -10%,rgba(124,92,240,.35),transparent 60%),radial-gradient(90% 50% at -10% 110%,rgba(94,234,212,.12),transparent 60%),var(--bg);
+padding:22px 16px 120px;max-width:560px;margin:0 auto}
+.eye{font-size:11px;letter-spacing:.28em;color:var(--mu);text-transform:uppercase}
+h1{font-size:30px;margin:6px 0 2px;font-weight:700}h1 b{color:var(--a)}
+.sub{color:var(--mu);margin:0 0 18px;font-size:15px}
+.card{background:linear-gradient(160deg,#1b1b30,#13131f);border-radius:26px;padding:18px;margin:14px 0;
+box-shadow:8px 10px 24px rgba(0,0,0,.55),-4px -4px 14px rgba(255,255,255,.03),inset 0 1px 0 rgba(255,255,255,.07)}
+.card h2{margin:0 0 4px;font-size:17px;font-weight:600;display:flex;align-items:center;gap:10px}
+.dot{width:10px;height:10px;border-radius:50%;background:var(--a);box-shadow:0 0 12px var(--a)}
+.card p{margin:0 0 12px;color:var(--mu);font-size:13px}
+input,textarea{width:100%;font:inherit;font-size:16px;color:var(--tx);background:#0d0d18;border:1px solid rgba(255,255,255,.08);
+border-radius:16px;padding:14px;outline:0;box-shadow:inset 3px 3px 8px rgba(0,0,0,.5)}
+input:focus,textarea:focus{border-color:var(--a);box-shadow:0 0 0 3px rgba(167,139,250,.25)}
+#k{text-align:center;font-size:30px;letter-spacing:.5em;padding:14px 0 14px .5em;font-weight:700;color:var(--a)}
+input[type=file]{display:none}
+.drop{display:block;text-align:center;padding:22px 12px;border:1.5px dashed rgba(167,139,250,.55);border-radius:18px;
+color:var(--a);font-size:14px;background:rgba(167,139,250,.06);margin-bottom:10px;word-break:break-all}
+button,.btn{width:100%;font:inherit;font-size:16px;font-weight:700;color:#fff;border:0;border-radius:18px;padding:14px;margin-top:8px;cursor:pointer;
+background:linear-gradient(135deg,var(--a2),var(--a));box-shadow:0 8px 22px rgba(124,92,240,.45),inset 0 1px 0 rgba(255,255,255,.3)}
+button:active{transform:scale(.98)}
+.ghost{background:#1f1f35;color:var(--a);box-shadow:inset 0 0 0 1px rgba(167,139,250,.4);display:block;text-align:center;text-decoration:none}
+#m{position:fixed;left:50%;transform:translateX(-50%);bottom:92px;max-width:88%;background:rgba(30,30,52,.92);color:var(--ok);
+border:1px solid rgba(94,234,212,.4);border-radius:999px;padding:10px 18px;font-size:14px;box-shadow:0 8px 24px rgba(0,0,0,.5)}
+#m:empty{display:none}
+nav{position:fixed;left:14px;right:14px;bottom:14px;max-width:532px;margin:0 auto;display:flex;justify-content:space-around;padding:12px 8px;
+background:rgba(24,24,42,.78);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-radius:30px;
+border:1px solid rgba(255,255,255,.1);box-shadow:0 10px 30px rgba(0,0,0,.55)}
+nav a{color:var(--mu);text-decoration:none;font-size:12px;text-align:center;padding:4px 14px;border-radius:18px}
+nav a span{display:block;font-size:20px}nav a:active{color:var(--a);background:rgba(167,139,250,.15)}
+</style></head><body>
+<div class="eye">One Piece · Control remoto</div>
+<h1>Tu <b>launcher</b></h1><p class="sub">Maneja la TV desde el celular.</p>
+<div class="card"><h2><i class="dot"></i>Código</h2><p>Escribe el código de 4 dígitos que se ve en la TV.</p>
+<input id="k" inputmode="numeric" maxlength="4" placeholder="••••"></div>
+<div class="card" id="s1"><h2><i class="dot"></i>Subir fondo</h2><p>Foto o video para el fondo de la TV.</p>
+<label class="drop" for="f" id="fl">Toca para elegir un archivo</label>
+<input id="f" type="file" accept="image/*,video/*" onchange="nm(this,'fl')"><button onclick="up()">Subir</button></div>
+<div class="card" id="s2"><h2><i class="dot"></i>Escribir en la búsqueda</h2><p>Teclear en el celular es más cómodo.</p>
+<textarea id="t" rows="2" placeholder="Escribe aquí"></textarea><button onclick="tx()">Enviar a la TV</button></div>
+<div class="card" id="s3"><h2><i class="dot"></i>Configuración</h2><p>Descarga o restaura tu copia de ajustes.</p>
+<a class="btn ghost" href="#" onclick="ex();return false">Descargar copia</a>
+<label class="drop" for="c" id="cl" style="margin-top:12px">Elegir copia para importar</label>
+<input id="c" type="file" accept=".json,application/json" onchange="nm(this,'cl')"><button onclick="im()">Importar copia</button></div>
+<div id="m"></div>
+<nav><a href="#s1"><span>🖼</span>Fondo</a><a href="#s2"><span>⌨</span>Texto</a><a href="#s3"><span>⚙</span>Ajustes</a></nav>
+<script>
+const K=()=>encodeURIComponent(document.getElementById('k').value),M=s=>{const e=document.getElementById('m');e.textContent=s;setTimeout(()=>{if(e.textContent===s)e.textContent=''},5000)};
+function nm(i,l){document.getElementById(l).textContent=i.files[0]?i.files[0].name:'Elegir archivo'}
 async function send(u,b){try{const r=await fetch(u,{method:'POST',body:b});M(await r.text())}catch(e){M('No se pudo conectar')}}
 function up(){const f=document.getElementById('f').files[0];if(!f)return M('Elige un archivo');M('Subiendo...');send('/upload?k='+K()+'&name='+encodeURIComponent(f.name),f)}
 function tx(){send('/text?k='+K(),document.getElementById('t').value)}
 function ex(){location.href='/config?k='+K()}
 function im(){const f=document.getElementById('c').files[0];if(!f)return M('Elige un archivo');send('/config?k='+K(),f)}
-</script></body></html>"""
+</script></body></html>
+"""
 } 

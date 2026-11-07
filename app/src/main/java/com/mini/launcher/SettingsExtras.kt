@@ -31,6 +31,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
@@ -69,8 +70,8 @@ fun ExtraDialog(
                 .widthIn(max = maxWidth.dp)
                 .heightIn(max = 460.dp)
                 .clip(shape)
-                .background(Color(0xF0101624))
-                .border(1.dp, Color(0x33FFFFFF), shape)
+                .background(Brush.verticalGradient(listOf(Color(0xF0182036), Color(0xF00D1220))))
+                .border(1.dp, Brush.verticalGradient(listOf(Themes.current.acc.copy(alpha = 0.55f), Color(0x22FFFFFF))), shape)
                 .then(if (scroll) Modifier.verticalScroll(scrollState) else Modifier)
                 .padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
