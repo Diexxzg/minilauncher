@@ -1,5 +1,10 @@
 # Novedades
 
+## 4.20
+- El remapeo de botones vuelve a funcionar en cualquier app, no solo en el launcher.
+- El apagado inteligente («¿sigues ahí?») vuelve a ver tus botones y funciona de verdad.
+- Tras instalar, desactiva y vuelve a activar «One Piece - energía» en Accesibilidad.
+
 ## 4.18
 - Nuevo «Remapear botones del mando» (Sistema): elige cualquier botón y asígnale una acción o una app; funciona dentro del launcher.
 - «Uso diario»: doble Inicio vuelve a la última app, dock por franja horaria, hábitos, tarjeta del día y perfil al encender, y apagado inteligente («¿sigues ahí?»).
