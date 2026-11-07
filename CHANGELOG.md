@@ -1,5 +1,8 @@
 # Novedades
 
+## 4.25
+- Si «One Piece - energía» no se puede reactivar sola, ahora muestra el motivo en pantalla.
+
 ## 4.24
 - Tras instalar una versión nueva, la accesibilidad «One Piece - energía» se reactiva sola, sin abrir el launcher.
 
