@@ -562,12 +562,12 @@ private fun RailItem(
                     )
                 }
             }
-            .padding(horizontal = 14.dp, vertical = 8.dp),
+            .padding(horizontal = 12.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(
             Modifier
-                .size(34.dp)
+                .size(30.dp)
                 .clip(RoundedCornerShape(10.dp))
                 .background(if (focused || selected) ACC.copy(alpha = 0.22f) else Color(0x14FFFFFF)),
             contentAlignment = Alignment.Center
@@ -591,7 +591,7 @@ private fun RailItem(
  * El contenido se dibuja a PANEL_SCALE para verse mas compacto.
  */
 @Composable
-fun GlassPanelFrame(wide: Boolean = false, content: @Composable () -> Unit) {
+fun GlassPanelFrame(wide: Boolean = false, compact: Boolean = false, content: @Composable () -> Unit) {
     val conf = LocalConfiguration.current
     val dens = androidx.compose.ui.platform.LocalDensity.current
     val us = LocalUiScale.current
@@ -600,20 +600,40 @@ fun GlassPanelFrame(wide: Boolean = false, content: @Composable () -> Unit) {
     LaunchedEffect(Unit) { shown = true }
     val p by animateFloatAsState(if (shown) 1f else 0f, tween(300), label = "panelIn")
     val availW = conf.screenWidthDp.toFloat() / us - 2f * ov
-    val pw = sidePanelWidth(availW, wide)
-    val shape = RoundedCornerShape(22.dp)
+    val availH = conf.screenHeightDp.toFloat() / us - 2f * ov
+    // Configuración (wide): ventana horizontal centrada. En Fondo y Dock se hace más baja y se sube
+    // para que el inicio siga viéndose debajo con los cambios en vivo.
+    val pw = if (wide) (availW * 0.90f).coerceIn(560f, 1180f) else sidePanelWidth(availW, false)
+    val winFrac by animateFloatAsState(if (!wide) 1f else if (compact) 0.60f else 0.90f, tween(300), label = "winH")
+    val topPad by androidx.compose.animation.core.animateDpAsState(
+        if (!wide) 8.dp else if (compact) 14.dp else (availH * 0.05f).dp, tween(300), label = "winTop"
+    )
+    val shape = RoundedCornerShape(if (wide) 28.dp else 22.dp)
     val panelBg = Brush.verticalGradient(listOf(Themes.current.panelTop, Themes.current.panelBottom))
     val panelBorder = Brush.verticalGradient(listOf(ACC.copy(alpha = 0.55f), Color(0x1AFFFFFF)))
     Box(Modifier.fillMaxSize()) {
         Box(
             Modifier
-                .align(Alignment.CenterEnd)
-                .padding(top = 8.dp, bottom = 8.dp, end = 6.dp)
+                .align(if (wide) Alignment.TopCenter else Alignment.CenterEnd)
+                .padding(top = topPad, bottom = if (wide) 0.dp else 8.dp, end = if (wide) 0.dp else 6.dp)
                 .width(pw.dp)
-                .fillMaxHeight()
+                .fillMaxHeight(winFrac)
                 .graphicsLayer {
-                    translationX = (1f - p) * 56.dp.toPx()
+                    if (wide) translationY = (1f - p) * 40.dp.toPx() else translationX = (1f - p) * 56.dp.toPx()
                     alpha = p
+                }
+                .drawBehind {
+                    // Resplandor del acento alrededor de la ventana (capas suaves, sin desenfoque).
+                    val cr = if (wide) 28.dp.toPx() else 22.dp.toPx()
+                    for (i in 1..5) {
+                        val g = i * 7.dp.toPx()
+                        drawRoundRect(
+                            ACC.copy(alpha = 0.035f),
+                            topLeft = Offset(-g, -g),
+                            size = Size(size.width + 2 * g, size.height + 2 * g),
+                            cornerRadius = CornerRadius(cr + g)
+                        )
+                    }
                 }
                 .clip(shape)
                 .background(panelBg)
@@ -1430,7 +1450,7 @@ fun SettingsScreen(
     val shown = items.filter { it.cat == curCat }
         .sortedBy { i -> secOrder.indexOf(i.sec).let { if (it < 0) 99 else it } }
     val title = CATS[curCat].name
-    val subtitle = if (settingsPreviewCat(curCat)) "Los cambios se ven en vivo a la izquierda" else CATS[curCat].desc
+    val subtitle = if (settingsPreviewCat(curCat)) "Los cambios se ven en vivo debajo" else CATS[curCat].desc
     val scroll = remember(curCat) { androidx.compose.foundation.ScrollState(0) }
     val startCat = remember { curCat }
     // Mientras no se toquen las pestañas, el foco cae solo en la primera opcion (o en la fila que abrio un sub-panel).
@@ -1450,50 +1470,60 @@ fun SettingsScreen(
     val upMod = Modifier.focusProperties { up = tabFr[curCat] }
     DisposableEffect(Unit) { onDispose { onRightFocus(false) } }
 
-    GlassPanelFrame(wide = true) {
-        Column(
+    GlassPanelFrame(wide = true, compact = settingsPreviewCat(curCat)) {
+        Row(
             Modifier
                 .fillMaxSize()
                 .focusProperties { canFocus = !blocked }
-                .padding(start = 18.dp, end = 18.dp, top = 14.dp, bottom = 12.dp)
         ) {
-            Row(Modifier.padding(start = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                GearIcon(Color(0x99FFFFFF), 14)
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    "CONFIGURACIÓN", color = Color(0x99FFFFFF), fontSize = 13.sp,
-                    letterSpacing = 1.sp, fontWeight = FontWeight.Normal
-                )
-                Spacer(Modifier.weight(1f))
-                Text(
-                    "↓ entrar  ·  Atrás cerrar", color = Color(0x80FFFFFF),
-                    fontSize = 12.sp, maxLines = 1
-                )
-            }
-            Spacer(Modifier.height(10.dp))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+            // Barra lateral de categorías (arriba/abajo cambia de categoría, derecha entra a las opciones).
+            Column(
+                Modifier
+                    .width(250.dp)
+                    .fillMaxHeight()
+                    .background(Color(0x22000000))
+                    .verticalScroll(androidx.compose.foundation.rememberScrollState())
+                    .padding(horizontal = 12.dp, vertical = 14.dp),
+                verticalArrangement = Arrangement.spacedBy(3.dp)
+            ) {
+                Row(Modifier.padding(start = 6.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    GearIcon(ACC, 16)
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        "CONFIGURACIÓN", color = Color(0xB3FFFFFF), fontSize = 13.sp,
+                        letterSpacing = 1.sp, fontWeight = FontWeight.Normal
+                    )
+                }
                 CATS.forEachIndexed { i, c ->
-                    TabChip(
-                        c.icon, i == curCat,
-                        Modifier.weight(1f).focusRequester(tabFr[i]).focusProperties {
-                            up = tabFr[i]
-                            if (i == 0) left = tabFr[i]
-                            if (i == CATS.lastIndex) right = tabFr[i]
+                    RailItem(
+                        c.icon, c.name, i == curCat,
+                        Modifier.focusRequester(tabFr[i]).focusProperties {
+                            if (i == 0) up = tabFr[i]
+                            if (i == CATS.lastIndex) down = tabFr[i]
+                            right = firstFr
                         },
-                        dot = (RESET_KEYS[i]?.let { prefs.countKeys(it) } ?: 0) > 0,
                         onFocus = {
                             tabTouched = true
                             if (i != curCat) onCat(i)
                         },
-                        onEnter = enterOptions,
                         onClick = {
                             onCat(i)
                             enterOptions()
                         }
                     )
                 }
+                Text(
+                    "→ entrar  ·  Atrás cerrar", color = Color(0x80FFFFFF), fontSize = 12.sp,
+                    modifier = Modifier.padding(start = 8.dp, top = 10.dp)
+                )
             }
-            Spacer(Modifier.height(12.dp))
+            Box(Modifier.width(1.dp).fillMaxHeight().background(Color(0x1FFFFFFF)))
+            Column(
+                Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .padding(start = 22.dp, end = 18.dp, top = 14.dp, bottom = 12.dp)
+            ) {
             Row(Modifier.padding(start = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                 LineIcon(CATS[curCat].icon, ACC, 26)
                 Spacer(Modifier.width(10.dp))
@@ -1510,6 +1540,7 @@ fun SettingsScreen(
                 Modifier
                     .weight(1f)
                     .fillMaxWidth()
+                    .focusProperties { left = tabFr[curCat] }
                     .verticalScroll(scroll),
                 verticalArrangement = Arrangement.spacedBy(2.dp)
             ) {
@@ -1558,6 +1589,7 @@ fun SettingsScreen(
                     }
                 }
                 Spacer(Modifier.height(12.dp))
+            }
             }
         }
     }

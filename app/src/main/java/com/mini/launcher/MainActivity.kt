@@ -1110,7 +1110,7 @@ fun HomeRoot(
     val sideSpec: androidx.compose.animation.core.AnimationSpec<androidx.compose.ui.unit.Dp> =
         if (eAnim) tween(260) else androidx.compose.animation.core.snap()
     val sideInset by animateDpAsState(
-        if (sideOpen) (sidePanelWidth(availW, screen == "settings") + 20f).dp else 0.dp, sideSpec, label = "sideInset"
+        if (sideOpen && screen != "settings") (sidePanelWidth(availW, false) + 20f).dp else 0.dp, sideSpec, label = "sideInset"
     )
     val dimLayer: Long = when (screen) {
         "all", "hidden" -> 0x99000000
