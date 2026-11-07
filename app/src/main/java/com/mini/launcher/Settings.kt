@@ -7,6 +7,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -519,7 +520,7 @@ private fun CategoryRow(
     }
 }
 
-/** Fila de la columna de categorias: icono y nombre; la seleccionada queda resaltada. */
+/** Fila de la barra lateral: icono y nombre; la activa lleva contorno y brillo del acento (como en la referencia). */
 @Composable
 private fun RailItem(
     icon: String,
@@ -530,7 +531,7 @@ private fun RailItem(
     onClick: () -> Unit
 ) {
     var focused by remember { mutableStateOf(false) }
-    val shape = RoundedCornerShape(12.dp)
+    val shape = RoundedCornerShape(16.dp)
     Row(
         modifier
             .fillMaxWidth()
@@ -540,46 +541,35 @@ private fun RailItem(
                         val g = i * 3.dp.toPx()
                         drawRoundRect(
                             ACC.copy(alpha = 0.07f), topLeft = Offset(-g, -g),
-                            size = Size(size.width + 2 * g, size.height + 2 * g), cornerRadius = CornerRadius(12.dp.toPx() + g)
+                            size = Size(size.width + 2 * g, size.height + 2 * g), cornerRadius = CornerRadius(16.dp.toPx() + g)
                         )
                     }
                 }
             }
             .clip(shape)
-            .background(if (selected) ACCENT else SolidColor(if (focused) Color(0x26FFFFFF) else Color.Transparent))
-            .then(if (focused) Modifier.border(1.5.dp, if (selected) Color.White else ACC, shape) else Modifier)
+            .background(
+                if (selected) Brush.horizontalGradient(listOf(ACC.copy(alpha = 0.34f), ACC.copy(alpha = 0.10f)))
+                else SolidColor(if (focused) Color(0x1FFFFFFF) else Color.Transparent)
+            )
+            .then(
+                if (selected) Modifier.border(1.5.dp, ACC, shape)
+                else if (focused) Modifier.border(1.dp, Color(0x66FFFFFF), shape)
+                else Modifier
+            )
             .onFocusChanged {
                 focused = it.isFocused
                 if (it.isFocused) onFocus()
             }
             .clickable(onClick = onClick)
-            .drawBehind {
-                if (selected) {
-                    drawRoundRect(
-                        color = ACC,
-                        topLeft = Offset(3.dp.toPx(), size.height * 0.24f),
-                        size = Size(3.dp.toPx(), size.height * 0.52f),
-                        cornerRadius = CornerRadius(2.dp.toPx())
-                    )
-                }
-            }
-            .padding(horizontal = 12.dp, vertical = 6.dp),
+            .padding(horizontal = 14.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(
-            Modifier
-                .size(30.dp)
-                .clip(RoundedCornerShape(10.dp))
-                .background(if (selected) Color(0x26000000) else if (focused) ACC.copy(alpha = 0.22f) else Color(0x14FFFFFF)),
-            contentAlignment = Alignment.Center
-        ) {
-            LineIcon(icon, if (selected) Color(0xFF0B0B12) else if (focused) ACC else TAB_IDLE, 20)
-        }
-        Spacer(Modifier.width(12.dp))
+        LineIcon(icon, if (selected) ACC else Color(0xCCFFFFFF), 22)
+        Spacer(Modifier.width(14.dp))
         Text(
             name,
-            color = if (selected) Color(0xFF0B0B12) else if (focused) Color.White else Color(0xCCFFFFFF),
-            fontSize = 17.sp, maxLines = 1, overflow = TextOverflow.Ellipsis
+            color = if (selected || focused) Color.White else Color(0xCCFFFFFF),
+            fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis
         )
     }
 }
@@ -604,10 +594,10 @@ fun GlassPanelFrame(wide: Boolean = false, compact: Boolean = false, content: @C
     val availH = conf.screenHeightDp.toFloat() / us - 2f * ov
     // Configuración (wide): ventana horizontal centrada. En Fondo y Dock se hace más baja y se sube
     // para que el inicio siga viéndose debajo con los cambios en vivo.
-    val pw = if (wide) (availW * 0.95f).coerceIn(560f, 1280f) else sidePanelWidth(availW, false)
-    val winFrac by animateFloatAsState(if (!wide) 1f else if (compact) 0.62f else 0.92f, tween(300), label = "winH")
+    val pw = if (wide) (availW * 0.82f).coerceIn(520f, 1100f) else sidePanelWidth(availW, false)
+    val winFrac by animateFloatAsState(if (!wide) 1f else if (compact) 0.60f else 0.80f, tween(300), label = "winH")
     val topPad by androidx.compose.animation.core.animateDpAsState(
-        if (!wide) 8.dp else if (compact) 14.dp else (availH * 0.04f).dp, tween(300), label = "winTop"
+        if (!wide) 8.dp else if (compact) 14.dp else (availH * 0.09f).dp, tween(300), label = "winTop"
     )
     val shape = RoundedCornerShape(if (wide) 28.dp else 22.dp)
     val panelBg = if (wide) Brush.verticalGradient(listOf(Color(0xFA10101A), Color(0xFA08080E)))
@@ -663,7 +653,7 @@ fun GlassPanelFrame(wide: Boolean = false, compact: Boolean = false, content: @C
         ) {
             androidx.compose.runtime.CompositionLocalProvider(
                 androidx.compose.ui.platform.LocalDensity provides
-                    androidx.compose.ui.unit.Density(dens.density * (if (wide) 0.80f else PANEL_SCALE), dens.fontScale)
+                    androidx.compose.ui.unit.Density(dens.density * (if (wide) 0.66f else PANEL_SCALE), dens.fontScale)
             ) { content() }
         }
     }
@@ -692,6 +682,7 @@ private var returnKey: String? = null
  * opciones de una categoria. cat vive en MainActivity para que Atras funcione: dentro de una
  * categoria vuelve a la lista y desde la lista cierra el panel (una sola pulsacion cada vez).
  */
+@OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
 @Composable
 fun SettingsScreen(
     style: DockStyle,
@@ -1472,6 +1463,9 @@ fun SettingsScreen(
     // Arriba desde la primera opcion siempre vuelve a la pestaña de la categoria abierta.
     val upMod = Modifier.focusProperties { up = tabFr[curCat] }
     DisposableEffect(Unit) { onDispose { onRightFocus(false) } }
+    LaunchedEffect(railBack) {
+        if (railBack > 0) runCatching { tabFr[curCat].requestFocus() }
+    }
     val focusMgr = androidx.compose.ui.platform.LocalFocusManager.current
     LaunchedEffect(Unit) {
         // Al abrir Configuración el foco podía quedarse en el dock: se suelta y se entra a la ventana.
@@ -1487,53 +1481,65 @@ fun SettingsScreen(
         Column(
             Modifier
                 .fillMaxSize()
+                .focusProperties { exit = { androidx.compose.ui.focus.FocusRequester.Cancel } }
+                .focusGroup()
                 .focusProperties { canFocus = !blocked }
         ) {
             SettingsTopBar()
             Row(Modifier.weight(1f).fillMaxWidth()) {
-            // Barra lateral de categorías (arriba/abajo cambia de categoría, derecha entra a las opciones).
+            // Barra lateral de categorías: tarjeta oscura con contorno (arriba/abajo cambia de categoría).
+            val sideShape = RoundedCornerShape(22.dp)
             Column(
                 Modifier
-                    .width(250.dp)
+                    .padding(start = 14.dp, top = 12.dp, bottom = 12.dp)
+                    .width(238.dp)
                     .fillMaxHeight()
-                    .background(Color(0x22000000))
-                    .verticalScroll(androidx.compose.foundation.rememberScrollState())
-                    .padding(horizontal = 12.dp, vertical = 14.dp),
-                verticalArrangement = Arrangement.spacedBy(3.dp)
+                    .clip(sideShape)
+                    .background(Brush.verticalGradient(listOf(Color(0xFF0C0C12), Color(0xFF07070B))))
+                    .border(1.dp, ACC.copy(alpha = 0.40f), sideShape)
+                    .padding(horizontal = 10.dp, vertical = 12.dp)
             ) {
-                Row(Modifier.padding(start = 6.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    GearIcon(ACC, 16)
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        "CONFIGURACIÓN", color = Color(0xB3FFFFFF), fontSize = 13.sp,
-                        letterSpacing = 1.sp, fontWeight = FontWeight.Normal
-                    )
+                Column(
+                    Modifier
+                        .weight(1f)
+                        .verticalScroll(androidx.compose.foundation.rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    CATS.forEachIndexed { i, c ->
+                        RailItem(
+                            c.icon, c.name, i == curCat,
+                            Modifier.focusRequester(tabFr[i]).focusProperties {
+                                if (i == 0) up = tabFr[i]
+                                right = firstFr
+                            },
+                            onFocus = {
+                                tabTouched = true
+                                if (i != curCat) onCat(i)
+                            },
+                            onClick = {
+                                onCat(i)
+                                enterOptions()
+                            }
+                        )
+                    }
                 }
-                CATS.forEachIndexed { i, c ->
-                    RailItem(
-                        c.icon, c.name, i == curCat,
-                        Modifier.focusRequester(tabFr[i]).focusProperties {
-                            if (i == 0) up = tabFr[i]
-                            right = firstFr
-                        },
-                        onFocus = {
-                            tabTouched = true
-                            if (i != curCat) onCat(i)
-                        },
-                        onClick = {
-                            onCat(i)
-                            enterOptions()
-                        }
-                    )
-                }
-                Spacer(Modifier.height(10.dp))
+                Spacer(Modifier.height(8.dp))
                 UpdateButton(Modifier.focusRequester(updFr).focusProperties { down = updFr; right = firstFr }) { onUpdate() }
             }
-            Box(Modifier.width(1.dp).fillMaxHeight().background(Color(0x1FFFFFFF)))
             Column(
                 Modifier
                     .weight(1f)
                     .fillMaxHeight()
+                    .onFocusChanged { onRightFocus(it.hasFocus) }
+                    .onKeyEvent { e ->
+                        // Izquierda en una fila que no la usa (acciones, tarjetas) vuelve a las categorías.
+                        if (e.type == KeyEventType.KeyDown && e.key == Key.DirectionLeft) {
+                            runCatching { tabFr[curCat].requestFocus() }
+                            true
+                        } else {
+                            false
+                        }
+                    }
                     .padding(start = 22.dp, end = 18.dp, top = 14.dp, bottom = 12.dp)
             ) {
             Row(Modifier.padding(start = 6.dp), verticalAlignment = Alignment.CenterVertically) {

@@ -685,6 +685,7 @@ fun HomeRoot(
             }
             showPower -> showPower = false
             screen == "walls" || screen == "edit" || screen == "dock" -> screen = "settings"
+            screen == "settings" && settingsRight -> railBack++
             screen == "wizard" -> {
                 prefs.putInt("wizardDone", 1)
                 screen = "home"
