@@ -1129,7 +1129,7 @@ fun HomeRoot(
     val panelOpen = screen == "settings" || screen == "edit" || screen == "inputs" ||
         menuApp != null || showPower
     val blurDp by animateDpAsState(
-        if (eBlur && panelOpen && !preview && screen != "edit") 24.dp else 0.dp, tween(350), label = "blur"
+        if (eBlur && panelOpen && !preview && screen != "edit" && screen != "settings") 24.dp else 0.dp, tween(350), label = "blur"
     )
     // Fondo animado (video / GIF): se pausa con paneles, menus o cuando hay otra app abierta.
     val wallPaused = (screen == "ambient" && (!cfg.ambAnim || cfg.saver)) ||

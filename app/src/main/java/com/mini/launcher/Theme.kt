@@ -29,7 +29,10 @@ object Themes {
         AppTheme("Aurora", Color(0xFF7CF5C8), Color(0xFF3FBF98), Color(0xCC10241F), Color(0xCC0A1713), Color(0x5560F0C0), Color(0xDDB5FBE3)),
         AppTheme("Cereza", Color(0xFFFF6B7A), Color(0xFFD63C4E), Color(0xCC261217), Color(0xCC170B0E), Color(0x55FF5266), Color(0xDDFFB0B8)),
         AppTheme("Hielo", Color(0xFFA8E1FF), Color(0xFF6FB6E6), Color(0xCC15212B), Color(0xCC0D151C), Color(0x558ED0FF), Color(0xDDD2EEFF)),
-        AppTheme("Dorado", Color(0xFFFFD36B), Color(0xFFD9A63A), Color(0xCC272010), Color(0xCC17130A), Color(0x55FFC94D), Color(0xDDFFE6A8))
+        AppTheme("Dorado", Color(0xFFFFD36B), Color(0xFFD9A63A), Color(0xCC272010), Color(0xCC17130A), Color(0x55FFC94D), Color(0xDDFFE6A8)),
+        AppTheme("Neón verde", Color(0xFF39FF7A), Color(0xFF14B85A), Color(0xCC0D1A12), Color(0xCC08100B), Color(0x5539FF7A), Color(0xDD9CFFC0)),
+        AppTheme("Neón violeta", Color(0xFFA78BFA), Color(0xFF7C5CF0), Color(0xCC15101F), Color(0xCC0D0A14), Color(0x55A78BFA), Color(0xDDD3C6FF)),
+        AppTheme("Neón rojo", Color(0xFFFF3B4E), Color(0xFFC4182B), Color(0xCC1F0D10), Color(0xCC140709), Color(0x55FF3B4E), Color(0xDDFFA3AB))
     )
 
     var current by mutableStateOf(list[0])

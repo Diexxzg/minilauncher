@@ -226,7 +226,7 @@ fun SliderRow(
     ) { focused ->
         Text(label, color = Color(0xF2FFFFFF), fontSize = 17.sp, modifier = Modifier.weight(1f))
         val frac = ((value - min).toFloat() / (max - min).toFloat()).coerceIn(0f, 1f)
-        Box(Modifier.width(170.dp).height(24.dp)) {
+        Box(Modifier.width(130.dp).height(24.dp)) {
             Box(
                 Modifier
                     .align(Alignment.CenterStart)
@@ -245,16 +245,8 @@ fun SliderRow(
             Box(
                 Modifier
                     .align(Alignment.CenterStart)
-                    .offset(x = (152f * frac).dp)
+                    .offset(x = (112f * frac).dp)
                     .size(18.dp)
-                    .drawBehind {
-                        if (focused) {
-                            drawCircle(
-                                Brush.radialGradient(listOf(ACC.copy(alpha = 0.65f), Color.Transparent), radius = size.width * 1.15f),
-                                radius = size.width * 1.15f
-                            )
-                        }
-                    }
                     .clip(CircleShape)
                     .background(if (focused) ACC else Color.White)
             )
@@ -284,14 +276,6 @@ fun SwitchRow(
         Text(label, color = Color(0xF2FFFFFF), fontSize = 17.sp, modifier = Modifier.weight(1f))
         Box(
             Modifier
-                .drawBehind {
-                    if (checked) {
-                        drawCircle(
-                            Brush.radialGradient(listOf(ACC.copy(alpha = 0.5f), Color.Transparent), radius = size.width * 0.8f),
-                            radius = size.width * 0.8f
-                        )
-                    }
-                }
                 .width(52.dp)
                 .height(30.dp)
                 .clip(RoundedCornerShape(15.dp))
@@ -356,20 +340,12 @@ private fun ThemeSwatchRow(selected: Int, modifier: Modifier = Modifier, onSelec
         Column(Modifier.weight(1f)) {
             Text("Tema de color", color = Color(0xF2FFFFFF), fontSize = 17.sp)
             Spacer(Modifier.height(8.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(9.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
                 for ((i, t) in Themes.list.withIndex()) {
                     val on = i == sel
                     Box(
                         Modifier
-                            .size(if (on) 28.dp else 21.dp)
-                            .drawBehind {
-                                if (on) {
-                                    drawCircle(
-                                        Brush.radialGradient(listOf(t.acc.copy(alpha = 0.7f), Color.Transparent), radius = size.width),
-                                        radius = size.width
-                                    )
-                                }
-                            }
+                            .size(if (on) 22.dp else 17.dp)
                             .clip(CircleShape)
                             .background(t.acc)
                             .then(if (on) Modifier.border(2.dp, Color.White, CircleShape) else Modifier)
@@ -535,17 +511,6 @@ private fun RailItem(
     Row(
         modifier
             .fillMaxWidth()
-            .drawBehind {
-                if (selected) {
-                    for (i in 1..3) {
-                        val g = i * 3.dp.toPx()
-                        drawRoundRect(
-                            ACC.copy(alpha = 0.07f), topLeft = Offset(-g, -g),
-                            size = Size(size.width + 2 * g, size.height + 2 * g), cornerRadius = CornerRadius(16.dp.toPx() + g)
-                        )
-                    }
-                }
-            }
             .clip(shape)
             .background(
                 if (selected) Brush.horizontalGradient(listOf(ACC.copy(alpha = 0.34f), ACC.copy(alpha = 0.10f)))
@@ -561,10 +526,10 @@ private fun RailItem(
                 if (it.isFocused) onFocus()
             }
             .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 10.dp),
+            .padding(horizontal = 14.dp, vertical = 7.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        LineIcon(icon, if (selected) ACC else Color(0xCCFFFFFF), 22)
+        LineIcon(icon, if (selected) ACC else Color(0xCCFFFFFF), 20)
         Spacer(Modifier.width(14.dp))
         Text(
             name,
@@ -594,11 +559,9 @@ fun GlassPanelFrame(wide: Boolean = false, compact: Boolean = false, content: @C
     val availH = conf.screenHeightDp.toFloat() / us - 2f * ov
     // Configuración (wide): ventana horizontal centrada. En Fondo y Dock se hace más baja y se sube
     // para que el inicio siga viéndose debajo con los cambios en vivo.
-    val pw = if (wide) (availW * 0.82f).coerceIn(520f, 1100f) else sidePanelWidth(availW, false)
-    val winFrac by animateFloatAsState(if (!wide) 1f else if (compact) 0.60f else 0.80f, tween(300), label = "winH")
-    val topPad by androidx.compose.animation.core.animateDpAsState(
-        if (!wide) 8.dp else if (compact) 14.dp else (availH * 0.09f).dp, tween(300), label = "winTop"
-    )
+    val pw = if (wide) (availW * 0.62f).coerceIn(520f, 1100f) else sidePanelWidth(availW, false)
+    val winFrac = if (!wide) 1f else 0.60f
+    val topPad = if (!wide) 8.dp else (availH * 0.09f).dp
     val shape = RoundedCornerShape(if (wide) 28.dp else 22.dp)
     val panelBg = if (wide) Brush.verticalGradient(listOf(Color(0xFA10101A), Color(0xFA08080E)))
     else Brush.verticalGradient(listOf(Themes.current.panelTop, Themes.current.panelBottom))
@@ -616,7 +579,8 @@ fun GlassPanelFrame(wide: Boolean = false, compact: Boolean = false, content: @C
                 }
                 .drawBehind {
                     // Resplandor del acento alrededor de la ventana (capas suaves, sin desenfoque).
-                    val cr = if (wide) 28.dp.toPx() else 22.dp.toPx()
+                    if (wide) return@drawBehind
+                    val cr = 22.dp.toPx()
                     for (i in 1..3) {
                         val g = i * 5.dp.toPx()
                         drawRoundRect(
@@ -638,7 +602,7 @@ fun GlassPanelFrame(wide: Boolean = false, compact: Boolean = false, content: @C
                             endY = size.height * 0.4f
                         )
                     )
-                    // Resplandor del acento en las esquinas, como en las referencias.
+                    if (wide) return@drawBehind
                     val r = size.width * 0.95f
                     drawCircle(
                         Brush.radialGradient(listOf(ACC.copy(alpha = 0.20f), Color.Transparent), center = Offset(0f, 0f), radius = r),
@@ -653,7 +617,7 @@ fun GlassPanelFrame(wide: Boolean = false, compact: Boolean = false, content: @C
         ) {
             androidx.compose.runtime.CompositionLocalProvider(
                 androidx.compose.ui.platform.LocalDensity provides
-                    androidx.compose.ui.unit.Density(dens.density * (if (wide) 0.66f else PANEL_SCALE), dens.fontScale)
+                    androidx.compose.ui.unit.Density(dens.density * (if (wide) 0.56f else PANEL_SCALE), dens.fontScale)
             ) { content() }
         }
     }
@@ -1451,6 +1415,8 @@ fun SettingsScreen(
     val tabFr = remember { List(CATS.size) { FocusRequester() } }
     val firstFr = remember { FocusRequester() }
     val updFr = remember { FocusRequester() }
+    val aLastFr = remember { FocusRequester() }
+    val bFirstFr = remember { FocusRequester() }
     val lastFr = remember { FocusRequester() }
     val hasReset = RESET_KEYS.containsKey(curCat) && curCat != ABOUT
     val enterOptions: () -> Boolean = { runCatching { firstFr.requestFocus() }.isSuccess }
@@ -1571,29 +1537,61 @@ fun SettingsScreen(
                         firstMod = (if (firstFocus) upMod.autoFocus() else upMod).focusRequester(firstFr)
                     )
                 } else {
-                    for ((group, list) in shown.groupBy { it.sec }) {
-                        if (group.isNotEmpty()) SectionLabel(group)
-                        SectionCard {
-                            for (si in list) {
-                                key(si.cat to si.label) {
-                                    val isFirst = si.label == firstLabel
-                                    var m: Modifier = if (isFirst) upMod.focusRequester(firstFr) else Modifier
-                                    if (si.focusable && si.label == retItem) {
-                                        m = m.autoFocus()
-                                    } else if (isFirst && firstFocus) {
-                                        m = m.autoFocus()
-                                    }
-                                    if (!hasReset && si.label == lastLabel) m = m.then(stopDown)
-                                    si.content(m)
-                                    val d = DESCS[si.label]
-                                    if (d != null) {
-                                        Text(
-                                            d, color = Color(0x80FFFFFF), fontSize = 12.sp,
-                                            modifier = Modifier.padding(start = 22.dp, end = 16.dp, bottom = 8.dp)
-                                        )
+                    val groups = shown.groupBy { it.sec }.toList()
+                    val colA = ArrayList<Pair<String, List<SItem>>>()
+                    val colB = ArrayList<Pair<String, List<SItem>>>()
+                    var wa = 0
+                    var wb = 0
+                    for (g in groups) {
+                        val w = g.second.size + 1
+                        if (wa <= wb) {
+                            colA.add(g)
+                            wa += w
+                        } else {
+                            colB.add(g)
+                            wb += w
+                        }
+                    }
+                    val aLabels = colA.flatMap { it.second }.filter { it.focusable }.map { it.label }
+                    val bLabels = colB.flatMap { it.second }.filter { it.focusable }.map { it.label }
+                    val aLast = aLabels.lastOrNull()
+                    val bFirst = bLabels.firstOrNull()
+                    val endLabel = bLabels.lastOrNull() ?: aLast
+                    val renderCol: @Composable (List<Pair<String, List<SItem>>>) -> Unit = { col ->
+                        for ((group, list) in col) {
+                            if (group.isNotEmpty()) SectionLabel(group)
+                            SectionCard {
+                                for (si in list) {
+                                    key(si.cat to si.label) {
+                                        val isFirst = si.label == firstLabel
+                                        var m: Modifier = if (isFirst) upMod.focusRequester(firstFr) else Modifier
+                                        if (si.focusable && si.label == bFirst) m = m.focusRequester(bFirstFr).focusProperties { up = aLastFr }
+                                        if (si.focusable && si.label == aLast && bFirst != null) m = m.focusRequester(aLastFr).focusProperties { down = bFirstFr }
+                                        if (si.focusable && si.label == retItem) {
+                                            m = m.autoFocus()
+                                        } else if (isFirst && firstFocus) {
+                                            m = m.autoFocus()
+                                        }
+                                        if (!hasReset && si.label == endLabel) m = m.then(stopDown)
+                                        si.content(m)
+                                        val d = DESCS[si.label]
+                                        if (d != null) {
+                                            Text(
+                                                d, color = Color(0x80FFFFFF), fontSize = 12.sp,
+                                                modifier = Modifier.padding(start = 22.dp, end = 16.dp, bottom = 8.dp)
+                                            )
+                                        }
                                     }
                                 }
                             }
+                        }
+                    }
+                    if (colB.isEmpty()) {
+                        Column(Modifier.fillMaxWidth()) { renderCol(colA) }
+                    } else {
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(18.dp)) {
+                            Column(Modifier.weight(1f)) { renderCol(colA) }
+                            Column(Modifier.weight(1f)) { renderCol(colB) }
                         }
                     }
                     if (RESET_KEYS.containsKey(curCat)) {
@@ -1609,6 +1607,57 @@ fun SettingsScreen(
                 Spacer(Modifier.height(12.dp))
             }
             }
+            }
+            SettingsBottomBar()
+        }
+    }
+}
+
+/** Barra inferior de estado: red, memoria usada y espacio libre (se lee una sola vez al abrir). */
+@Composable
+private fun SettingsBottomBar() {
+    val ctx = LocalContext.current
+    var info by remember { mutableStateOf(listOf<Triple<String, String, String>>()) }
+    LaunchedEffect(Unit) {
+        info = withContext(Dispatchers.IO) {
+            try {
+                val am = ctx.getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
+                val mi = android.app.ActivityManager.MemoryInfo()
+                am.getMemoryInfo(mi)
+                val used = 100 - (mi.availMem * 100 / mi.totalMem).toInt()
+                val sf = android.os.StatFs(android.os.Environment.getDataDirectory().path)
+                val cm = ctx.getSystemService(Context.CONNECTIVITY_SERVICE) as android.net.ConnectivityManager
+                val caps = cm.getNetworkCapabilities(cm.activeNetwork)
+                val net = when {
+                    caps == null -> "Sin red"
+                    caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI) -> "Wi-Fi"
+                    caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_ETHERNET) -> "Cable"
+                    else -> "Conectado"
+                }
+                listOf(
+                    Triple("globe", "Red", net),
+                    Triple("bolt", "RAM", "$used %"),
+                    Triple("device", "Libre", fmtBytes(sf.availableBytes))
+                )
+            } catch (e: Exception) {
+                emptyList()
+            }
+        }
+    }
+    Box(Modifier.fillMaxWidth().height(1.dp).background(Color(0x1FFFFFFF)))
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .background(Color(0xFF0B0B11))
+            .padding(horizontal = 20.dp, vertical = 9.dp),
+        horizontalArrangement = Arrangement.spacedBy(22.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        for ((icon, name, value) in info) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                LineIcon(icon, ACC, 16)
+                Spacer(Modifier.width(7.dp))
+                Text("$name  $value", color = Color(0xCCFFFFFF), fontSize = 13.sp, maxLines = 1)
             }
         }
     }
