@@ -1,5 +1,8 @@
 # Novedades
 
+## 4.35
+- Arreglado: al pulsar «Buscar actualizaciones» el cuadro de actualización ya recibe el foco y se puede actualizar desde el launcher.
+
 ## 4.34
 - Configuración al 62 % del ancho, con las opciones en tarjetas de dos columnas y barra inferior de estado (red, RAM, espacio libre).
 - Tres colores nuevos de tema: Neón verde, Neón violeta y Neón rojo (Fondo y color › Tema de color).
