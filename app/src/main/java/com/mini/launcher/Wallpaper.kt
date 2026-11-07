@@ -39,6 +39,8 @@ fun WallpaperLayer(file: File?, paused: Boolean = false) {
             modifier = Modifier.fillMaxSize(),
             factory = { c ->
                 FillVideoView(c).apply {
+                    // El fondo va sin sonido: que no tome el foco de audio y pause la musica.
+                    setAudioFocusRequest(android.media.AudioManager.AUDIOFOCUS_NONE)
                     setOnPreparedListener { mp ->
                         mp.isLooping = true
                         mp.setVolume(0f, 0f)
