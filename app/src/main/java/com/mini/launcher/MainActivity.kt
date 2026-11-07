@@ -1182,7 +1182,7 @@ fun HomeRoot(
                 ) {
                     val rv = Remap.map[it.nativeKeyEvent.keyCode]
                     if (rv != null) {
-                        if (Remap.runExtra(this@MainActivity, rv)) return@onPreviewKeyEvent true
+                        if (Remap.runExtra(ctx, rv)) return@onPreviewKeyEvent true
                         if (rv.startsWith("p:")) {
                             AppCache.apps.firstOrNull { a -> a.pkg == rv.substring(2) }?.let { a -> openApp(a) }
                             return@onPreviewKeyEvent true
