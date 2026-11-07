@@ -1,5 +1,10 @@
 # Novedades
 
+## 4.34
+- Configuración al 62 % del ancho, con las opciones en tarjetas de dos columnas y barra inferior de estado (red, RAM, espacio libre).
+- Tres colores nuevos de tema: Neón verde, Neón violeta y Neón rojo (Fondo y color › Tema de color).
+- Menos carga gráfica: sin brillos en capas ni desenfoque de fondo mientras Configuración está abierta.
+
 ## 4.33
 - Configuración más pequeña, con la barra lateral como tarjeta de contorno luminoso (categoría activa en pastilla con brillo) y el botón de actualizar fijo abajo.
 - El foco ya no puede salir de Configuración hacia el dock. Izquierda o Atrás desde las opciones vuelven a las categorías; Atrás otra vez cierra.
