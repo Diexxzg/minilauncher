@@ -1,5 +1,11 @@
 # Novedades
 
+## 4.24
+- Tras instalar una versión nueva, la accesibilidad «One Piece - energía» se reactiva sola, sin abrir el launcher.
+
+## 4.23
+- El permiso de superposición ya se puede conceder desde Termux (antes no estaba declarado y no se podía activar).
+
 ## 4.22
 - La accesibilidad «One Piece - energía» se vuelve a encender sola al abrir el launcher tras actualizar (requiere conceder WRITE_SECURE_SETTINGS una sola vez).
 
