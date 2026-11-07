@@ -1252,7 +1252,7 @@ fun SettingsScreen(
             DialogRow("Inicio: prueba, restaurar y permisos", m) { close -> HomeDialog(close) { onSetHome() } }
         })
         add(SItem(6, "Conexión con el celular", "Celular") { m ->
-            DialogRow("Conexión con el celular (fondos, texto, copia)", m) { close -> PhoneDialog(close) }
+            DialogRow("Conexión con el celular (fondos, texto, copia)", m) { close -> PhoneDialog(close, cfg) }
         })
         val colorNames = listOf("rojo", "verde", "amarillo", "azul")
         for (ci in 0..3) {

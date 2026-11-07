@@ -95,6 +95,8 @@ object HomeBridge {
     /** MainActivity los llena cuando el servidor ya esta activo (vacios si esta apagado). */
     var phoneAddress by mutableStateOf("")
     var phoneCode by mutableStateOf("")
+    /** Sube cuando un celular se empareja, para refrescar la lista en la TV. */
+    var phonesTick by mutableIntStateOf(0)
     /** Subir en 1 despues de guardar carpetas (prefs.saveGroups) o apps del perfil de ninos. */
     var groupsTick by mutableIntStateOf(0)
     var kidsTick by mutableIntStateOf(0)
@@ -485,8 +487,10 @@ fun HomeRoot(
     }
 
     // Conexion con el celular (36-38): el servidor solo vive mientras Configuracion lo pida.
-    LaunchedEffect(HomeBridge.phoneOn) {
-        if (!HomeBridge.phoneOn) return@LaunchedEffect
+    // Con «Mantener la conexión activa» (apagado por defecto) sigue vivo mientras el launcher viva.
+    val wantPhone = HomeBridge.phoneOn || cfg.ex("phoneKeep") == "1"
+    LaunchedEffect(wantPhone) {
+        if (!wantPhone) return@LaunchedEffect
         val ui = Handler(Looper.getMainLooper())
         val srv = PhoneServer(
             ctx.applicationContext, prefs,
@@ -507,7 +511,8 @@ fun HomeRoot(
                     scope.launch { walls = withContext(Dispatchers.IO) { listWalls(ctx) } }
                 }
             },
-            onConfig = { ui.post { findActivity(ctx)?.recreate() } }
+            onConfig = { ui.post { findActivity(ctx)?.recreate() } },
+            onPair = { ui.post { HomeBridge.phonesTick++ } }
         )
         val ok = withContext(Dispatchers.IO) { srv.start() }
         if (!ok) {

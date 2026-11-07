@@ -71,6 +71,7 @@ class Prefs(ctx: Context) {
     fun exportJson(): String {
         val o = JSONObject()
         for ((k, v) in sp.all) {
+            if (k == "phonesAuth" || k == "phonePin") continue
             when (v) {
                 is Int, is Long, is Boolean, is String -> o.put(k, v)
                 is Set<*> -> o.put(k, JSONArray(v.map { it.toString() }))
@@ -83,10 +84,13 @@ class Prefs(ctx: Context) {
         return try {
             val o = JSONObject(text)
             val e = sp.edit()
+            val keepA = sp.getString("phonesAuth", null)
+            val keepP = sp.getString("phonePin", null)
             e.clear()
             val keys = o.keys()
             while (keys.hasNext()) {
                 val k = keys.next()
+                if (k == "phonesAuth" || k == "phonePin") continue
                 when (val v = o.get(k)) {
                     is Int -> e.putInt(k, v)
                     is Long -> e.putLong(k, v)
@@ -96,6 +100,8 @@ class Prefs(ctx: Context) {
                     else -> {}
                 }
             }
+            if (keepA != null) e.putString("phonesAuth", keepA)
+            if (keepP != null) e.putString("phonePin", keepP)
             e.commit()
         } catch (ex: Exception) {
             false

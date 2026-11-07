@@ -23,10 +23,11 @@ class PhoneServer(
     private val onText: (String) -> Unit,
     private val onWall: (String) -> Unit,
     private val onConfig: () -> Unit,
-    private val onShop: () -> Unit = {}
+    private val onShop: () -> Unit = {},
+    private val onPair: () -> Unit = {}
 ) {
     val port = 8080
-    val code: String = (1000 + Random.nextInt(9000)).toString()
+    val code: String get() = Phones.pin(prefs)
     @Volatile private var server: ServerSocket? = null
     @Volatile private var running = false
 
@@ -38,6 +39,7 @@ class PhoneServer(
             val s = ServerSocket(port)
             server = s
             running = true
+            Nsd.register(ctx, port)
             Thread {
                 while (running) {
                     try {
@@ -56,6 +58,7 @@ class PhoneServer(
 
     fun stop() {
         running = false
+        Nsd.unregister()
         try {
             server?.close()
         } catch (e: Exception) {
@@ -122,11 +125,51 @@ class PhoneServer(
                 reply(c, "200 OK", "text/html; charset=utf-8", PAGE.toByteArray())
                 return
             }
-            if (q["k"] != code) {
-                reply(c, "403 Forbidden", "text/plain; charset=utf-8", "Código incorrecto".toByteArray())
+            // App del celular: /hello dice quien eres; /pair cambia el PIN (una sola vez) por un token.
+            if (method == "GET" && path == "/hello") {
+                val ver = try { ctx.packageManager.getPackageInfo(ctx.packageName, 0).versionName ?: "" } catch (e: Exception) { "" }
+                val o = JSONObject().put("app", "onepiece").put("name", android.os.Build.MODEL).put("ver", ver)
+                reply(c, "200 OK", "application/json; charset=utf-8", o.toString().toByteArray())
                 return
             }
+            if (method == "POST" && path == "/pair") {
+                if (Phones.locked()) {
+                    reply(c, "429 Too Many Requests", "text/plain; charset=utf-8", "Demasiados intentos".toByteArray())
+                    return
+                }
+                if (q["pin"] != code) {
+                    Phones.fail()
+                    reply(c, "403 Forbidden", "text/plain; charset=utf-8", "PIN incorrecto".toByteArray())
+                    return
+                }
+                Phones.ok()
+                val t = Phones.add(prefs, q["name"] ?: "")
+                onPair()
+                val o = JSONObject().put("token", t).put("name", android.os.Build.MODEL)
+                reply(c, "200 OK", "application/json; charset=utf-8", o.toString().toByteArray())
+                return
+            }
+            // Autorizado por token (app) o por PIN (pagina de respaldo). Los intentos con PIN malo se limitan.
+            if (!Phones.valid(prefs, q["t"])) {
+                if (q["k"] == null) {
+                    reply(c, "401 Unauthorized", "text/plain; charset=utf-8", "Autorización no válida".toByteArray())
+                    return
+                }
+                if (Phones.locked()) {
+                    reply(c, "429 Too Many Requests", "text/plain; charset=utf-8", "Demasiados intentos".toByteArray())
+                    return
+                }
+                if (q["k"] != code) {
+                    Phones.fail()
+                    reply(c, "403 Forbidden", "text/plain; charset=utf-8", "Código incorrecto".toByteArray())
+                    return
+                }
+                Phones.ok()
+            }
             when {
+                method == "GET" && path == "/ping" -> {
+                    reply(c, "200 OK", "text/plain; charset=utf-8", "ok".toByteArray())
+                }
                 method == "POST" && path == "/upload" -> {
                     if (len <= 0 || len > 300L * 1024 * 1024) {
                         reply(c, "413 Too Large", "text/plain; charset=utf-8", "Archivo demasiado grande".toByteArray())

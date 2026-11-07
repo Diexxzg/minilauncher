@@ -175,7 +175,9 @@ fun StatsDialog(prefs: Prefs, onClose: () -> Unit) {
 // ---------- Conexion con el celular (36-38) ----------
 
 @Composable
-fun PhoneDialog(onClose: () -> Unit) {
+fun PhoneDialog(onClose: () -> Unit, cfg: Cfg) {
+    val ctx = LocalContext.current
+    val prefs = remember { Prefs(ctx) }
     DisposableEffect(Unit) {
         HomeBridge.phoneOn = true
         onDispose { HomeBridge.phoneOn = false }
@@ -185,21 +187,49 @@ fun PhoneDialog(onClose: () -> Unit) {
         delay(12_000)
         late = true
     }
+    var showQr by remember { mutableStateOf(false) }
+    var ver by remember { mutableIntStateOf(0) }
+    val tick = HomeBridge.phonesTick
+    val phones = remember(tick, ver) { Phones.list(prefs) }
     val addr = HomeBridge.phoneAddress
     val code = HomeBridge.phoneCode
-    ExtraDialog(stringResource(R.string.phone_title), onClose) {
+    ExtraDialog(stringResource(R.string.phone_title), onClose, 600, true) {
         if (addr.isEmpty() || code.isEmpty()) {
             Text(
                 stringResource(if (late) R.string.phone_failed else R.string.phone_connecting),
                 color = Color(0xE6FFFFFF), fontSize = 15.sp
             )
         } else {
-            Text(stringResource(R.string.phone_steps), color = Color(0xB3FFFFFF), fontSize = 14.sp)
-            Text("http://" + addr, color = Themes.current.acc, fontSize = 24.sp)
-            Text(stringResource(R.string.phone_code, code), color = Color.White, fontSize = 30.sp)
-            Text(stringResource(R.string.phone_use), color = Color(0x99FFFFFF), fontSize = 12.sp)
+            Text(
+                "En la app «One Piece Control» elige esta TV y escribe el PIN (solo la primera vez).",
+                color = Color(0xB3FFFFFF), fontSize = 14.sp
+            )
+            Text("http://" + addr, color = Themes.current.acc, fontSize = 22.sp)
+            Text("PIN: " + code, color = Color.White, fontSize = 30.sp)
         }
-        ActionRow(stringResource(R.string.x_close), Modifier.autoFocus()) { onClose() }
+        SwitchRow("Mantener la conexión activa", cfg.ex("phoneKeep") == "1") {
+            cfg.setEx("phoneKeep", if (it) "1" else "0")
+        }
+        Text(
+            "Gasta algo de RAM y deja el puerto 8080 abierto en tu red local. Sigue activa mientras el launcher esté en memoria.",
+            color = Color(0x99FFFFFF), fontSize = 12.sp
+        )
+        ActionRow(if (showQr) "Ocultar QR" else "Mostrar QR para emparejar") { showQr = !showQr }
+        if (showQr && addr.isNotEmpty() && code.isNotEmpty()) {
+            QrBox("onepiece://pair?a=" + addr + "&k=" + code, 200)
+        }
+        ActionRow("Cambiar PIN") { HomeBridge.phoneCode = Phones.newPin(prefs) }
+        Text("Celulares autorizados", color = Color.White, fontSize = 16.sp)
+        if (phones.isEmpty()) {
+            Text("Ninguno todavía.", color = Color(0x99FFFFFF), fontSize = 13.sp)
+        }
+        phones.forEach { d ->
+            ActionRow("Revocar · " + d.name + " · " + Phones.ago(d.last)) {
+                Phones.revoke(prefs, d.token)
+                ver++
+            }
+        }
+        ActionRow(stringResource(R.string.x_close)) { onClose() }
     }
 }
 

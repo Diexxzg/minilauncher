@@ -50,7 +50,7 @@ private fun visitQr(text: String): BitMatrix? =
     }
 
 @Composable
-private fun QrBox(text: String, sizeDp: Int) {
+internal fun QrBox(text: String, sizeDp: Int) {
     val m = remember(text) { visitQr(text) }
     if (m != null) {
         Box(Modifier.size(sizeDp.dp).background(Color.White).padding(10.dp)) {

@@ -253,7 +253,8 @@ class UpdaterState(private val ctx: Context, private val prefs: Prefs) {
             if (assets != null) {
                 for (k in 0 until assets.length()) {
                     val a = assets.optJSONObject(k) ?: continue
-                    if (a.optString("name").endsWith(".apk", ignoreCase = true)) {
+                    val nm = a.optString("name")
+                    if (nm.startsWith("One-Piece-v") && nm.endsWith(".apk", ignoreCase = true)) {
                         url = a.optString("browser_download_url")
                         size = a.optLong("size", 0L)
                         break
