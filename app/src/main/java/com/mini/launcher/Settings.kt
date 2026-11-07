@@ -107,7 +107,7 @@ private val SEC_ORDER = mapOf(
     0 to listOf("Fondo", "Color"),
     1 to listOf("Perfil", "Fichas", "Información", "Filas extra", "Foco y efectos", "Compartir diseño"),
     2 to listOf("Parte superior", "Reloj y fecha", "Tarjetas junto al reloj", "Clima", "Contenido", "Barra superior"),
-    3 to listOf("Pantalla", "Rendimiento", "Noche", "Reposo", "Diseño del modo ambiente", "Sonido"),
+    3 to listOf("Pantalla", "Rendimiento", "Efectos visuales", "Noche", "Reposo", "Diseño del modo ambiente", "Sonido"),
     6 to listOf("Conexiones", "Sistema", "Celular", "Botones de color", "Mando y uso diario", "Arranque", "Escena de cine", "Rutina diaria", "Perfiles de familia", "Asistente"),
     7 to listOf("Permisos")
 )
@@ -169,6 +169,7 @@ fun FocusRow(
         )
         .drawBehind {
             if (focused) {
+                if (Fx.glow) drawRoundRect(ACC.copy(alpha = 0.10f), cornerRadius = CornerRadius(16.dp.toPx()))
                 // Brillo del acento que nace en el borde izquierdo.
                 drawRect(
                     Brush.horizontalGradient(
@@ -554,7 +555,7 @@ fun GlassPanelFrame(wide: Boolean = false, compact: Boolean = false, content: @C
     val ov = LocalOverscan.current / us
     var shown by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { shown = true }
-    val p by animateFloatAsState(if (shown) 1f else 0f, tween(300), label = "panelIn")
+    val p by animateFloatAsState(if (shown) 1f else 0f, if (Fx.anim) tween(300) else androidx.compose.animation.core.snap(), label = "panelIn")
     val availW = conf.screenWidthDp.toFloat() / us - 2f * ov
     val availH = conf.screenHeightDp.toFloat() / us - 2f * ov
     // Configuración (wide): ventana horizontal centrada. En Fondo y Dock se hace más baja y se sube
@@ -579,8 +580,8 @@ fun GlassPanelFrame(wide: Boolean = false, compact: Boolean = false, content: @C
                 }
                 .drawBehind {
                     // Resplandor del acento alrededor de la ventana (capas suaves, sin desenfoque).
-                    if (wide) return@drawBehind
-                    val cr = 22.dp.toPx()
+                    if (wide && !Fx.glow) return@drawBehind
+                    val cr = (if (wide) 28.dp else 22.dp).toPx()
                     for (i in 1..3) {
                         val g = i * 5.dp.toPx()
                         drawRoundRect(
@@ -832,6 +833,18 @@ fun SettingsScreen(
         })
         add(SItem(3, "Rendimiento: salud, red, almacenamiento y más", "Rendimiento") { m ->
             DialogRow("Rendimiento: salud, red, almacenamiento y más", m) { close -> PerfDialog(close) }
+        })
+        add(SItem(3, "Desenfoque del fondo con paneles abiertos", "Efectos visuales") { m ->
+            SwitchRow("Desenfoque del fondo con paneles abiertos", Fx.blur, m) { cfg.setFxBlur(it) }
+        })
+        add(SItem(3, "Brillos y resplandor", "Efectos visuales") { m ->
+            SwitchRow("Brillos y resplandor", Fx.glow, m) { cfg.setFxGlow(it) }
+        })
+        add(SItem(3, "Animaciones de ventanas", "Efectos visuales") { m ->
+            SwitchRow("Animaciones de ventanas", Fx.anim, m) { cfg.setFxAnim(it) }
+        })
+        add(SItem(3, "Efectos recomendados (todo apagado)", "Efectos visuales") { m ->
+            ActionRow("Efectos recomendados (todo apagado)", m) { cfg.fxRecommended() }
         })
         add(SItem(3, "Modo noche automático", "Noche") { m ->
             SwitchRow("Modo noche automático", cfg.night, m) { cfg.setNight(it) }

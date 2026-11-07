@@ -18,7 +18,23 @@ val COLOR_ACTIONS = listOf(
 )
 
 /** Ajustes de inicio, fondo y musica (se guardan en Prefs). */
+/** Efectos visuales opcionales (todos apagados por defecto). Se leen como estado: aplican al momento. */
+object Fx {
+    var blur by mutableStateOf(false)
+    var glow by mutableStateOf(false)
+    var anim by mutableStateOf(false)
+}
+
 class Cfg(private val p: Prefs) {
+    init {
+        Fx.blur = p.getInt("fxBlur", 0) == 1
+        Fx.glow = p.getInt("fxGlow", 0) == 1
+        Fx.anim = p.getInt("fxAnim", 0) == 1
+    }
+    fun setFxBlur(v: Boolean) { Fx.blur = v; p.putInt("fxBlur", if (v) 1 else 0) }
+    fun setFxGlow(v: Boolean) { Fx.glow = v; p.putInt("fxGlow", if (v) 1 else 0) }
+    fun setFxAnim(v: Boolean) { Fx.anim = v; p.putInt("fxAnim", if (v) 1 else 0) }
+    fun fxRecommended() { setFxBlur(false); setFxGlow(false); setFxAnim(false) }
     private var _clock24 by mutableStateOf(p.getInt("clock24", 0) == 1)
     private var _showDate by mutableStateOf(p.getInt("showDate", 1) == 1)
     private var _showWeather by mutableStateOf(p.getInt("showWeather", 1) == 1)
