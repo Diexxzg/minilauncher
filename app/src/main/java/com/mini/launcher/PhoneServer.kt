@@ -22,7 +22,8 @@ class PhoneServer(
     private val prefs: Prefs,
     private val onText: (String) -> Unit,
     private val onWall: (String) -> Unit,
-    private val onConfig: () -> Unit
+    private val onConfig: () -> Unit,
+    private val onShop: () -> Unit = {}
 ) {
     val port = 8080
     val code: String = (1000 + Random.nextInt(9000)).toString()
@@ -159,6 +160,31 @@ class PhoneServer(
                     onText(String(b, 0, r, Charsets.UTF_8))
                     reply(c, "200 OK", "text/plain; charset=utf-8", "Texto enviado".toByteArray())
                 }
+                method == "GET" && path == "/shop" -> {
+                    reply(c, "200 OK", "text/plain; charset=utf-8", Shop.raw(prefs).toByteArray())
+                }
+                method == "POST" && path == "/shopadd" -> {
+                    val b = ByteArray(minOf(len, 400L).toInt())
+                    var r = 0
+                    while (r < b.size) {
+                        val n = i.read(b, r, b.size - r)
+                        if (n < 0) break
+                        r += n
+                    }
+                    Shop.add(prefs, String(b, 0, r, Charsets.UTF_8))
+                    onShop()
+                    reply(c, "200 OK", "text/plain; charset=utf-8", Shop.raw(prefs).toByteArray())
+                }
+                method == "POST" && path == "/shoptoggle" -> {
+                    Shop.toggle(prefs, q["i"]?.toIntOrNull() ?: -1)
+                    onShop()
+                    reply(c, "200 OK", "text/plain; charset=utf-8", Shop.raw(prefs).toByteArray())
+                }
+                method == "POST" && path == "/shopdel" -> {
+                    Shop.remove(prefs, q["i"]?.toIntOrNull() ?: -1)
+                    onShop()
+                    reply(c, "200 OK", "text/plain; charset=utf-8", Shop.raw(prefs).toByteArray())
+                }
                 method == "GET" && path == "/config" -> {
                     reply(
                         c, "200 OK", "application/json; charset=utf-8", prefs.exportJson().toByteArray(),
@@ -232,6 +258,7 @@ button:active{transform:scale(.98)}
 #m{position:fixed;left:50%;transform:translateX(-50%);bottom:92px;max-width:88%;background:rgba(30,30,52,.92);color:var(--ok);
 border:1px solid rgba(94,234,212,.4);border-radius:999px;padding:10px 18px;font-size:14px;box-shadow:0 8px 24px rgba(0,0,0,.5)}
 #m:empty{display:none}
+.it{display:flex;justify-content:space-between;padding:10px 4px;border-bottom:1px solid rgba(255,255,255,.06)}.it span{flex:1}.it.dn span{text-decoration:line-through;color:var(--mu)}.it b{color:var(--mu);padding:0 8px}
 nav{position:fixed;left:14px;right:14px;bottom:14px;max-width:532px;margin:0 auto;display:flex;justify-content:space-around;padding:12px 8px;
 background:rgba(24,24,42,.78);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-radius:30px;
 border:1px solid rgba(255,255,255,.1);box-shadow:0 10px 30px rgba(0,0,0,.55)}
@@ -251,6 +278,8 @@ nav a span{display:block;font-size:20px}nav a:active{color:var(--a);background:r
 <a class="btn ghost" href="#" onclick="ex();return false">Descargar copia</a>
 <label class="drop" for="c" id="cl" style="margin-top:12px">Elegir copia para importar</label>
 <input id="c" type="file" accept=".json,application/json" onchange="nm(this,'cl')"><button onclick="im()">Importar copia</button></div>
+<div class="card" id="s4"><h2><i class="dot"></i>Lista de compras</h2><p>Toca un producto para marcarlo; × lo quita.</p>
+<div id="sl"></div><input id="si" placeholder="Nuevo producto"><button onclick="sa()">Agregar</button><button class="ghost" onclick="sh('/shop?')">Actualizar lista</button></div>
 <div id="m"></div>
 <nav><a href="#s1"><span>🖼</span>Fondo</a><a href="#s2"><span>⌨</span>Texto</a><a href="#s3"><span>⚙</span>Ajustes</a></nav>
 <script>
@@ -260,6 +289,10 @@ async function send(u,b){try{const r=await fetch(u,{method:'POST',body:b});M(awa
 function up(){const f=document.getElementById('f').files[0];if(!f)return M('Elige un archivo');M('Subiendo...');send('/upload?k='+K()+'&name='+encodeURIComponent(f.name),f)}
 function tx(){send('/text?k='+K(),document.getElementById('t').value)}
 function ex(){location.href='/config?k='+K()}
+async function sh(u,b){try{const r=await fetch(u+'k='+K(),{method:b===undefined?'GET':'POST',body:b});const t=await r.text();if(!r.ok)return M(t);rs(t)}catch(e){M('No se pudo conectar')}}
+function rs(t){const l=document.getElementById('sl');l.innerHTML='';t.split('\n').forEach((x,i)=>{if(x.length<3)return;const d=document.createElement('div');d.className='it'+(x.charAt(0)==='1'?' dn':'');const s=document.createElement('span');s.textContent=x.substring(2);s.onclick=()=>sh('/shoptoggle?i='+i+'&',' ');const b=document.createElement('b');b.textContent='\u00d7';b.onclick=()=>sh('/shopdel?i='+i+'&',' ');d.appendChild(s);d.appendChild(b);l.appendChild(d)})}
+function sa(){const e=document.getElementById('si');if(!e.value.trim())return;sh('/shopadd?',e.value);e.value=''}
+(function(){const u=new URLSearchParams(location.search).get('k');if(u){document.getElementById('k').value=u;sh('/shop?')}})();
 function im(){const f=document.getElementById('c').files[0];if(!f)return M('Elige un archivo');send('/config?k='+K(),f)}
 </script></body></html>
 """

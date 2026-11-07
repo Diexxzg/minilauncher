@@ -108,7 +108,7 @@ private val SEC_ORDER = mapOf(
     1 to listOf("Perfil", "Fichas", "Información", "Filas extra", "Foco y efectos", "Compartir diseño"),
     2 to listOf("Parte superior", "Reloj y fecha", "Tarjetas junto al reloj", "Clima", "Contenido", "Barra superior"),
     3 to listOf("Pantalla", "Rendimiento", "Efectos visuales", "Noche", "Reposo", "Diseño del modo ambiente", "Sonido"),
-    6 to listOf("Conexiones", "Sistema", "Celular", "Botones de color", "Mando y uso diario", "Arranque", "Escena de cine", "Rutina diaria", "Perfiles de familia", "Asistente"),
+    6 to listOf("Conexiones", "Sistema", "Celular", "Botones de color", "Mando y uso diario", "Arranque", "Escena de cine", "Rutina diaria", "Perfiles de familia", "Asistente", "Hogar y utilidades"),
     7 to listOf("Permisos")
 )
 
@@ -1557,6 +1557,19 @@ fun SettingsScreen(
         })
         add(SItem(9, "Foco grueso", "Navegación") { m ->
             SwitchRow("Foco más grueso en las fichas", cfg.thickFocus, m) { cfg.setThickFocus(it) }
+        })
+        // ---- Hogar y utilidades ----
+        add(SItem(6, "Tarjeta de visitas", "Hogar y utilidades") { m ->
+            DialogRow("Tarjeta de visitas (QR del Wi-Fi)", m) { close -> VisitorCardDialog(prefs, close) }
+        })
+        add(SItem(6, "Lista de compras", "Hogar y utilidades") { m ->
+            DialogRow("Lista de compras (con el celular)", m) { close -> ShoppingDialog(prefs, close) }
+        })
+        add(SItem(6, "Ruido para dormir", "Hogar y utilidades") { m ->
+            DialogRow("Ruido para dormir", m) { close -> SleepNoiseDialog(prefs, close) }
+        })
+        add(SItem(6, "Modo fácil", "Hogar y utilidades") { m ->
+            DialogRow("Modo fácil (tres botones enormes)", m) { close -> EasyModeDialog(prefs, close) }
         })
         // ---- Acerca de ----
         add(SItem(ABOUT, "Estadísticas de uso", "Uso y diagnóstico") { m ->
