@@ -336,8 +336,9 @@ fun HomeRoot(
 
     // Tema de color: se fija antes de dibujar nada y se actualiza al cambiarlo.
     val themeIdx = Themes.pick(cfg, hourNow)
-    remember { Themes.set(themeIdx, cfg.accentCustom); 0 }
-    SideEffect { Themes.set(themeIdx, cfg.accentCustom) }
+    val tOvr = Amb2.themeOverride
+    remember { Themes.set(themeIdx, if (tOvr != 0) tOvr else cfg.accentCustom); 0 }
+    SideEffect { Themes.set(themeIdx, if (tOvr != 0) tOvr else cfg.accentCustom) }
 
     // Tecla Home: si ya estas en el inicio, vuelve al principio de la fila, devuelve el
     // foco a la primera ficha y sale del modo ambiente / menus.
@@ -1687,7 +1688,7 @@ fun HomeRoot(
                             }
                         )
                     }
-                    HomeOverlays(cfg)
+                    HomeOverlays(cfg, m, screen == "home", { if (screen == "ambient" || screen == "black") screen = "home" })
                     if (showQuick) {
                         QuickPanel(
                             cfg = cfg,

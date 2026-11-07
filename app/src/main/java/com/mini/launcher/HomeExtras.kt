@@ -158,13 +158,25 @@ object HomeFx {
 }
 
 @Composable
-fun HomeOverlays(cfg: Cfg) {
+fun HomeOverlays(cfg: Cfg, media: MediaInfo?, onHome: Boolean, onWake: () -> Unit) {
     val ctx = LocalContext.current
+    val mediaNow by androidx.compose.runtime.rememberUpdatedState(media)
+    val wakeNow by androidx.compose.runtime.rememberUpdatedState(onWake)
     LaunchedEffect(Unit) {
         while (true) {
             delay(15000)
             if (cfg.ex("remOn") == "1") Remind.check(cfg)
+            Amb2.tick(ctx, cfg, mediaNow, wakeNow)
         }
+    }
+    LaunchedEffect(media?.title, media?.playing) { Amb2.tick(ctx, cfg, media, onWake) }
+    if (onHome && cfg.ex("artBg") == "1" && media != null && media.playing) {
+        val dc = Amb2.artColor(media)
+        if (dc != 0) Box(
+            Modifier.fillMaxSize().background(
+                androidx.compose.ui.graphics.Brush.verticalGradient(listOf(Color(dc).copy(alpha = 0.30f), Color.Transparent))
+            )
+        )
     }
     val acc = Themes.current.acc
     val ambOn = cfg.ex("ambiOn") == "1"
@@ -191,6 +203,20 @@ fun HomeOverlays(cfg: Cfg) {
                 Text("RECORDATORIO · " + r.take(5), color = acc, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                 Text(r.drop(6), color = Color.White, fontSize = 24.sp, modifier = Modifier.padding(vertical = 6.dp))
                 Text("OK = hecho · Derecha = en 10 min", color = Color(0xB3FFFFFF), fontSize = 14.sp)
+            }
+        }
+        if (onHome && cfg.ex("cdOn") == "1") {
+            val cds = Amb2.countdowns(cfg)
+            if (cds.isNotEmpty()) {
+                val shape = RoundedCornerShape(16.dp)
+                Column(
+                    Modifier.align(Alignment.TopEnd).padding(top = 70.dp).clip(shape)
+                        .background(Color(0xE6121722)).border(1.dp, acc, shape)
+                        .padding(horizontal = 18.dp, vertical = 12.dp)
+                ) {
+                    Text("CUENTA REGRESIVA", color = acc, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    for (l in cds) Text(l, color = Color.White, fontSize = 16.sp, modifier = Modifier.padding(top = 3.dp))
+                }
             }
         }
         val url = cfg.ex("camUrl")

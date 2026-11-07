@@ -876,6 +876,69 @@ fun SettingsScreen(
         add(SItem(3, "Efectos recomendados (todo apagado)", "Efectos visuales") { m ->
             ActionRow("Efectos recomendados (todo apagado)", m) { cfg.fxRecommended() }
         })
+        add(SItem(3, "Tema desde la carátula", "Ambiente y noche") { m ->
+            SwitchRow("Tema desde la carátula de lo que suena", cfg.ex("artTheme") == "1", m) { cfg.setEx("artTheme", if (it) "1" else "0") }
+        })
+        add(SItem(3, "Fondo musical", "Ambiente y noche") { m ->
+            SwitchRow("Fondo musical (tinte de la carátula)", cfg.ex("artBg") == "1", m) { cfg.setEx("artBg", if (it) "1" else "0") }
+        })
+        add(SItem(3, "Temas por fechas", "Ambiente y noche") { m ->
+            SwitchRow("Temas por fechas especiales", cfg.ex("dateThemes") == "1", m) { cfg.setEx("dateThemes", if (it) "1" else "0") }
+        })
+        add(SItem(3, "Cuentas regresivas", "Ambiente y noche") { m ->
+            SwitchRow("Mostrar cuentas regresivas en el inicio", cfg.ex("cdOn") == "1", m) { cfg.setEx("cdOn", if (it) "1" else "0") }
+        })
+        add(SItem(3, "Nueva cuenta regresiva", "Ambiente y noche") { m ->
+            DialogRow("Nueva cuenta regresiva (" + cfg.ex("cdList").split("\n").count { it.isNotBlank() } + "/5)", m) { close ->
+                TextEditDialog("Nueva cuenta regresiva", "", "Formato: 25/12/2026 Navidad (se muestran las 3 más cercanas).", 60, { t ->
+                    val l = Amb2.parseCd(t)
+                    val cur = cfg.ex("cdList").split("\n").filter { it.isNotBlank() }
+                    if (l == null) toast(ctx, "Formato no válido. Ejemplo: 25/12/2026 Navidad")
+                    else if (cur.size >= 5) toast(ctx, "Máximo 5 cuentas.")
+                    else { cfg.setEx("cdList", (cur + l).joinToString("\n")); cfg.setEx("cdOn", "1") }
+                    close()
+                }, close)
+            }
+        })
+        add(SItem(3, "Borrar cuentas", "Ambiente y noche") { m ->
+            ActionRow("Borrar todas las cuentas regresivas", m) { cfg.setEx("cdList", "") }
+        })
+        add(SItem(3, "Noche por contenido", "Ambiente y noche") { m ->
+            SwitchRow("Noche: bajar volumen poco a poco (22:00 a 6:00)", cfg.ex("nightOn") == "1", m) { cfg.setEx("nightOn", if (it) "1" else "0") }
+        })
+        add(SItem(3, "Volumen mínimo de noche", "Ambiente y noche") { m ->
+            SliderRow("Volumen mínimo de noche", cfg.ex("nightVol", "20").toIntOrNull() ?: 20, 5, 60, 5, "%", m) { cfg.setEx("nightVol", it.toString()) }
+        })
+        add(SItem(3, "Despertador con rampa", "Ambiente y noche") { m ->
+            SwitchRow("Despertador con rampa de brillo y volumen", cfg.ex("wakeOn") == "1", m) { cfg.setEx("wakeOn", if (it) "1" else "0") }
+        })
+        add(SItem(3, "Hora del despertador", "Ambiente y noche") { m ->
+            DialogRow("Hora del despertador: " + cfg.ex("wakeTime", "07:00"), m) { close ->
+                TextEditDialog("Hora del despertador", cfg.ex("wakeTime", "07:00"), "Formato 24 h, ej.: 07:00", 5, { t ->
+                    val mm = Regex("^(\\d{1,2}):(\\d{2})$").find(t.trim())
+                    if (mm != null && mm.groupValues[1].toInt() < 24 && mm.groupValues[2].toInt() < 60)
+                        cfg.setEx("wakeTime", "%02d:%s".format(mm.groupValues[1].toInt(), mm.groupValues[2]))
+                    else toast(ctx, "Hora no válida.")
+                    close()
+                }, close)
+            }
+        })
+        add(SItem(3, "Duración de la rampa", "Ambiente y noche") { m ->
+            SliderRow("Duración de la rampa", cfg.ex("wakeMin", "10").toIntOrNull() ?: 10, 1, 30, 1, " min", m) { cfg.setEx("wakeMin", it.toString()) }
+        })
+        add(SItem(3, "Filtro de luz cálida", "Ambiente y noche") { m ->
+            SwitchRow("Filtro de luz cálida (sobre todas las apps)", cfg.ex("warmOn") == "1", m) { cfg.setEx("warmOn", if (it) "1" else "0") }
+        })
+        add(SItem(3, "Intensidad del filtro", "Ambiente y noche") { m ->
+            SliderRow("Intensidad del filtro", cfg.ex("warmPct", "20").toIntOrNull() ?: 20, 5, 50, 5, "%", m) { cfg.setEx("warmPct", it.toString()) }
+        })
+        add(SItem(3, "Tarjeta en esquina", "Ambiente y noche") { m ->
+            SwitchRow("Tarjeta con hora y clima sobre otras apps", cfg.ex("cornerOn") == "1", m) { cfg.setEx("cornerOn", if (it) "1" else "0") }
+        })
+        add(SItem(3, "Esquina de la tarjeta", "Ambiente y noche") { m ->
+            ChoiceRow("Esquina de la tarjeta", listOf("Arriba derecha", "Arriba izquierda", "Abajo derecha", "Abajo izquierda"),
+                cfg.ex("cornerPos", "0").toIntOrNull() ?: 0, m) { cfg.setEx("cornerPos", it.toString()) }
+        })
         add(SItem(3, "Modo noche automático", "Noche") { m ->
             SwitchRow("Modo noche automático", cfg.night, m) { cfg.setNight(it) }
         })
