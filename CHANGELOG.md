@@ -1,5 +1,9 @@
 # Novedades
 
+## 4.43
+- Herramientas del sistema (Configuración › Sistema): modo juego (libera RAM, pausa el fondo animado y silencia avisos), volumen adaptable con tope y piso, y centro de notificaciones con historial por app (apagado por defecto).
+- Instalar APK desde USB con comprobación de paquete, versión y firma (necesita el permiso «Acceso a todos los archivos»).
+
 ## 4.42
 - Hogar y utilidades (Configuración › Sistema): tarjeta de visitas con el QR del Wi-Fi y lista de compras que también se maneja desde el celular.
 - Ruido para dormir (lluvia, marrón o blanco) con temporizador y modo fácil con tres botones enormes.
