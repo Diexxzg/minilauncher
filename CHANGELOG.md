@@ -1,5 +1,9 @@
 # Novedades
 
+## 4.32
+- Configuración: ventana oscura casi opaca, barra superior con versión y hora, categoría activa como pastilla de color y botón fijo «Buscar actualizaciones» en la barra lateral.
+- Al abrir Configuración el foco ya no se queda en el dock.
+
 ## 4.31
 - Configuración ahora es una ventana horizontal centrada: categorías a la izquierda (con nombre) y opciones a la derecha. Derecha entra a las opciones, izquierda vuelve a las categorías.
 
