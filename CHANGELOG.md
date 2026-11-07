@@ -1,5 +1,8 @@
 # Novedades
 
+## 4.26
+- La actualización desde el launcher ahora se instala por sesión de Android, para que la accesibilidad no se apague al actualizar.
+
 ## 4.25
 - Si «One Piece - energía» no se puede reactivar sola, ahora muestra el motivo en pantalla.
 
