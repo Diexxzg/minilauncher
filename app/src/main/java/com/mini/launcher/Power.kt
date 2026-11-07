@@ -38,6 +38,7 @@ import androidx.compose.ui.unit.sp
  */
 class PowerService : AccessibilityService() {
     private val h = android.os.Handler(android.os.Looper.getMainLooper())
+    private var homeEaten = false
     private val screenOn = object : android.content.BroadcastReceiver() {
         override fun onReceive(c: Context?, i: Intent?) {
             Remap.lastKeyMs = android.os.SystemClock.elapsedRealtime()
@@ -88,6 +89,27 @@ class PowerService : AccessibilityService() {
     override fun onKeyEvent(event: android.view.KeyEvent): Boolean {
         Remap.lastKeyMs = android.os.SystemClock.elapsedRealtime()
         val code = event.keyCode
+        // Boton Inicio -> One Piece (opcional). Si no se puede abrir, deja pasar la tecla al sistema.
+        if (code == android.view.KeyEvent.KEYCODE_HOME && Prefs(this).getInt("dHomeBtn", 0) == 1) {
+            if (event.action == android.view.KeyEvent.ACTION_DOWN) {
+                if (event.repeatCount == 0) {
+                    homeEaten = try {
+                        startActivity(
+                            Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
+                                .setClass(this, MainActivity::class.java)
+                                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                        )
+                        true
+                    } catch (e: Exception) {
+                        false
+                    }
+                }
+                return homeEaten
+            }
+            val e = homeEaten
+            homeEaten = false
+            return e
+        }
         if (Remap.blocked(code)) return false
         val down = event.action == android.view.KeyEvent.ACTION_DOWN && event.repeatCount == 0
         val lr = Remap.learn

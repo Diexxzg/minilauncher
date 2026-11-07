@@ -465,6 +465,7 @@ private fun PChoice(label: String, options: List<String>, key: String, after: (I
 fun DailyDialog(onClose: () -> Unit) {
     val c = LocalContext.current
     ExtraDialog("Uso diario", onClose, scroll = true) {
+        PSwitch("Botón Inicio abre One Piece (necesita accesibilidad)", "dHomeBtn")
         PSwitch("Doble Inicio: volver a la última app", "dAltTab")
         PSwitch("Dock distinto por franja horaria", "dSlots")
         PSwitch("Aprender hábitos (la ficha sube según día y hora)", "dHabits")
