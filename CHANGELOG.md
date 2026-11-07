@@ -1,5 +1,9 @@
 # Novedades
 
+## 4.39
+- Modo ambiente: marco de fotos desde una carpeta, hora atenuada al llegar una notificación, fondo vivo según la hora, movimiento anti-quemado más amplio y opción de pantalla negra.
+- Margen de seguridad guiado con vista previa (Pantalla).
+
 ## 4.38
 - Casa y avisos (Configuración › Sistema): recordatorios en pantalla (OK = hecho, Derecha = en 10 min), Ambilight casero hacia un WLED y cámara IP en una esquina.
 - Panel rápido: hasta 4 atajos que llaman a una web, encienden un equipo o abren la cámara.
