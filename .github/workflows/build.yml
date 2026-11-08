@@ -99,5 +99,8 @@ jobs:
           if [ ! -s notes.md ]; then echo "Nueva versión $VN" > notes.md; fi
           cp app/build/outputs/apk/release/app-release.apk "One-Piece-$TAG.apk"
           cp remote/build/outputs/apk/release/remote-release.apk "One-Piece-Control-$TAG.apk"
-          gh release create "$TAG" "One-Piece-$TAG.apk" "One-Piece-Control-$TAG.apk" \
+          # Primero se crea el Release con el APK de la TV y despues se sube el del celular,
+          # para que queden en ese orden.
+          gh release create "$TAG" "One-Piece-$TAG.apk" \
             --title "One Piece $VN" --notes-file notes.md --target "$GITHUB_SHA" --latest
+          gh release upload "$TAG" "One-Piece-Control-$TAG.apk"
