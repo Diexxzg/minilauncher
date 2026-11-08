@@ -76,7 +76,9 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: launcher-apk
-          path: app/build/outputs/apk/release/app-release.apk
+          path: |
+            app/build/outputs/apk/release/app-release.apk
+            remote/build/outputs/apk/release/remote-release.apk
 
       # Publica el Release SOLO al pulsar "Run workflow" (asi puedes subir todos los archivos
       # con calma y publicar al final). Solo si esta version (etiqueta) todavia no existe y el
@@ -96,5 +98,6 @@ jobs:
           fi
           if [ ! -s notes.md ]; then echo "Nueva versión $VN" > notes.md; fi
           cp app/build/outputs/apk/release/app-release.apk "One-Piece-$TAG.apk"
-          gh release create "$TAG" "One-Piece-$TAG.apk" \
+          cp remote/build/outputs/apk/release/remote-release.apk "One-Piece-Control-$TAG.apk"
+          gh release create "$TAG" "One-Piece-$TAG.apk" "One-Piece-Control-$TAG.apk" \
             --title "One Piece $VN" --notes-file notes.md --target "$GITHUB_SHA" --latest
