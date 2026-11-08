@@ -29,8 +29,8 @@ android {
         applicationId = "com.mini.launcher"
         minSdk = 26
         targetSdk = 34
-        versionCode = 60
-        versionName = "4.46"
+        versionCode = 61
+        versionName = "4.47"
     }
     signingConfigs {
         if (hasOwnKey) {
