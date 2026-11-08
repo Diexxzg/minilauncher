@@ -148,3 +148,90 @@ class Finder(ctx: Context, private val onFound: (Tv) -> Unit) {
         l = null
     }
 }
+
+/** Estado del volumen de la TV (0 a 100). */
+class Vol(val pct: Int, val mute: Boolean)
+
+/** Ordenes a la TV ya emparejada. Todo es bloqueante: llamar desde un hilo de fondo. */
+class Conn(val host: String, val port: Int, val token: String) {
+    private fun t() = "t=" + URLEncoder.encode(token, "UTF-8")
+
+    /** null = salió bien; si no, el mensaje de error. */
+    private fun fail(r: Api.Res): String? = when (r.code) {
+        in 200..299 -> null
+        401, 403 -> "La TV ya no reconoce este celular. Vuelve a emparejar."
+        else -> r.body.ifEmpty { "La TV respondió con error " + r.code + "." }
+    }
+
+    private fun vol(r: Api.Res): Vol? {
+        if (r.code != 200) return null
+        val o = JSONObject(r.body)
+        return Vol(o.optInt("vol", 0), o.optBoolean("mute", false))
+    }
+
+    fun state(): Vol? = vol(Api.call(host, port, "GET", "/state?" + t(), 4000))
+
+    fun vol(arg: String): Vol? = vol(Api.call(host, port, "POST", "/vol?" + t() + "&" + arg, 4000))
+
+    fun key(n: String): String? = fail(Api.call(host, port, "POST", "/key?" + t() + "&n=" + n, 4000))
+
+    fun open(url: String): String? = fail(post("/open?" + t(), url.toByteArray(Charsets.UTF_8)))
+
+    fun text(s: String): String? = fail(post("/text?" + t(), s.toByteArray(Charsets.UTF_8)))
+
+    private fun post(path: String, body: ByteArray): Api.Res {
+        if (!Api.isLan(host)) throw IOException("Solo se permiten direcciones de tu red local.")
+        val c = URL("http://$host:$port$path").openConnection() as HttpURLConnection
+        try {
+            c.requestMethod = "POST"
+            c.connectTimeout = 5000
+            c.readTimeout = 8000
+            c.doOutput = true
+            c.setFixedLengthStreamingMode(body.size)
+            c.outputStream.use { it.write(body) }
+            val code = c.responseCode
+            val st = if (code in 200..299) c.inputStream else c.errorStream
+            return Api.Res(code, st?.use { it.readBytes().toString(Charsets.UTF_8) } ?: "")
+        } finally {
+            c.disconnect()
+        }
+    }
+
+    /** Sube un fondo (foto o video). El tamaño debe ser exacto: la TV lo exige. */
+    fun upload(name: String, size: Long, open: () -> java.io.InputStream, onProgress: (Int) -> Unit): String? {
+        if (!Api.isLan(host)) throw IOException("Solo se permiten direcciones de tu red local.")
+        if (size <= 0) throw IOException("No se pudo leer el tamaño del archivo.")
+        val u = "http://$host:$port/upload?" + t() + "&name=" + URLEncoder.encode(name, "UTF-8")
+        val c = URL(u).openConnection() as HttpURLConnection
+        try {
+            c.requestMethod = "POST"
+            c.connectTimeout = 5000
+            c.readTimeout = 120000
+            c.doOutput = true
+            c.setFixedLengthStreamingMode(size)
+            open().use { inp ->
+                c.outputStream.use { out ->
+                    val buf = ByteArray(16384)
+                    var sent = 0L
+                    var last = -1
+                    while (true) {
+                        val n = inp.read(buf)
+                        if (n < 0) break
+                        out.write(buf, 0, n)
+                        sent += n
+                        val p = (sent * 100 / size).toInt().coerceAtMost(100)
+                        if (p != last) {
+                            last = p
+                            onProgress(p)
+                        }
+                    }
+                }
+            }
+            val code = c.responseCode
+            val st = if (code in 200..299) c.inputStream else c.errorStream
+            return fail(Api.Res(code, st?.use { it.readBytes().toString(Charsets.UTF_8) } ?: ""))
+        } finally {
+            c.disconnect()
+        }
+    }
+}
