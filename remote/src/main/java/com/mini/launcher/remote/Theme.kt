@@ -139,7 +139,7 @@ internal fun Chip(text: String, selected: Boolean, modifier: Modifier = Modifier
             .border(1.dp, if (selected) Color(0x60FFFFFF) else EDGE, shape).clickable(onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
-        Text(text, color = if (selected) Color.White else TXT, fontSize = 15.sp, fontWeight = FontWeight.Medium)
+        Text(text, color = if (selected) Color.White else TXT, fontSize = 15.sp, fontWeight = FontWeight.Medium, maxLines = 1, modifier = Modifier.padding(horizontal = 18.dp))
     }
 }
 

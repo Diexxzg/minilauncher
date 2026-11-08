@@ -234,4 +234,60 @@ class Conn(val host: String, val port: Int, val token: String) {
             c.disconnect()
         }
     }
+
+    fun apps(): List<TvApp>? {
+        val r = Api.call(host, port, "GET", "/apps?" + t(), 8000)
+        if (r.code != 200) return null
+        val a = org.json.JSONArray(r.body)
+        return (0 until a.length()).map { val o = a.getJSONObject(it); TvApp(o.getString("p"), o.getString("l"), o.optInt("f") == 1) }
+    }
+
+    fun launch(pkg: String): String? = fail(Api.call(host, port, "POST", "/launch?" + t() + "&p=" + URLEncoder.encode(pkg, "UTF-8"), 5000))
+
+    fun schema(): Schema? {
+        val r = Api.call(host, port, "GET", "/schema?" + t(), 8000)
+        if (r.code != 200) return null
+        val o = JSONObject(r.body)
+        val cats = o.getJSONArray("cats").let { a -> (0 until a.length()).map { a.getString(it) } }
+        val vals = HashMap<Int, Int>()
+        val rows = o.getJSONArray("rows").let { a ->
+            (0 until a.length()).map {
+                val x = a.getJSONObject(it)
+                if (x.has("v")) vals[x.getInt("id")] = x.getInt("v")
+                SRow(
+                    x.getInt("id"), x.getInt("c"), x.optString("s"), x.getString("l"), x.getString("k"),
+                    x.optJSONArray("o")?.let { oa -> (0 until oa.length()).map { i -> oa.getString(i) } } ?: emptyList(),
+                    x.optInt("mn"), x.optInt("mx"), x.optInt("st", 1).coerceAtLeast(1), x.optString("u"), x.optString("a")
+                )
+            }
+        }
+        val th = o.optJSONArray("themes")?.let { a -> (0 until a.length()).map { a.getJSONObject(it).getLong("c") } } ?: emptyList()
+        return Schema(cats, rows, vals, th)
+    }
+
+    fun setv(id: Int, v: Int): String? = fail(Api.call(host, port, "POST", "/setv?" + t() + "&id=" + id + "&v=" + v, 5000))
+
+    fun about(): List<Pair<String, List<Pair<String, String>>>>? {
+        val r = Api.call(host, port, "GET", "/about?" + t(), 8000)
+        if (r.code != 200) return null
+        val a = org.json.JSONArray(r.body)
+        return (0 until a.length()).map {
+            val x = a.getJSONObject(it)
+            val l = x.getJSONArray("l")
+            x.getString("t") to (0 until l.length()).map { i -> l.getJSONArray(i).let { p -> p.getString(0) to p.getString(1) } }
+        }
+    }
+
+    fun sys(n: String): String? = fail(Api.call(host, port, "POST", "/sys?" + t() + "&n=" + n, 5000))
 }
+
+/** Una app de la TV. */
+class TvApp(val pkg: String, val label: String, val fav: Boolean)
+
+/** Una fila de ajustes de la TV. kind: switch, choice, slider, theme, action o info (solo se ve). */
+class SRow(
+    val id: Int, val cat: Int, val sec: String, val label: String, val kind: String,
+    val opts: List<String>, val mn: Int, val mx: Int, val step: Int, val unit: String, val act: String
+)
+
+class Schema(val cats: List<String>, val rows: List<SRow>, val vals: Map<Int, Int>, val themes: List<Long>)

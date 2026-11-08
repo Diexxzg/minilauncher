@@ -78,10 +78,10 @@ private fun NavItem(glyph: String, label: String, selected: Boolean, modifier: M
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         val box = if (selected) Modifier.background(GRAD).border(1.dp, Color(0x60FFFFFF), shape) else Modifier
-        Box(Modifier.size(54.dp).clip(shape).then(box), contentAlignment = Alignment.Center) {
+        Box(Modifier.size(50.dp).clip(shape).then(box), contentAlignment = Alignment.Center) {
             Text(glyph, color = if (selected) Color.White else MUT, fontSize = 22.sp)
         }
-        Text(label, color = if (selected) TXT else MUT, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+        Text(label, color = if (selected) TXT else MUT, fontSize = 11.sp, fontWeight = FontWeight.Medium, maxLines = 1)
     }
 }
 
@@ -97,7 +97,7 @@ fun ControlApp() {
     var port by remember { mutableStateOf(store.get("port").toIntOrNull() ?: 8080) }
     // 0 sin emparejar, 1 comprobando, 2 conectada, 3 sin respuesta, 4 la TV revoco este celular
     var link by remember { mutableStateOf(if (token.isEmpty()) 0 else 1) }
-    var tab by remember { mutableStateOf(if (token.isEmpty()) 2 else 0) } // 0 Mando, 1 Enviar, 2 Conexion
+    var tab by remember { mutableStateOf(if (token.isEmpty()) 4 else 0) } // 0 Mando, 1 Apps, 2 Enviar, 3 Ajustes, 4 Conexion
     val found = remember { mutableStateListOf<Tv>() }
     var target by remember { mutableStateOf<Tv?>(null) }
     var pin by remember { mutableStateOf("") }
@@ -215,7 +215,7 @@ fun ControlApp() {
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Glass(Modifier.weight(1f).height(60.dp), radius = 30.dp, onClick = { tab = 2 }) {
+                Glass(Modifier.weight(1f).height(60.dp), radius = 30.dp, onClick = { tab = 4 }) {
                     Row(Modifier.fillMaxSize().padding(horizontal = 10.dp), verticalAlignment = Alignment.CenterVertically) {
                         IconBox("★", 40.dp, 13.dp, 18.sp)
                         Spacer(Modifier.width(12.dp))
@@ -230,7 +230,7 @@ fun ControlApp() {
                     }
                 }
                 Box(Modifier.size(60.dp)) {
-                    Glass(Modifier.fillMaxSize(), radius = 20.dp, onClick = { tab = 2 }) {
+                    Glass(Modifier.fillMaxSize(), radius = 20.dp, onClick = { tab = 4 }) {
                         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                             Text("⚙", color = TXT, fontSize = 24.sp)
                         }
@@ -243,18 +243,22 @@ fun ControlApp() {
                 Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 18.dp, vertical = 14.dp),
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                if (tab != 2 && !paired) {
-                    Title(if (tab == 0) "Mando de la TV" else "Enviar a la TV", "Primero empareja el celular con tu TV.")
+                if (tab != 4 && !paired) {
+                    Title(when (tab) { 0 -> "Mando de la TV"; 1 -> "Apps de la TV"; 2 -> "Enviar a la TV"; else -> "Ajustes de la TV" }, "Primero empareja el celular con tu TV.")
                     Glass(Modifier.fillMaxWidth(), radius = 30.dp) {
                         Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                             Text("Aún no hay una TV emparejada.", color = TXT, fontSize = 16.sp)
-                            PrimaryBtn("Ir a Conexión") { tab = 2 }
+                            PrimaryBtn("Ir a Conexión") { tab = 4 }
                         }
                     }
                 } else if (tab == 0) {
                     MandoScreen(Conn(host, port, token))
                 } else if (tab == 1) {
+                    AppsScreen(Conn(host, port, token))
+                } else if (tab == 2) {
                     EnviarScreen(Conn(host, port, token))
+                } else if (tab == 3) {
+                    AjustesScreen(Conn(host, port, token))
                 } else {
                     Title("Conexión con tu TV", "Empareja el celular una sola vez.")
 
@@ -389,8 +393,10 @@ fun ControlApp() {
             Glass(Modifier.fillMaxWidth().padding(start = 18.dp, end = 18.dp, bottom = 14.dp, top = 4.dp), radius = 34.dp) {
                 Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp)) {
                     NavItem("●", "Mando", tab == 0, Modifier.weight(1f)) { tab = 0 }
-                    NavItem("➤", "Enviar", tab == 1, Modifier.weight(1f)) { tab = 1 }
-                    NavItem("⚙", "Conexión", tab == 2, Modifier.weight(1f)) { tab = 2 }
+                    NavItem("▣", "Apps", tab == 1, Modifier.weight(1f)) { tab = 1 }
+                    NavItem("➤", "Enviar", tab == 2, Modifier.weight(1f)) { tab = 2 }
+                    NavItem("⚙", "Ajustes", tab == 3, Modifier.weight(1f)) { tab = 3 }
+                    NavItem("⇄", "Conexión", tab == 4, Modifier.weight(1f)) { tab = 4 }
                 }
             }
         }
