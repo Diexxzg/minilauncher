@@ -13,3 +13,4 @@ dependencyResolutionManagement {
 }
 rootProject.name = "MiniLauncher"
 include(":app")
+include(":remote")

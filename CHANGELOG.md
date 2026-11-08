@@ -1,5 +1,10 @@
 # Novedades
 
+## 4.45
+- Nueva app del celular «One Piece Control» (se publica junto al launcher): encuentra la TV sola, por QR o por IP, y se empareja con el PIN una sola vez.
+- Configuración › Celular: PIN fijo, QR de emparejamiento, lista de celulares autorizados con «Revocar» y la opción «Mantener la conexión activa» (apagada por defecto).
+- La actualización desde el launcher ahora elige solo el APK del launcher.
+
 ## 4.44
 - Corregido: al pulsar Inicio o volver al inicio desde el protector de pantalla, ya no se corta la música; el fondo en video no toma más el foco de audio.
 
