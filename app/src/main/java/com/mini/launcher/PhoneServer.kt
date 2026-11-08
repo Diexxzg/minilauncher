@@ -25,7 +25,9 @@ class PhoneServer(
     private val onConfig: () -> Unit,
     private val onShop: () -> Unit = {},
     private val onPair: () -> Unit = {},
-    private val onKey: (Int) -> Unit = {}
+    private val onKey: (Int) -> Unit = {},
+    private val onSchema: () -> String = { "{}" },
+    private val onSetRow: (Int, Int) -> Unit = { _, _ -> }
 ) {
     val port = 8080
     val code: String get() = Phones.pin(prefs)
@@ -281,6 +283,33 @@ class PhoneServer(
                     }
                     val res = RemoteCmd.open(ctx, String(b, 0, r, Charsets.UTF_8))
                     reply(c, if (res.first == 200) "200 OK" else "400 Bad Request", "text/plain; charset=utf-8", res.second.toByteArray())
+                }
+                method == "GET" && path == "/apps" -> {
+                    reply(c, "200 OK", "application/json; charset=utf-8", RemoteCmd.apps(prefs).toByteArray())
+                }
+                method == "POST" && path == "/launch" -> {
+                    val r = RemoteCmd.launch(ctx, q["p"] ?: "")
+                    reply(c, if (r.first == 200) "200 OK" else "400 Bad Request", "text/plain; charset=utf-8", r.second.toByteArray())
+                }
+                method == "GET" && path == "/schema" -> {
+                    reply(c, "200 OK", "application/json; charset=utf-8", onSchema().toByteArray())
+                }
+                method == "POST" && path == "/setv" -> {
+                    val id = q["id"]?.toIntOrNull()
+                    val v = q["v"]?.toIntOrNull()
+                    if (id == null || v == null) {
+                        reply(c, "400 Bad Request", "text/plain; charset=utf-8", "Ajuste no válido".toByteArray())
+                    } else {
+                        onSetRow(id, v)
+                        reply(c, "200 OK", "text/plain; charset=utf-8", "ok".toByteArray())
+                    }
+                }
+                method == "GET" && path == "/about" -> {
+                    reply(c, "200 OK", "application/json; charset=utf-8", RemoteCmd.about(ctx).toByteArray())
+                }
+                method == "POST" && path == "/sys" -> {
+                    val r = RemoteCmd.sys(ctx, q["n"] ?: "")
+                    reply(c, if (r.first == 200) "200 OK" else "400 Bad Request", "text/plain; charset=utf-8", r.second.toByteArray())
                 }
                 else -> reply(c, "404 Not Found", "text/plain; charset=utf-8", "No existe".toByteArray())
             }

@@ -520,7 +520,9 @@ fun HomeRoot(
                         act.dispatchKeyEvent(AKey(AKey.ACTION_UP, k))
                     }
                 }
-            }
+            },
+            onSchema = { RemoteSchema.json(cfg, prefs, ctx.applicationContext) },
+            onSetRow = { id, v -> ui.post { RemoteSchema.apply(cfg, prefs, ctx.applicationContext, id, v) } }
         )
         val ok = withContext(Dispatchers.IO) { srv.start() }
         if (!ok) {

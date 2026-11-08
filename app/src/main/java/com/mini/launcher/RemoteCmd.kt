@@ -6,6 +6,7 @@ import android.content.Intent
 import android.media.AudioManager
 import android.net.Uri
 import android.view.KeyEvent
+import org.json.JSONArray
 import org.json.JSONObject
 
 /** Ordenes que manda la app del celular: teclas, volumen y enlaces. Devuelve (codigo HTTP, texto). */
@@ -65,6 +66,95 @@ object RemoteCmd {
             Pair(200, "Abierto en la TV")
         } catch (e: Exception) {
             Pair(500, "La TV no pudo abrir el enlace")
+        }
+    }
+
+    /** Apps de la TV: [{p: paquete, l: nombre, f: 1 si es favorita}]. */
+    fun apps(prefs: Prefs): String {
+        val favs = prefs.favs().toSet()
+        val a = JSONArray()
+        for (x in AppCache.apps) {
+            a.put(JSONObject().put("p", x.pkg).put("l", x.label).put("f", if (x.pkg in favs) 1 else 0))
+        }
+        return a.toString()
+    }
+
+    fun launch(c: Context, pkg: String): Pair<Int, String> {
+        val app = AppCache.apps.firstOrNull { it.pkg == pkg } ?: return Pair(400, "App no encontrada")
+        return try {
+            c.startActivity(Intent(app.intent).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            Pair(200, "ok")
+        } catch (e: Exception) {
+            Pair(500, "La TV no pudo abrir la app")
+        }
+    }
+
+    private fun fb(b: Long): String =
+        if (b >= 1L shl 30) String.format("%.1f GB", b / 1073741824.0) else (b shr 20).toString() + " MB"
+
+    /** Pantalla "Acerca de": [{t: titulo, l: [[nombre, valor], ...]}]. */
+    @Suppress("DEPRECATION")
+    fun about(c: Context): String {
+        fun sec(t: String, l: List<Pair<String, String>>): JSONObject {
+            val a = JSONArray()
+            for (x in l) a.put(JSONArray().put(x.first).put(x.second))
+            return JSONObject().put("t", t).put("l", a)
+        }
+        val pi = try { c.packageManager.getPackageInfo(c.packageName, 0) } catch (e: Exception) { null }
+        val out = JSONArray()
+        out.put(sec("Versión", listOf("Versión" to (pi?.versionName ?: "?"), "Código de versión" to (pi?.versionCode?.toString() ?: "?"))))
+        out.put(sec("Equipo", listOf(
+            "Dispositivo" to android.os.Build.MODEL,
+            "Fabricante" to android.os.Build.MANUFACTURER.replaceFirstChar { it.uppercase() },
+            "Android" to android.os.Build.VERSION.RELEASE + " (API " + android.os.Build.VERSION.SDK_INT + ")",
+            "Procesador" to (android.os.Build.SUPPORTED_ABIS.firstOrNull() ?: "?") + " · " + Runtime.getRuntime().availableProcessors() + " núcleos",
+            "Apps instaladas" to AppCache.apps.size.toString(),
+            "Encendida desde hace" to (android.os.SystemClock.elapsedRealtime() / 60000).let { m -> (m / 60).toString() + " h " + (m % 60) + " min" },
+            "Parche de seguridad" to (android.os.Build.VERSION.SECURITY_PATCH.takeIf { it.isNotBlank() } ?: "—")
+        )))
+        try {
+            val wm = c.getSystemService(Context.WINDOW_SERVICE) as android.view.WindowManager
+            val dm = android.util.DisplayMetrics()
+            wm.defaultDisplay.getRealMetrics(dm)
+            out.put(sec("Pantalla", listOf(
+                "Resolución" to dm.widthPixels.toString() + " × " + dm.heightPixels,
+                "Densidad" to dm.densityDpi.toString() + " dpi",
+                "Frecuencia" to Math.round(wm.defaultDisplay.refreshRate).toString() + " Hz"
+            )))
+        } catch (e: Exception) {
+        }
+        val mem = ArrayList<Pair<String, String>>()
+        try {
+            val st = android.os.StatFs(android.os.Environment.getDataDirectory().path)
+            mem.add("Almacenamiento" to fb(st.availableBlocksLong * st.blockSizeLong) + " libres de " + fb(st.blockCountLong * st.blockSizeLong))
+        } catch (e: Exception) {
+        }
+        try {
+            val am = c.getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
+            val mi = android.app.ActivityManager.MemoryInfo()
+            am.getMemoryInfo(mi)
+            mem.add("Memoria (RAM)" to fb(mi.availMem) + " libres de " + fb(mi.totalMem))
+        } catch (e: Exception) {
+        }
+        if (mem.isNotEmpty()) out.put(sec("Almacenamiento y memoria", mem))
+        return out.toString()
+    }
+
+    fun sys(c: Context, n: String): Pair<Int, String> {
+        val a = when (n) {
+            "wifi" -> android.provider.Settings.ACTION_WIFI_SETTINGS
+            "bluetooth" -> android.provider.Settings.ACTION_BLUETOOTH_SETTINGS
+            "sound" -> android.provider.Settings.ACTION_SOUND_SETTINGS
+            "display" -> android.provider.Settings.ACTION_DISPLAY_SETTINGS
+            "settings" -> android.provider.Settings.ACTION_SETTINGS
+            "dream" -> android.provider.Settings.ACTION_DREAM_SETTINGS
+            else -> return Pair(400, "Ajuste desconocido")
+        }
+        return try {
+            c.startActivity(Intent(a).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            Pair(200, "ok")
+        } catch (e: Exception) {
+            Pair(500, "La TV no tiene esa pantalla")
         }
     }
 }
