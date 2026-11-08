@@ -1,5 +1,9 @@
 # Novedades
 
+## 4.47
+- «One Piece Control» suma Apps (favoritas y todas, con búsqueda; tocar una la abre en la TV).
+- Ajustes del celular con las 11 secciones de la TV, de Fondo y color hasta Acerca de: interruptores, opciones y deslizadores se cambian desde el celular, con búsqueda en todos los ajustes. Lo que abre diálogos o permisos se ve como «Solo en la TV».
+
 ## 4.46
 - «One Piece Control» estrenó diseño morado: barra inferior con Mando, Enviar y Conexión.
 - Mando: Atrás, Inicio, silencio, volumen con deslizador y cruceta con OK (las flechas y OK mueven el foco dentro del launcher).
