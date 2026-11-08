@@ -1,5 +1,10 @@
 # Novedades
 
+## 4.46
+- «One Piece Control» estrenó diseño morado: barra inferior con Mando, Enviar y Conexión.
+- Mando: Atrás, Inicio, silencio, volumen con deslizador y cruceta con OK (las flechas y OK mueven el foco dentro del launcher).
+- Enviar a la TV: abrir un enlace, escribir texto y subir un fondo (foto o video) con barra de progreso.
+
 ## 4.45
 - Nueva app del celular «One Piece Control» (se publica junto al launcher): encuentra la TV sola, por QR o por IP, y se empareja con el PIN una sola vez.
 - Configuración › Celular: PIN fijo, QR de emparejamiento, lista de celulares autorizados con «Revocar» y la opción «Mantener la conexión activa» (apagada por defecto).
