@@ -512,7 +512,15 @@ fun HomeRoot(
                 }
             },
             onConfig = { ui.post { findActivity(ctx)?.recreate() } },
-            onPair = { ui.post { HomeBridge.phonesTick++ } }
+            onPair = { ui.post { HomeBridge.phonesTick++ } },
+            onKey = { k ->
+                ui.post {
+                    findActivity(ctx)?.let { act ->
+                        act.dispatchKeyEvent(AKey(AKey.ACTION_DOWN, k))
+                        act.dispatchKeyEvent(AKey(AKey.ACTION_UP, k))
+                    }
+                }
+            }
         )
         val ok = withContext(Dispatchers.IO) { srv.start() }
         if (!ok) {

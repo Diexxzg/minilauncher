@@ -24,7 +24,8 @@ class PhoneServer(
     private val onWall: (String) -> Unit,
     private val onConfig: () -> Unit,
     private val onShop: () -> Unit = {},
-    private val onPair: () -> Unit = {}
+    private val onPair: () -> Unit = {},
+    private val onKey: (Int) -> Unit = {}
 ) {
     val port = 8080
     val code: String get() = Phones.pin(prefs)
@@ -259,6 +260,27 @@ class PhoneServer(
                     } else {
                         reply(c, "400 Bad Request", "text/plain; charset=utf-8", "Ese archivo no es una copia válida".toByteArray())
                     }
+                }
+                method == "GET" && path == "/state" -> {
+                    reply(c, "200 OK", "application/json; charset=utf-8", RemoteCmd.state(ctx).toByteArray())
+                }
+                method == "POST" && path == "/key" -> {
+                    val r = RemoteCmd.key(ctx, q["n"] ?: "", onKey)
+                    reply(c, if (r.first == 200) "200 OK" else if (r.first == 409) "409 Conflict" else "400 Bad Request", "text/plain; charset=utf-8", r.second.toByteArray())
+                }
+                method == "POST" && path == "/vol" -> {
+                    reply(c, "200 OK", "application/json; charset=utf-8", RemoteCmd.vol(ctx, q["d"], q["p"]?.toIntOrNull()).toByteArray())
+                }
+                method == "POST" && path == "/open" -> {
+                    val b = ByteArray(minOf(len, 2000L).toInt())
+                    var r = 0
+                    while (r < b.size) {
+                        val n = i.read(b, r, b.size - r)
+                        if (n < 0) break
+                        r += n
+                    }
+                    val res = RemoteCmd.open(ctx, String(b, 0, r, Charsets.UTF_8))
+                    reply(c, if (res.first == 200) "200 OK" else "400 Bad Request", "text/plain; charset=utf-8", res.second.toByteArray())
                 }
                 else -> reply(c, "404 Not Found", "text/plain; charset=utf-8", "No existe".toByteArray())
             }
