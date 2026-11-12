@@ -206,13 +206,6 @@ fun AppMenu(
                 ActionRow("Mover a la izquierda") { onMoveL() }
                 ActionRow("Mover a la derecha") { onMoveR() }
             }
-            for (i in rowNames.indices) {
-                val rn = rowNames[i]
-                if (rn != null) {
-                    val on = inRow.getOrElse(i) { false }
-                    SwitchRow("En la fila " + rn, on) { v -> if (v != on) onRow(i) }
-                }
-            }
             for (i in folderNames.indices) {
                 val on = inFolder.getOrElse(i) { false }
                 SwitchRow("En la carpeta " + folderNames[i], on) { v -> if (v != on) onFolder(i) }

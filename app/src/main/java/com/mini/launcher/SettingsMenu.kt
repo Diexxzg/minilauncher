@@ -1,6 +1,7 @@
 package com.mini.launcher
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.lazy.LazyColumn
@@ -51,6 +52,7 @@ private val S_DARK = Color(0xFF0B0D11)
 private val S_RAIL = Color(0xFF0B0D11)
 
 /** Panel plano de Configuración (548×492 en la escena de 960×540): sin cristal ni desenfoque. */
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun SPanel(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
     val acc = Themes.current.acc
