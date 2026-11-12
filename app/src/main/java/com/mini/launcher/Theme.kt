@@ -45,3 +45,13 @@ object Themes {
 
     fun pick(cfg: Cfg): Int = cfg.theme
 }
+
+/** Tema armado a partir de un solo color de acento. */
+fun customTheme(argb: Int): AppTheme {
+    val c = Color(argb)
+    return AppTheme(
+        "Propio", c, lerp(c, Color.Black, 0.25f),
+        Color(0xCC1B1D20), Color(0xCC121416),
+        c.copy(alpha = 0.33f), lerp(c, Color.White, 0.5f).copy(alpha = 0.87f)
+    )
+}

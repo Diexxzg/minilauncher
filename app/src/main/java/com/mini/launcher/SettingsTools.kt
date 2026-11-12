@@ -60,34 +60,6 @@ val RESET_KEYS: Map<Int, List<String>> = mapOf(
     9 to listOf("bigText", "highContrast", "thickFocus")
 )
 
-/** Solo el aspecto (Fondo y color + Dock y diseño): no incluye apps, PIN ni notas. */
-val DESIGN_KEYS: List<String> =
-    ((RESET_KEYS[0] ?: emptyList()) + (RESET_KEYS[1] ?: emptyList())).distinct()
-
-/** Perfiles de familia: cada uno guarda su dock, filas, tema, diseño y ajustes de inicio. */
-val FAM_KEYS: List<String> =
-    (DESIGN_KEYS + (RESET_KEYS[2] ?: emptyList()) + listOf("favs")).distinct()
-
-    try {
-        val out = ctx.contentResolver.openOutputStream(uri, "wt")
-        if (out == null) {
-            false
-        } else {
-            out.use { it.write(prefs.exportKeysJson(DESIGN_KEYS).toByteArray(Charsets.UTF_8)) }
-            true
-        }
-    } catch (e: Exception) {
-        false
-    }
-
-    try {
-        val text = ctx.contentResolver.openInputStream(uri)?.use { it.readBytes().toString(Charsets.UTF_8) }
-        if (text == null || text.isBlank() || text.length > 200_000) false
-        else prefs.importKeysJson(text, DESIGN_KEYS)
-    } catch (e: Exception) {
-        false
-    }
-
 /** Explicaciones cortas que salen bajo las opciones menos obvias (clave = nombre interno de la opcion). */
 val DESCS: Map<String, String> = mapOf(
     "Perfil de diseño" to "Combina tamaño, separación y brillo en un solo paso.",
