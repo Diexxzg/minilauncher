@@ -62,37 +62,3 @@ fun SlowWatch(active: Boolean, lastInputMs: () -> Long, onSlow: () -> Unit) {
     }
 }
 
-/** Aviso con tres botones: activar, ahora no, no volver a sugerir. Atras = ahora no. */
-@Composable
-fun SaverHint(onEnable: () -> Unit, onNever: () -> Unit, onClose: () -> Unit) {
-    val shape = RoundedCornerShape(26.dp)
-    Box(
-        Modifier.fillMaxSize().background(Color(0x99000000)),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(
-            Modifier
-                .width(480.dp)
-                .clip(shape)
-                .background(Color(0xF0101624))
-                .border(1.dp, Color(0x33FFFFFF), shape)
-                .padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Text(
-                "Tu TV parece ir lenta", color = Color.White, fontSize = 22.sp,
-                fontWeight = FontWeight.Medium, modifier = Modifier.padding(start = 4.dp)
-            )
-            Text(
-                "El modo ahorro apaga el desenfoque, las animaciones, el fondo según la app " +
-                    "enfocada y el brillo de color. Puedes desactivarlo cuando quieras en " +
-                    "Configuración > Apariencia.",
-                color = Color(0xCCFFFFFF), fontSize = 14.sp,
-                modifier = Modifier.padding(start = 4.dp, end = 4.dp, bottom = 6.dp)
-            )
-            ActionRow("Activar modo ahorro", Modifier.autoFocus()) { onEnable() }
-            ActionRow("Ahora no") { onClose() }
-            ActionRow("No volver a sugerir") { onNever() }
-        }
-    }
-}

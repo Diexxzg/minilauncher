@@ -32,7 +32,8 @@ object Themes {
         AppTheme("Dorado", Color(0xFFFFD36B), Color(0xFFD9A63A), Color(0xCC272010), Color(0xCC17130A), Color(0x55FFC94D), Color(0xDDFFE6A8)),
         AppTheme("Neón verde", Color(0xFF39FF7A), Color(0xFF14B85A), Color(0xCC0D1A12), Color(0xCC08100B), Color(0x5539FF7A), Color(0xDD9CFFC0)),
         AppTheme("Neón violeta", Color(0xFFA78BFA), Color(0xFF7C5CF0), Color(0xCC15101F), Color(0xCC0D0A14), Color(0x55A78BFA), Color(0xDDD3C6FF)),
-        AppTheme("Neón rojo", Color(0xFFFF3B4E), Color(0xFFC4182B), Color(0xCC1F0D10), Color(0xCC140709), Color(0x55FF3B4E), Color(0xDDFFA3AB))
+        AppTheme("Neón rojo", Color(0xFFFF3B4E), Color(0xFFC4182B), Color(0xCC1F0D10), Color(0xCC140709), Color(0x55FF3B4E), Color(0xDDFFA3AB)),
+        AppTheme("Rojo", Color(0xFFFF4D5E), Color(0xFFCC2F3E), Color(0xCC4A1520), Color(0xCC1A0B10), Color(0x55FF4D5E), Color(0xDDFFA3AB))
     )
 
     var current by mutableStateOf(list[0])
@@ -42,20 +43,5 @@ object Themes {
         current = if (custom != 0) customTheme(custom) else list[i.coerceIn(0, list.lastIndex)]
     }
 
-    /**
-     * Indice del tema a usar. Con el tema automatico: Oceano de dia (7:00 a 18:59) y
-     * Atardecer (calido) de noche; si no, el tema elegido.
-     */
-    fun pick(cfg: Cfg, hour: Int): Int =
-        if (cfg.autoTheme) (if (hour in 7..18) 1 else 3) else cfg.theme
-}
-
-/** Tema armado a partir de un solo color de acento. */
-fun customTheme(argb: Int): AppTheme {
-    val c = Color(argb)
-    return AppTheme(
-        "Propio", c, lerp(c, Color.Black, 0.25f),
-        Color(0xCC1B1D20), Color(0xCC121416),
-        c.copy(alpha = 0.33f), lerp(c, Color.White, 0.5f).copy(alpha = 0.87f)
-    )
+    fun pick(cfg: Cfg): Int = cfg.theme
 }

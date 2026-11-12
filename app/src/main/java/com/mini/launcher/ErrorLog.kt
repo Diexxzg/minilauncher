@@ -20,8 +20,6 @@ class OnePieceApp : Application() {
         ErrorLog.install(this)
         Safe.check(this)
         val p = Prefs(this)
-        WeatherOpts.forecast = p.getInt("forecast", 0)
-        WeatherOpts.autoLoc = p.getInt("autoLoc", 0)
         VolGuard.apply(this)
     }
 

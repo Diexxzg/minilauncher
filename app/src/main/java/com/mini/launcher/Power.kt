@@ -44,24 +44,6 @@ class PowerService : AccessibilityService() {
             Remap.lastKeyMs = android.os.SystemClock.elapsedRealtime()
         }
     }
-    private val smartCheck = object : Runnable {
-        override fun run() {
-            val hrs = Daily.smartHours(this@PowerService)
-            val idle = android.os.SystemClock.elapsedRealtime() - Remap.lastKeyMs
-            if (hrs > 0 && idle > hrs * 3_600_000L) {
-                Remap.lastKeyMs = android.os.SystemClock.elapsedRealtime()
-                try {
-                    startActivity(
-                        Intent(this@PowerService, MainActivity::class.java).putExtra("dAct", 99)
-                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
-                    )
-                } catch (e: Exception) {
-                }
-            }
-            h.postDelayed(this, 60_000L)
-        }
-    }
-
     override fun onServiceConnected() {
         super.onServiceConnected()
         instance = this
@@ -71,13 +53,10 @@ class PowerService : AccessibilityService() {
             registerReceiver(screenOn, android.content.IntentFilter(Intent.ACTION_SCREEN_ON))
         } catch (e: Exception) {
         }
-        h.removeCallbacks(smartCheck)
-        h.postDelayed(smartCheck, 60_000L)
     }
 
     override fun onUnbind(intent: Intent?): Boolean {
         if (instance === this) instance = null
-        h.removeCallbacks(smartCheck)
         try {
             unregisterReceiver(screenOn)
         } catch (e: Exception) {

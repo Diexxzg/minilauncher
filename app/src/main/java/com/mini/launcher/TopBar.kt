@@ -58,12 +58,11 @@ private fun MoreRow(
 }
 
 /**
- * Panel pequeno bajo la barra superior con lo menos usado: voz, entradas y energia.
+ * Panel pequeno bajo la barra superior con lo menos usado: entradas y energia.
  * Se cierra con Atras o tocando fuera.
  */
 @Composable
 fun MoreMenu(
-    onVoice: () -> Unit,
     onInputs: () -> Unit,
     onPower: () -> Unit,
     onClose: () -> Unit
@@ -86,8 +85,7 @@ fun MoreMenu(
                 .padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            MoreRow("Voz y búsqueda", Modifier.autoFocus(), { MicIcon(Color.White) }, onVoice)
-            MoreRow("Entradas", Modifier, { InputIcon(Color.White) }, onInputs)
+            MoreRow("Entradas", Modifier.autoFocus(), { InputIcon(Color.White) }, onInputs)
             MoreRow("Energía", Modifier, { PowerIcon(Color.White) }, onPower)
         }
     }

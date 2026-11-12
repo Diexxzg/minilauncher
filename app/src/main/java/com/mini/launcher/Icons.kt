@@ -130,31 +130,6 @@ fun BluetoothIcon(color: Color, s: Int = 18) {
 }
 
 @Composable
-fun MicIcon(color: Color, s: Int = 22) {
-    Canvas(Modifier.size(s.dp)) {
-        val w = size.width
-        val sw = w * 0.09f
-        drawRoundRect(
-            color = color,
-            topLeft = Offset(w * 0.36f, w * 0.08f),
-            size = Size(w * 0.28f, w * 0.46f),
-            cornerRadius = CornerRadius(w * 0.14f, w * 0.14f),
-            style = Stroke(sw)
-        )
-        drawArc(
-            color = color,
-            startAngle = 0f,
-            sweepAngle = 180f,
-            useCenter = false,
-            topLeft = Offset(w * 0.24f, w * 0.3f),
-            size = Size(w * 0.52f, w * 0.46f),
-            style = Stroke(sw, cap = StrokeCap.Round)
-        )
-        drawLine(color, Offset(w * 0.5f, w * 0.76f), Offset(w * 0.5f, w * 0.92f), strokeWidth = sw, cap = StrokeCap.Round)
-    }
-}
-
-@Composable
 fun InputIcon(color: Color, s: Int = 22) {
     Canvas(Modifier.size(s.dp)) {
         val w = size.width
@@ -192,7 +167,6 @@ fun GearIcon(color: Color, s: Int = 22) {
         }
     }
 }
-
 
 /** Iconos de linea fina para las pestanas del panel de configuracion. */
 @Composable
@@ -320,7 +294,6 @@ fun LineIcon(kind: String, color: Color, s: Int = 24) {
         }
     }
 }
-
 
 @Composable
 fun PowerIcon(color: Color, s: Int = 22) {

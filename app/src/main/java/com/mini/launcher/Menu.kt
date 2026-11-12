@@ -120,9 +120,6 @@ fun AppMenu(
     onSize: (Int) -> Unit,
     onInfo: () -> Unit,
     onUninstall: () -> Unit,
-    rowNames: List<String?> = emptyList(),
-    inRow: List<Boolean> = emptyList(),
-    onRow: (Int) -> Unit = {},
     // Mejora 16: nombre propio, color de brillo e icono propio (valores por defecto: sin cambios).
     customName: String = "",
     onRename: (String) -> Unit = {},

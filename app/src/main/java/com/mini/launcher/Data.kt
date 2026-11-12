@@ -29,9 +29,7 @@ object AppCache {
 
 class Prefs(ctx: Context) {
     private val sp = ctx.getSharedPreferences("home", Context.MODE_PRIVATE)
-    // Dock por franja horaria (opcional): cada franja guarda su propia lista.
-    private fun favsKey(): String =
-        if (sp.getInt("dSlots", 0) == 1) "favs" + Daily.dayPart() else "favs"
+    private fun favsKey(): String = "favs"
     fun favs(): List<String> {
         val k = favsKey()
         val v = if (sp.contains(k)) sp.getString(k, "") else sp.getString("favs", "")
@@ -173,11 +171,6 @@ class Prefs(ctx: Context) {
     fun saveSizes(m: Map<String, Int>) {
         sp.edit().putString("sizes", m.entries.joinToString(",") { it.key + ":" + it.value }).apply()
     }
-    fun rowApps(i: Int): List<String> =
-        (sp.getString("rowApps$i", "") ?: "").split(",").filter { it.isNotEmpty() }
-    fun saveRowApps(i: Int, l: List<String>) {
-        sp.edit().putString("rowApps$i", l.joinToString(",")).apply()
-    }
     // ---- Mejoras 16, 17, 29, 32, 34: datos extra guardados como JSON de texto ----
     private fun jsonMap(k: String): Map<String, String> {
         val out = LinkedHashMap<String, String>()
@@ -227,11 +220,6 @@ class Prefs(ctx: Context) {
         jsonMap("dockGroups").mapValues { e -> e.value.split(",").filter { it.isNotEmpty() } }
     fun saveGroups(g: Map<String, List<String>>) =
         saveJsonMap("dockGroups", g.mapValues { it.value.joinToString(",") })
-    /** Apps permitidas en el perfil para ninos (34). */
-    fun kidsApps(): Set<String> = (sp.getString("kidsApps", "") ?: "").split(",").filter { it.isNotEmpty() }.toSet()
-    fun saveKidsApps(s: Set<String>) {
-        sp.edit().putString("kidsApps", s.joinToString(",")).apply()
-    }
     /** Aperturas por dia (32): "paquete:aaaammdd:n", se guardan los ultimos 14 dias. */
     private fun dayKey(offset: Int = 0): String {
         val c = java.util.Calendar.getInstance()

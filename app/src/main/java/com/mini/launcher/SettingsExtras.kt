@@ -153,25 +153,6 @@ fun SleepRow(modifier: Modifier = Modifier) {
     }
 }
 
-// ---------- Estadisticas (32) ----------
-
-@Composable
-fun StatsDialog(prefs: Prefs, onClose: () -> Unit) {
-    val items = remember { topWeek(prefs, AppCache.apps) }
-    val stale = remember { staleApps(prefs, AppCache.apps) }
-    ExtraDialog(stringResource(R.string.stats_title), onClose) {
-        UsageChart(items, Themes.current.acc)
-        if (stale.isNotEmpty()) {
-            Text(
-                "Sin abrir hace tiempo: " + stale.joinToString(", ") { it.first + " (" + it.second + " días)" } +
-                    ". Puedes ocultarlas o quitarlas desde Editar apps.",
-                color = Color(0xB3FFFFFF), fontSize = 13.sp
-            )
-        }
-        ActionRow(stringResource(R.string.x_close), Modifier.autoFocus()) { onClose() }
-    }
-}
-
 // ---------- Conexion con el celular (36-38) ----------
 
 @Composable
@@ -230,35 +211,6 @@ fun PhoneDialog(onClose: () -> Unit, cfg: Cfg) {
             }
         }
         ActionRow(stringResource(R.string.x_close)) { onClose() }
-    }
-}
-
-// ---------- Perfil para ninos (34) ----------
-
-@Composable
-fun KidsAppsDialog(prefs: Prefs, onClose: () -> Unit) {
-    val apps = remember { AppCache.apps.sortedBy { it.label.lowercase() } }
-    var sel by remember { mutableStateOf(prefs.kidsApps()) }
-    fun save(s: Set<String>) {
-        prefs.saveKidsApps(s)
-        sel = s
-        HomeBridge.kidsTick++
-    }
-    ExtraDialog(stringResource(R.string.kids_title), onClose, 560) {
-        Text(stringResource(R.string.kids_hint), color = Color(0xB3FFFFFF), fontSize = 13.sp)
-        if (apps.isEmpty()) {
-            Text(stringResource(R.string.kids_none), color = Color(0xE6FFFFFF), fontSize = 14.sp)
-        } else {
-            LazyColumn(Modifier.weight(1f, fill = false), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                itemsIndexed(apps, key = { _, a -> a.pkg }) { i, a ->
-                    SwitchRow(a.label, a.pkg in sel, if (i == 0) Modifier.autoFocus() else Modifier) { on ->
-                        save(if (on) sel + a.pkg else sel - a.pkg)
-                    }
-                }
-            }
-        }
-        ActionRow(stringResource(R.string.kids_clear)) { save(emptySet()) }
-        ActionRow(stringResource(R.string.x_close), if (apps.isEmpty()) Modifier.autoFocus() else Modifier) { onClose() }
     }
 }
 

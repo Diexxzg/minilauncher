@@ -101,28 +101,6 @@ fun WallPicker(files: List<File>, current: String, onPick: (String) -> Unit, onA
     }
 }
 
-@Composable
-fun GhostBtn(text: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
-    var focused by remember { mutableStateOf(false) }
-    val shape = RoundedCornerShape(10.dp)
-    Box(
-        modifier
-            .height(34.dp)
-            .widthIn(min = 34.dp)
-            .clip(shape)
-            .background(if (focused) Color(0x2BFFFFFF) else Color(0x14FFFFFF))
-            .then(if (focused) Modifier.border(1.dp, Color(0x66FFFFFF), shape) else Modifier)
-            .onFocusChanged { focused = it.isFocused }
-            .clickable(onClick = onClick),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text, color = if (focused) Color.White else Color(0xCCFFFFFF), fontSize = 14.sp,
-            modifier = Modifier.padding(horizontal = 10.dp)
-        )
-    }
-}
-
 // ---------- Editar apps (panel lateral derecho) ----------
 //
 // Dos vistas, pensadas para control remoto:

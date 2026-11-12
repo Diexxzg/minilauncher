@@ -47,9 +47,16 @@ class MediaListener : NotificationListenerService() {
     override fun onListenerConnected() {
         super.onListenerConnected()
         instance = this
+        Notif.link++
+        Notif.tick++
+    }
+
+    override fun onNotificationRemoved(sbn: android.service.notification.StatusBarNotification?) {
+        Notif.tick++
     }
 
     override fun onNotificationPosted(sbn: android.service.notification.StatusBarNotification?) {
+        Notif.tick++
         if (sbn != null && sbn.packageName != packageName && sbn.isClearable) Notif.at = SystemClock.elapsedRealtime()
         if (sbn != null && sbn.packageName != packageName && !sbn.isOngoing &&
             (sbn.notification.flags and Notification.FLAG_GROUP_SUMMARY) == 0 && Prefs(this).getInt("nlOn", 0) == 1
@@ -146,14 +153,6 @@ fun livePosition(c: MediaController): Pair<Long, Long> {
     } catch (e: Exception) {
         Pair(0L, 0L)
     }
-}
-
-fun seekBy(c: MediaController, d: Long) {
-    val r = livePosition(c)
-    var t = r.first + d
-    if (t < 0L) t = 0L
-    if (r.second > 0L && t > r.second) t = r.second
-    c.transportControls.seekTo(t)
 }
 
 fun DrawScope.drawPlay(c: Color) {

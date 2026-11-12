@@ -37,63 +37,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 
 /** Tarjetas pequenas junto al reloj (14): evento del calendario, nota rapida y cuenta regresiva. */
-@Composable
-fun ClockCards(cfg: Cfg, onEditNote: () -> Unit, modifier: Modifier = Modifier) {
-    if (!cfg.cardEvent && !cfg.cardNote && !cfg.cardCountdown) return
-    val ctx = LocalContext.current
-    val ev by produceState<String?>(null, cfg.cardEvent) {
-        if (!cfg.cardEvent) {
-            value = null
-            return@produceState
-        }
-        while (true) {
-            value = withContext(Dispatchers.IO) { nextEventText(ctx) }
-            delay(300_000)
-        }
-    }
-    Row(modifier, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        if (cfg.cardEvent) {
-            InfoCard(
-                "Calendario",
-                ev ?: if (hasCalendarPermission(ctx)) "Sin eventos próximos" else "Falta el permiso del calendario"
-            )
-        }
-        if (cfg.cardNote) {
-            GlassBox(onClick = onEditNote, shape = RoundedCornerShape(14.dp), cornerDp = 14.dp) {
-                Column(Modifier.widthIn(max = 220.dp).padding(horizontal = 12.dp, vertical = 8.dp)) {
-                    Text("Nota", color = Color(0x99FFFFFF), fontSize = 11.sp)
-                    Text(
-                        cfg.noteText.ifBlank { "Pulsa OK para escribir" },
-                        color = Color.White, fontSize = 14.sp, maxLines = 2, overflow = TextOverflow.Ellipsis
-                    )
-                }
-            }
-        }
-        if (cfg.cardCountdown) {
-            InfoCard(
-                "Cuenta regresiva",
-                countdownText(cfg.countdownDate, cfg.countdownLabel) ?: "Elige la fecha en Configuración"
-            )
-        }
-    }
-}
-
-@Composable
-private fun InfoCard(title: String, text: String) {
-    val shape = RoundedCornerShape(14.dp)
-    Column(
-        Modifier
-            .widthIn(max = 240.dp)
-            .clip(shape)
-            .background(Color(0x66121416))
-            .border(1.dp, Color(0x26FFFFFF), shape)
-            .padding(horizontal = 12.dp, vertical = 8.dp)
-    ) {
-        Text(title, color = Color(0x99FFFFFF), fontSize = 11.sp)
-        Text(text, color = Color.White, fontSize = 14.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
-    }
-}
-
 /**
  * Cuadro para escribir un texto con el teclado de la TV (nota, fecha, etiqueta...).
  * Atras cierra sin guardar; "Guardar" o el boton de listo del teclado guardan.

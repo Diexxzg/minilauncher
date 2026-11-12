@@ -44,8 +44,6 @@ import androidx.compose.ui.unit.sp
 @Composable
 fun QuickPanel(
     cfg: Cfg,
-    profile: Int,
-    onProfile: (Int) -> Unit,
     onSettings: () -> Unit,
     onClose: () -> Unit,
     net: NetState = NetState(),
@@ -55,8 +53,6 @@ fun QuickPanel(
     onWalls: () -> Unit = {},
     onInputs: () -> Unit = {},
     onSearch: () -> Unit = {},
-    sceneOn: Boolean = false,
-    onScene: () -> Unit = {}
 ) {
     val ctx = LocalContext.current
     val os = (LocalOverscan.current / LocalUiScale.current).dp
@@ -127,11 +123,6 @@ fun QuickPanel(
                 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                // La opcion 0 ("Personalizado") solo indica el estado; al pulsar se pasa al siguiente perfil.
-                QTile("Perfil", PROFILE_OPTIONS[profile.coerceIn(0, PROFILE_OPTIONS.lastIndex)], Modifier.weight(1f)) {
-                    val next = (profile % (PROFILE_OPTIONS.size - 1)) + 1
-                    onProfile(next - 1)
-                }
                 QTile("Fluidez máxima", if (cfg.fluid) "Activada" else "Apagada", Modifier.weight(1f)) { cfg.setFluid(!cfg.fluid) }
                 QTile("Reposo", "Modo ambiente", Modifier.weight(1f)) { onAmbient() }
             }
@@ -145,7 +136,6 @@ fun QuickPanel(
             // El brillo es lo contrario de "Oscurecer fondo": 100% = sin oscurecer.
             SliderRow("Brillo del fondo", 100 - cfg.dim, 20, 100, 5, "%") { cfg.setDim(100 - it) }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                SmallBtn(if (sceneOn) "Salir cine" else "Cine", Modifier.weight(1f)) { onScene() }
                 SmallBtn("Entradas", Modifier.weight(1f)) { onInputs() }
                 SmallBtn("Buscar", Modifier.weight(1f)) { onSearch() }
                 SmallBtn("Ajustes", Modifier.weight(1f)) { onSettings() }

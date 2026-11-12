@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -83,45 +84,15 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 
-private class Cat(val icon: String, val name: String, val desc: String)
-
-private val CATS = listOf(
-    Cat("palette", "Fondo y color", "Fondos, temas, acento y brillo"),
-    Cat("layout", "Dock y diseño", "Perfil, fichas, filas y efectos"),
-    Cat("home", "Inicio", "Parte superior, reloj, clima y contenido"),
-    Cat("bolt", "Pantalla y energía", "Tamaño, ahorro, noche, reposo y sonido"),
-    Cat("music", "Música", "Reproductor y posición"),
-    Cat("device", "Apps", "Organizar, carpetas y apps nuevas"),
-    Cat("globe", "Sistema", "Red, celular, botones de color y arranque"),
-    Cat("shield", "Permisos", "Calendario, ubicación, red y notificaciones"),
-    Cat("lock", "Seguridad", "PIN, protección y perfil para niños"),
-    Cat("eye", "Accesibilidad", "Texto grande, contraste y foco"),
-    Cat("info", "Acerca de", "Versión, equipo, copias y actualizaciones")
-)
-
-/** Indice de la categoría "Acerca de" (la última de la lista). */
-private const val ABOUT = 10
-
-/** Orden de las secciones dentro de cada categoría (las no listadas van al final, en orden de código). */
-private val SEC_ORDER = mapOf(
-    0 to listOf("Fondo", "Color"),
-    1 to listOf("Perfil", "Fichas", "Información", "Filas extra", "Foco y efectos", "Compartir diseño"),
-    2 to listOf("Parte superior", "Reloj y fecha", "Tarjetas junto al reloj", "Clima", "Contenido", "Barra superior"),
-    3 to listOf("Pantalla", "Rendimiento", "Efectos visuales", "Noche", "Reposo", "Diseño del modo ambiente", "Sonido"),
-    6 to listOf("Conexiones", "Sistema", "Celular", "Botones de color", "Mando y uso diario", "Arranque", "Escena de cine", "Rutina diaria", "Perfiles de familia", "Asistente", "Hogar y utilidades", "Herramientas del sistema"),
-    7 to listOf("Permisos")
-)
-
 /** Categorías que muestran la vista previa en vivo a la izquierda (Fondo y color, Dock y diseño). */
 fun settingsPreviewCat(cat: Int): Boolean = cat in 0..1
 
-private val CITIES = listOf(
+val CITIES = listOf(
     "Caracas", "Maracaibo", "Valencia", "Barquisimeto", "Bogotá", "Medellín",
     "Ciudad de México", "Miami", "Madrid", "Lima", "Santiago", "Buenos Aires"
 )
 
-private val GLOW_NAMES = listOf("Apagado", "Suave", "Medio", "Fuerte", "Máximo")
-
+val GLOW_NAMES = listOf("Apagado", "Suave", "Medio", "Fuerte", "Máximo")
 
 // ---------- Estilo (cristal oscuro) ----------
 // Escala interna del contenido del panel (menor = mas pequeño).
@@ -140,11 +111,13 @@ fun sidePanelWidth(availDp: Float, wide: Boolean = false): Float =
     }
 
 private val ACC: Color get() = Themes.current.acc
-private val ACC_DIM: Color get() = Themes.current.accDim
-private val ACCENT: Brush get() = Brush.horizontalGradient(listOf(ACC_DIM, ACC))
-private val TAB_IDLE = Color(0xB3C8D2F0)
+private val R_TEXT = Color(0xFFF1F4FA)
+private val R_TEXT2 = Color(0xFFA8B1C3)
+private val R_OFF = Color(0xFF3A4150)
+private val R_DARK = Color(0xFF0B0D11)
 
-// ---------- Controles ----------
+/** Icono de la fila que se está dibujando (lo fija la lista; vacío = sin cajita de icono). */
+val LocalRowIcon = androidx.compose.runtime.compositionLocalOf { "" }
 
 @Composable
 fun FocusRow(
@@ -154,37 +127,17 @@ fun FocusRow(
     content: @Composable RowScope.(Boolean) -> Unit
 ) {
     var focused by remember { mutableStateOf(false) }
-    val shape = RoundedCornerShape(16.dp)
+    val shape = RoundedCornerShape(14.dp)
+    val icon = LocalRowIcon.current
     val base = modifier
         .fillMaxWidth()
+        .heightIn(min = 44.dp)
         .clip(shape)
         .background(
-            if (focused) Brush.horizontalGradient(listOf(ACC.copy(alpha = 0.30f), ACC.copy(alpha = 0.08f)))
-            else Brush.horizontalGradient(listOf(Color(0x12FFFFFF), Color(0x07FFFFFF)))
+            if (focused) Brush.horizontalGradient(listOf(ACC.copy(alpha = 0.33f), ACC.copy(alpha = 0.18f)))
+            else SolidColor(Color(0x0AFFFFFF))
         )
-        .border(
-            if (focused) 1.5.dp else 1.dp,
-            if (focused) SolidColor(ACC.copy(alpha = 0.9f)) else SolidColor(Color(0x0FFFFFFF)),
-            shape
-        )
-        .drawBehind {
-            if (focused) {
-                if (Fx.glow) drawRoundRect(ACC.copy(alpha = 0.10f), cornerRadius = CornerRadius(16.dp.toPx()))
-                // Brillo del acento que nace en el borde izquierdo.
-                drawRect(
-                    Brush.horizontalGradient(
-                        listOf(ACC.copy(alpha = 0.35f), Color.Transparent),
-                        endX = 70.dp.toPx()
-                    )
-                )
-                drawRoundRect(
-                    color = ACC,
-                    topLeft = Offset(7.dp.toPx(), size.height * 0.26f),
-                    size = Size(3.5.dp.toPx(), size.height * 0.48f),
-                    cornerRadius = CornerRadius(2.dp.toPx())
-                )
-            }
-        }
+        .then(if (focused) Modifier.border(2.dp, ACC, shape) else Modifier)
         .onKeyEvent { e ->
             if (e.type == KeyEventType.KeyDown) {
                 when (e.key) {
@@ -199,9 +152,21 @@ fun FocusRow(
         .onFocusChanged { focused = it.isFocused }
     val clickable = if (onClick != null) base.clickable(onClick = onClick) else base.focusable()
     Row(
-        clickable.padding(start = 22.dp, end = 16.dp, top = 12.dp, bottom = 12.dp),
+        clickable.padding(start = 7.dp, end = 12.dp, top = 5.dp, bottom = 5.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        if (icon.isNotEmpty()) {
+            Box(
+                Modifier
+                    .size(30.dp)
+                    .clip(RoundedCornerShape(9.dp))
+                    .background(if (focused) ACC else ACC.copy(alpha = 0.18f)),
+                contentAlignment = Alignment.Center
+            ) { LineIcon(icon, if (focused) R_DARK else ACC, 16) }
+            Spacer(Modifier.width(10.dp))
+        } else {
+            Spacer(Modifier.width(8.dp))
+        }
         content(this, focused)
     }
 }
@@ -225,36 +190,36 @@ fun SliderRow(
             true
         }
     ) { focused ->
-        Text(label, color = Color(0xF2FFFFFF), fontSize = 17.sp, modifier = Modifier.weight(1f))
+        Text(label, color = R_TEXT, fontSize = 14.sp, maxLines = 1, modifier = Modifier.weight(1f))
         val frac = ((value - min).toFloat() / (max - min).toFloat()).coerceIn(0f, 1f)
-        Box(Modifier.width(130.dp).height(24.dp)) {
+        Box(Modifier.width(110.dp).height(20.dp)) {
             Box(
                 Modifier
                     .align(Alignment.CenterStart)
                     .fillMaxWidth()
-                    .height(6.dp)
-                    .clip(RoundedCornerShape(3.dp))
-                    .background(Color(0x33FFFFFF))
+                    .height(8.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(R_OFF)
             ) {
                 Box(
                     Modifier
                         .fillMaxHeight()
                         .fillMaxWidth(frac)
-                        .background(if (focused) ACCENT else SolidColor(Color(0x99FFFFFF)))
+                        .background(if (focused) ACC else ACC.copy(alpha = 0.6f))
                 )
             }
             Box(
                 Modifier
                     .align(Alignment.CenterStart)
-                    .offset(x = (112f * frac).dp)
-                    .size(18.dp)
+                    .offset(x = (94f * frac).dp)
+                    .size(16.dp)
                     .clip(CircleShape)
-                    .background(if (focused) ACC else Color.White)
+                    .background(R_TEXT)
             )
         }
         Text(
-            value.toString() + unit, color = Color(0xE6FFFFFF), fontSize = 16.sp,
-            textAlign = TextAlign.End, modifier = Modifier.width(62.dp)
+            value.toString() + unit, color = R_TEXT2, fontSize = 13.sp, maxLines = 1,
+            textAlign = TextAlign.End, modifier = Modifier.width(56.dp)
         )
     }
 }
@@ -274,17 +239,17 @@ fun SwitchRow(
         },
         onClick = { onChange(!checked) }
     ) {
-        Text(label, color = Color(0xF2FFFFFF), fontSize = 17.sp, modifier = Modifier.weight(1f))
+        Text(label, color = R_TEXT, fontSize = 14.sp, maxLines = 1, modifier = Modifier.weight(1f))
         Box(
             Modifier
-                .width(52.dp)
-                .height(30.dp)
-                .clip(RoundedCornerShape(15.dp))
-                .background(if (checked) ACCENT else SolidColor(Color(0x33FFFFFF)))
+                .width(42.dp)
+                .height(24.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(if (checked) ACC else R_OFF)
                 .padding(3.dp),
             contentAlignment = if (checked) Alignment.CenterEnd else Alignment.CenterStart
         ) {
-            Box(Modifier.size(24.dp).clip(CircleShape).background(Color.White))
+            Box(Modifier.size(18.dp).clip(CircleShape).background(if (checked) R_DARK else R_TEXT2))
         }
     }
 }
@@ -307,54 +272,54 @@ fun ChoiceRow(
         },
         onClick = { onSelect((sel + 1) % options.size) }
     ) { focused ->
-        Text(label, color = Color(0xF2FFFFFF), fontSize = 17.sp, modifier = Modifier.weight(1f))
-        Box(
-            Modifier
-                .clip(RoundedCornerShape(14.dp))
-                .background(if (focused) ACC.copy(alpha = 0.26f) else Color(0x14FFFFFF))
-                .border(1.dp, if (focused) ACC.copy(alpha = 0.8f) else Color(0x1FFFFFFF), RoundedCornerShape(14.dp))
-                .padding(horizontal = 14.dp, vertical = 6.dp)
-        ) {
-            Text(
-                (if (focused) "‹  " else "") + options[sel] + (if (focused) "  ›" else ""),
-                color = if (focused) Color.White else Color(0xCCFFFFFF),
-                fontSize = 16.sp, fontWeight = FontWeight.Normal, maxLines = 1
-            )
-        }
+        Text(label, color = R_TEXT, fontSize = 14.sp, maxLines = 1, modifier = Modifier.weight(1f))
+        Text(
+            (if (focused) "‹ " else "") + options[sel] + (if (focused) " ›" else ""),
+            color = if (focused) R_TEXT else R_TEXT2, fontSize = 13.sp, maxLines = 1
+        )
     }
 }
 
-/** Selector de tema con círculos de color (el elegido lleva anillo y brillo). */
+private val THEME_SHOWN = listOf("Medianoche", "Océano", "Esmeralda", "Atardecer", "Rojo", "Violeta", "Dorado")
+
+/** Selector de tema: 7 círculos fijos y «+N más»; izquierda/derecha recorre todos (los guardados siguen por índice). */
 @Composable
-private fun ThemeSwatchRow(selected: Int, modifier: Modifier = Modifier, onSelect: (Int) -> Unit) {
-    val n = Themes.list.size
-    val sel = selected.coerceIn(0, n - 1)
+fun ThemeSwatchRow(selected: Int, modifier: Modifier = Modifier, onSelect: (Int) -> Unit) {
+    val order = remember {
+        val first = THEME_SHOWN.map { n -> Themes.list.indexOfFirst { it.name == n } }.filter { it >= 0 }
+        first + Themes.list.indices.filter { it !in first }
+    }
+    val sel = selected.coerceIn(0, Themes.list.lastIndex)
+    val pos = order.indexOf(sel).coerceAtLeast(0)
+    val shown = minOf(7, order.size)
     FocusRow(
         modifier = modifier,
         onKey = { d ->
-            val nn = (sel + d).coerceIn(0, n - 1)
-            if (nn != sel) onSelect(nn)
+            val np = (pos + d).coerceIn(0, order.lastIndex)
+            if (np != pos) onSelect(order[np])
             true
         },
-        onClick = { onSelect((sel + 1) % n) }
+        onClick = { onSelect(order[(pos + 1) % order.size]) }
     ) {
         Column(Modifier.weight(1f)) {
-            Text("Tema de color", color = Color(0xF2FFFFFF), fontSize = 17.sp)
-            Spacer(Modifier.height(8.dp))
+            Text("Tema de color", color = R_TEXT, fontSize = 14.sp)
+            Spacer(Modifier.height(6.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                for ((i, t) in Themes.list.withIndex()) {
+                val idx = if (pos >= shown) order.take(shown) + order[pos] else order.take(shown)
+                for (i in idx) {
                     val on = i == sel
                     Box(
                         Modifier
-                            .size(if (on) 22.dp else 17.dp)
+                            .size(if (on) 20.dp else 16.dp)
                             .clip(CircleShape)
-                            .background(t.acc)
-                            .then(if (on) Modifier.border(2.dp, Color.White, CircleShape) else Modifier)
+                            .background(Themes.list[i].acc)
+                            .then(if (on) Modifier.border(2.dp, R_TEXT, CircleShape) else Modifier)
                     )
                 }
+                if (order.size > shown) Text("+" + (order.size - shown) + " más", color = R_TEXT2, fontSize = 11.sp)
             }
-            Spacer(Modifier.height(4.dp))
-            Text(Themes.list[sel].name, color = ACC, fontSize = 13.sp)
+            Spacer(Modifier.height(3.dp))
+            Text(Themes.list[sel].name, color = ACC, fontSize = 12.sp)
         }
     }
 }
@@ -362,186 +327,21 @@ private fun ThemeSwatchRow(selected: Int, modifier: Modifier = Modifier, onSelec
 @Composable
 fun ActionRow(text: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
     FocusRow(modifier = modifier, onClick = onClick) { focused ->
-        Text(text, color = Color(0xF2FFFFFF), fontSize = 17.sp, modifier = Modifier.weight(1f))
-        Text("›", color = if (focused) ACC else Color(0xAAFFFFFF), fontSize = 22.sp)
+        Text(text, color = R_TEXT, fontSize = 14.sp, maxLines = 1, modifier = Modifier.weight(1f))
+        Text("›", color = if (focused) R_TEXT else R_TEXT2, fontSize = 18.sp)
     }
 }
 
 @Composable
 fun InfoRow(label: String, value: String) {
     Row(
-        Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 7.dp),
+        Modifier.fillMaxWidth().padding(horizontal = 15.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(label, color = Color(0xA6FFFFFF), fontSize = 16.sp, modifier = Modifier.weight(1f))
-        Text(value, color = Color(0xF2FFFFFF), fontSize = 16.sp, fontWeight = FontWeight.Normal)
+        Text(label, color = R_TEXT2, fontSize = 13.sp, modifier = Modifier.weight(1f))
+        Text(value, color = R_TEXT, fontSize = 13.sp)
     }
 }
-// ---------- Etiqueta de seccion ----------
-/** Titulo pequeno que agrupa opciones dentro de una categoria (con una linea fina a la derecha). */
-@Composable
-private fun SectionLabel(text: String) {
-    Row(
-        Modifier.fillMaxWidth().padding(start = 8.dp, end = 4.dp, top = 16.dp, bottom = 6.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Box(Modifier.width(3.dp).height(13.dp).clip(RoundedCornerShape(2.dp)).background(ACCENT))
-        Spacer(Modifier.width(8.dp))
-        Text(text.uppercase(), color = ACC, fontSize = 12.sp, letterSpacing = 1.4.sp, maxLines = 1)
-        Spacer(Modifier.width(10.dp))
-        Box(Modifier.weight(1f).height(1.dp).background(Color(0x1AFFFFFF)))
-    }
-}
-
-/** Tarjeta de cristal que agrupa las filas de una seccion. */
-@Composable
-private fun SectionCard(content: @Composable () -> Unit) {
-    val shape = RoundedCornerShape(20.dp)
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .clip(shape)
-            .background(Brush.verticalGradient(listOf(Color(0x14FFFFFF), Color(0x08FFFFFF))))
-            .border(1.dp, Brush.verticalGradient(listOf(Color(0x33FFFFFF), Color(0x0AFFFFFF))), shape)
-            .padding(vertical = 4.dp, horizontal = 2.dp),
-        verticalArrangement = Arrangement.spacedBy(2.dp)
-    ) { content() }
-}
-
-/** Pestaña de categoria (solo icono): se selecciona al recibir el foco, sin pulsar OK. */
-@Composable
-private fun TabChip(
-    icon: String,
-    selected: Boolean,
-    modifier: Modifier = Modifier,
-    dot: Boolean = false,
-    onFocus: () -> Unit,
-    onEnter: () -> Boolean,
-    onClick: () -> Unit
-) {
-    var focused by remember { mutableStateOf(false) }
-    val shape = RoundedCornerShape(12.dp)
-    Box(
-        modifier
-            .height(38.dp)
-            .clip(shape)
-            .background(
-                when {
-                    focused -> Color(0x2BFFFFFF)
-                    selected -> ACC.copy(alpha = 0.24f)
-                    else -> Color.Transparent
-                }
-            )
-            .then(
-                if (focused) Modifier.border(1.5.dp, ACC.copy(alpha = 0.9f), shape)
-                else if (selected) Modifier.border(1.dp, ACC.copy(alpha = 0.5f), shape)
-                else Modifier
-            )
-            .drawBehind {
-                if (dot) {
-                    // Punto: esta categoria tiene ajustes que ya cambiaste.
-                    drawCircle(ACC, radius = 3.dp.toPx(), center = Offset(size.width - 8.dp.toPx(), 8.dp.toPx()))
-                }
-                if (selected) {
-                    drawRoundRect(
-                        color = ACC,
-                        topLeft = Offset(size.width * 0.3f, size.height - 4.dp.toPx()),
-                        size = Size(size.width * 0.4f, 2.5.dp.toPx()),
-                        cornerRadius = CornerRadius(2.dp.toPx())
-                    )
-                }
-            }
-            .onKeyEvent { e ->
-                // Abajo entra directo a la primera opcion de la categoria (sin depender de la busqueda de foco).
-                if (e.type == KeyEventType.KeyDown && e.key == Key.DirectionDown) onEnter() else false
-            }
-            .onFocusChanged {
-                focused = it.isFocused
-                if (it.isFocused) onFocus()
-            }
-            .clickable(onClick = onClick),
-        contentAlignment = Alignment.Center
-    ) {
-        LineIcon(icon, if (focused || selected) ACC else TAB_IDLE, 22)
-    }
-}
-
-/** Fila de la lista de categorias: icono, nombre y una descripcion corta. */
-@Composable
-private fun CategoryRow(
-    icon: String,
-    title: String,
-    desc: String,
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit
-) {
-    FocusRow(modifier = modifier, onClick = onClick) { focused ->
-        Box(
-            Modifier
-                .size(38.dp)
-                .clip(RoundedCornerShape(11.dp))
-                .background(if (focused) ACC.copy(alpha = 0.22f) else Color(0x14FFFFFF)),
-            contentAlignment = Alignment.Center
-        ) {
-            LineIcon(icon, if (focused) ACC else TAB_IDLE, 22)
-        }
-        Spacer(Modifier.width(14.dp))
-        Column(Modifier.weight(1f)) {
-            Text(title, color = Color(0xF2FFFFFF), fontSize = 18.sp)
-            Text(
-                desc, color = Color(0x80FFFFFF), fontSize = 12.sp,
-                maxLines = 1, overflow = TextOverflow.Ellipsis
-            )
-        }
-        Text("›", color = if (focused) ACC else Color(0xAAFFFFFF), fontSize = 22.sp)
-    }
-}
-
-/** Fila de la barra lateral: icono y nombre; la activa lleva contorno y brillo del acento (como en la referencia). */
-@Composable
-private fun RailItem(
-    icon: String,
-    name: String,
-    selected: Boolean,
-    modifier: Modifier = Modifier,
-    onFocus: () -> Unit,
-    onClick: () -> Unit
-) {
-    var focused by remember { mutableStateOf(false) }
-    val shape = RoundedCornerShape(16.dp)
-    Row(
-        modifier
-            .fillMaxWidth()
-            .clip(shape)
-            .background(
-                if (selected) Brush.horizontalGradient(listOf(ACC.copy(alpha = 0.34f), ACC.copy(alpha = 0.10f)))
-                else SolidColor(if (focused) Color(0x1FFFFFFF) else Color.Transparent)
-            )
-            .then(
-                if (selected) Modifier.border(1.5.dp, ACC, shape)
-                else if (focused) Modifier.border(1.dp, Color(0x66FFFFFF), shape)
-                else Modifier
-            )
-            .onFocusChanged {
-                focused = it.isFocused
-                if (it.isFocused) onFocus()
-            }
-            .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 7.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        LineIcon(icon, if (selected) ACC else Color(0xCCFFFFFF), 20)
-        Spacer(Modifier.width(14.dp))
-        Text(
-            name,
-            color = if (selected || focused) Color.White else Color(0xCCFFFFFF),
-            fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis
-        )
-    }
-}
-
-// ---------- Marco de cristal (compartido por Configuracion y Editar apps) ----------
-
 /**
  * Panel de cristal pegado al lado derecho, de arriba a abajo. El inicio se hace mas angosto
  * (ver sidePanelWidth) para que el panel nunca quede encima de las apps.
@@ -555,7 +355,7 @@ fun GlassPanelFrame(wide: Boolean = false, compact: Boolean = false, content: @C
     val ov = LocalOverscan.current / us
     var shown by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { shown = true }
-    val p by animateFloatAsState(if (shown) 1f else 0f, if (Fx.anim) tween(300) else androidx.compose.animation.core.snap(), label = "panelIn")
+    val p by animateFloatAsState(if (shown) 1f else 0f, androidx.compose.animation.core.snap(), label = "panelIn")
     val availW = conf.screenWidthDp.toFloat() / us - 2f * ov
     val availH = conf.screenHeightDp.toFloat() / us - 2f * ov
     // Configuración (wide): ventana horizontal centrada. En Fondo y Dock se hace más baja y se sube
@@ -625,1396 +425,8 @@ fun GlassPanelFrame(wide: Boolean = false, compact: Boolean = false, content: @C
 }
 // ---------- Opciones ----------
 
-/**
- * Una opcion de Configuracion: categoria, seccion donde se agrupa y su fila.
- * focusable = false para filas que solo muestran informacion (no reciben el foco inicial).
- * content recibe el Modifier que debe llevar la fila (aqui va el foco inicial).
- */
-private class SItem(
-    val cat: Int,
-    val label: String,
-    val sec: String = "",
-    val focusable: Boolean = true,
-    val content: @Composable (Modifier) -> Unit
-)
-
-/** Fila que abrio un sub-panel (fondos, apps, entradas): al volver, el foco regresa a ella. */
-private var returnKey: String? = null
-// ---------- Pantalla ----------
-
-/**
- * Configuracion en un panel a la derecha. Dos niveles: lista de categorias (cat = -1) y las
- * opciones de una categoria. cat vive en MainActivity para que Atras funcione: dentro de una
- * categoria vuelve a la lista y desde la lista cierra el panel (una sola pulsacion cada vez).
- */
-@OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
-@Composable
-fun SettingsScreen(
-    style: DockStyle,
-    cfg: Cfg,
-    cat: Int,
-    onCat: (Int) -> Unit,
-    onRightFocus: (Boolean) -> Unit = {},
-    railBack: Int = 0,
-    onSet: (String, Int) -> Unit,
-    onResetDock: () -> Unit,
-    onWalls: () -> Unit,
-    onEdit: () -> Unit,
-    onInputs: () -> Unit,
-    onOpen: (String) -> Unit,
-    onSetHome: () -> Unit,
-    onBackup: () -> Unit,
-    onRestore: () -> Unit,
-    onNetPerm: () -> Unit,
-    onPin: (String) -> Unit,
-    onProfile: (Int) -> Unit = {},
-    onBackupSave: () -> Unit = {},
-    onBackupShare: () -> Unit = {},
-    onRestorePick: () -> Unit = {},
-    onUpdate: () -> Unit = {},
-    onDesignSave: () -> Unit = {},
-    onDesignPick: () -> Unit = {},
-    onWizard: () -> Unit = {},
-    updBack: Int = 0,
-    blocked: Boolean = false
-) {
-    val ctx = LocalContext.current
-    val prefs = remember { Prefs(ctx) }
-    // Permisos que se piden solo al activar la opcion que los necesita.
-    var permTick by remember { mutableIntStateOf(0) }
-    var calWantsOn by remember { mutableStateOf(false) }
-    var locWantsOn by remember { mutableStateOf(false) }
-    val calPerm = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { ok ->
-        permTick++
-        if (calWantsOn) {
-            if (ok) {
-                cfg.setCardEvent(true)
-            } else {
-                toast(ctx, "Sin el permiso del calendario no se puede mostrar el próximo evento.")
-            }
-        }
-        calWantsOn = false
-    }
-    val locPerm = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { ok ->
-        permTick++
-        if (locWantsOn) {
-            if (ok) {
-                cfg.setAutoLoc(true)
-                WeatherOpts.autoLoc = 1
-            } else {
-                toast(ctx, "Sin el permiso de ubicación se usa la ciudad elegida.")
-            }
-        }
-        locWantsOn = false
-    }
-    // Weather.kt lee estos dos ajustes fuera de Configuracion: se mantienen al dia aqui.
-    SideEffect {
-        WeatherOpts.forecast = if (cfg.forecast) 1 else 0
-        WeatherOpts.autoLoc = if (cfg.autoLoc) 1 else 0
-    }
-    // Si venimos de un sub-panel, el foco vuelve a la fila que lo abrio (se lee una sola vez).
-    val retKey = remember { returnKey.also { returnKey = null } }
-
-    val dateLabels = remember { dateFormatLabels() }
-    val cityOpts = if (cfg.city in CITIES) CITIES else listOf(cfg.city) + CITIES
-    // Perfil que coincide con los ajustes actuales (0 = personalizado).
-    val profSel = profileIndex(style.scalePct, style.spacing, style.corner, style.glow, cfg)
-
-    // Todas las opciones en una sola lista; se muestra la de la categoria abierta.
-    val items = buildList<SItem> {
-        // ---- Apariencia ----
-        add(SItem(0, "Cambiar fondo de pantalla", "Fondo") { m ->
-            ActionRow("Cambiar fondo de pantalla", m) {
-                returnKey = "Cambiar fondo de pantalla"
-                onWalls()
-            }
-        })
-        add(SItem(0, "Rotación de fondos", "Fondo") { m ->
-            ChoiceRow(
-                "Rotación de fondos",
-                listOf("Desactivada", "Cada 30 min", "Cada hora", "Según la hora"),
-                cfg.rot, m
-            ) { cfg.setRot(it) }
-        })
-        add(SItem(0, "Transición suave", "Fondo") { m ->
-            SwitchRow("Transición suave", cfg.fade, m) { cfg.setFade(it) }
-        })
-        add(SItem(0, "Pausar fondo animado", "Fondo") { m ->
-            SwitchRow("Pausar fondo animado con paneles", cfg.pauseWall, m) { cfg.setPauseWall(it) }
-        })
-        add(SItem(0, "Fondo según app enfocada", "Fondo") { m ->
-            ChoiceRow(
-                "Fondo según app enfocada",
-                listOf("Apagado", "Degradado", "Banner"),
-                cfg.dynBg, m
-            ) { cfg.setDynBg(it) }
-        })
-        add(SItem(0, "Presentación de fondos", "Fondo") { m ->
-            SwitchRow("Presentación de fondos (cambian solos)", cfg.wallShow, m) { cfg.setWallShow(it) }
-        })
-        if (cfg.wallShow) {
-            add(SItem(0, "Cambiar cada", "Fondo") { m ->
-                SliderRow("Cambiar el fondo cada", cfg.wallShowMins, 5, 120, 5, " min", m) { cfg.setWallShowMins(it) }
-            })
-        }
-        add(SItem(0, "Clima en el fondo", "Fondo") { m ->
-            SwitchRow("Clima en el fondo (se apaga con modo ahorro)", cfg.weatherFx, m) { cfg.setWeatherFx(it) }
-        })
-        add(SItem(1, "Perfil de diseño", "Perfil") { m ->
-            // Izquierda/derecha cambia de perfil; la opcion "Personalizado" solo indica el estado.
-            ChoiceRow("Perfil de diseño", PROFILE_OPTIONS, profSel, m) {
-                onProfile(if (it > 0) it - 1 else 0)
-            }
-        })
-        add(SItem(0, "Tema de color", "Color") { m ->
-            ThemeSwatchRow(cfg.theme, m) { cfg.setTheme(it) }
-        })
-        add(SItem(0, "Tema automático", "Color") { m ->
-            SwitchRow("Tema automático (día y noche)", cfg.autoTheme, m) { cfg.setAutoTheme(it) }
-        })
-        add(SItem(0, "Color de acento propio", "Color") { m ->
-            DialogRow(
-                if (cfg.accentCustom != 0) "Color de acento propio (activo)" else "Color de acento propio",
-                m
-            ) { close ->
-                AccentPickerDialog(
-                    current = cfg.accentCustom,
-                    onSave = {
-                        cfg.setAccentCustom(it)
-                        close()
-                    },
-                    onClear = {
-                        cfg.setAccentCustom(0)
-                        close()
-                    },
-                    onClose = close
-                )
-            }
-        })
-        add(SItem(0, "Brillo de color", "Color") { m ->
-            ChoiceRow("Brillo de color", GLOW_NAMES, style.glow, m) { onSet("glow", it) }
-        })
-        add(SItem(0, "Color del brillo", "Color") { m ->
-            ChoiceRow(
-                "Color del brillo",
-                listOf("Color de cada app", "Color del fondo", "Color del tema"),
-                cfg.glowSrc, m
-            ) { cfg.setGlowSrc(it) }
-        })
-        add(SItem(1, "Estilo de foco", "Foco y efectos") { m ->
-            ChoiceRow("Estilo de foco", FOCUS_STYLES, cfg.focusStyle, m) { cfg.setFocusStyle(it) }
-        })
-        add(SItem(0, "Oscurecer fondo", "Color") { m ->
-            SliderRow("Oscurecer fondo", cfg.dim, 0, 80, 5, "%", m) { cfg.setDim(it) }
-        })
-        add(SItem(1, "Desenfoque al abrir paneles", "Foco y efectos") { m ->
-            SwitchRow("Desenfoque al abrir paneles", cfg.blur, m) { cfg.setBlur(it) }
-        })
-        add(SItem(1, "Animar cambio de pantallas", "Foco y efectos") { m ->
-            SwitchRow("Animar cambio de pantallas", cfg.screenAnim, m) { cfg.setScreenAnim(it) }
-        })
-        add(SItem(1, "Animación al abrir apps", "Foco y efectos") { m ->
-            SwitchRow("Animación al abrir una app", cfg.openAnim, m) { cfg.setOpenAnim(it) }
-        })
-        add(SItem(3, "Tamaño de la interfaz", "Pantalla") { m ->
-            SliderRow("Tamaño de la interfaz", cfg.uiScale, 70, 130, 5, "%", m) { cfg.setUiScale(it) }
-        })
-        add(SItem(3, "Margen de seguridad", "Pantalla") { m ->
-            SliderRow("Margen de seguridad", cfg.overscan, 0, 60, 2, " dp", m) { cfg.setOverscan(it) }
-        })
-        add(SItem(3, "Margen guiado", "Pantalla") { m ->
-            DialogRow("Margen de seguridad guiado (con vista previa)", m) { close -> OverscanGuide(cfg, close) }
-        })
-        add(SItem(3, "Marco de fotos", "Diseño del modo ambiente") { m ->
-            SwitchRow("Marco de fotos en modo ambiente", cfg.ex("frameOn") == "1", m) { cfg.setEx("frameOn", if (it) "1" else "0") }
-        })
-        add(SItem(3, "Carpeta del marco", "Diseño del modo ambiente") { m ->
-            val pick = androidx.activity.compose.rememberLauncherForActivityResult(
-                androidx.activity.result.contract.ActivityResultContracts.OpenDocumentTree()
-            ) { uri: android.net.Uri? ->
-                if (uri != null) {
-                    try {
-                        ctx.contentResolver.takePersistableUriPermission(uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                    } catch (e: Exception) { }
-                    cfg.setEx("frameUri", uri.toString()); cfg.setEx("frameOn", "1")
-                }
-            }
-            ActionRow(if (cfg.ex("frameUri").isEmpty()) "Elegir carpeta de fotos…" else "Cambiar carpeta de fotos…", m) {
-                try { pick.launch(null) } catch (e: Exception) { toast(ctx, "Esta TV no tiene selector de carpetas.") }
-            }
-        })
-        add(SItem(3, "Fondo vivo según la hora", "Diseño del modo ambiente") { m ->
-            SwitchRow("Fondo vivo según la hora", cfg.ex("liveBg") == "1", m) { cfg.setEx("liveBg", if (it) "1" else "0") }
-        })
-        add(SItem(3, "Amplitud del movimiento", "Diseño del modo ambiente") { m ->
-            ChoiceRow("Amplitud anti-quemado", listOf("Normal", "Amplia", "Muy amplia"), cfg.ex("ambMove", "0").toIntOrNull() ?: 0, m) { cfg.setEx("ambMove", it.toString()) }
-        })
-        add(SItem(3, "Pantalla negra al entrar", "Diseño del modo ambiente") { m ->
-            SwitchRow("Modo ambiente = pantalla negra (el audio sigue)", cfg.ex("ambBlack") == "1", m) { cfg.setEx("ambBlack", if (it) "1" else "0") }
-        })
-        add(SItem(3, "Fluidez máxima", "Rendimiento") { m ->
-            SwitchRow("Fluidez máxima", cfg.fluid, m) { cfg.setFluid(it) }
-        })
-        add(SItem(3, "Modo ahorro", "Rendimiento") { m ->
-            SwitchRow("Modo ahorro (TV modesta)", cfg.saverOnly, m) { cfg.setSaver(it) }
-        })
-        add(SItem(3, "Sugerir modo ahorro", "Rendimiento") { m ->
-            SwitchRow("Sugerir modo ahorro si va lenta", cfg.saverHint, m) { cfg.setSaverHint(it) }
-        })
-        add(SItem(3, "Rendimiento: salud, red, almacenamiento y más", "Rendimiento") { m ->
-            DialogRow("Rendimiento: salud, red, almacenamiento y más", m) { close -> PerfDialog(close) }
-        })
-        add(SItem(3, "Desenfoque del fondo con paneles abiertos", "Efectos visuales") { m ->
-            SwitchRow("Desenfoque del fondo con paneles abiertos", Fx.blur, m) { cfg.setFxBlur(it) }
-        })
-        add(SItem(3, "Brillos y resplandor", "Efectos visuales") { m ->
-            SwitchRow("Brillos y resplandor", Fx.glow, m) { cfg.setFxGlow(it) }
-        })
-        add(SItem(3, "Animaciones de ventanas", "Efectos visuales") { m ->
-            SwitchRow("Animaciones de ventanas", Fx.anim, m) { cfg.setFxAnim(it) }
-        })
-        add(SItem(3, "Efectos recomendados (todo apagado)", "Efectos visuales") { m ->
-            ActionRow("Efectos recomendados (todo apagado)", m) { cfg.fxRecommended() }
-        })
-        add(SItem(3, "Tema desde la carátula", "Ambiente y noche") { m ->
-            SwitchRow("Tema desde la carátula de lo que suena", cfg.ex("artTheme") == "1", m) { cfg.setEx("artTheme", if (it) "1" else "0") }
-        })
-        add(SItem(3, "Fondo musical", "Ambiente y noche") { m ->
-            SwitchRow("Fondo musical (tinte de la carátula)", cfg.ex("artBg") == "1", m) { cfg.setEx("artBg", if (it) "1" else "0") }
-        })
-        add(SItem(3, "Temas por fechas", "Ambiente y noche") { m ->
-            SwitchRow("Temas por fechas especiales", cfg.ex("dateThemes") == "1", m) { cfg.setEx("dateThemes", if (it) "1" else "0") }
-        })
-        add(SItem(3, "Cuentas regresivas", "Ambiente y noche") { m ->
-            SwitchRow("Mostrar cuentas regresivas en el inicio", cfg.ex("cdOn") == "1", m) { cfg.setEx("cdOn", if (it) "1" else "0") }
-        })
-        add(SItem(3, "Nueva cuenta regresiva", "Ambiente y noche") { m ->
-            DialogRow("Nueva cuenta regresiva (" + cfg.ex("cdList").split("\n").count { it.isNotBlank() } + "/5)", m) { close ->
-                TextEditDialog("Nueva cuenta regresiva", "", "Formato: 25/12/2026 Navidad (se muestran las 3 más cercanas).", 60, { t ->
-                    val l = Amb2.parseCd(t)
-                    val cur = cfg.ex("cdList").split("\n").filter { it.isNotBlank() }
-                    if (l == null) toast(ctx, "Formato no válido. Ejemplo: 25/12/2026 Navidad")
-                    else if (cur.size >= 5) toast(ctx, "Máximo 5 cuentas.")
-                    else { cfg.setEx("cdList", (cur + l).joinToString("\n")); cfg.setEx("cdOn", "1") }
-                    close()
-                }, close)
-            }
-        })
-        add(SItem(3, "Borrar cuentas", "Ambiente y noche") { m ->
-            ActionRow("Borrar todas las cuentas regresivas", m) { cfg.setEx("cdList", "") }
-        })
-        add(SItem(3, "Noche por contenido", "Ambiente y noche") { m ->
-            SwitchRow("Noche: bajar volumen poco a poco (22:00 a 6:00)", cfg.ex("nightOn") == "1", m) { cfg.setEx("nightOn", if (it) "1" else "0") }
-        })
-        add(SItem(3, "Volumen mínimo de noche", "Ambiente y noche") { m ->
-            SliderRow("Volumen mínimo de noche", cfg.ex("nightVol", "20").toIntOrNull() ?: 20, 5, 60, 5, "%", m) { cfg.setEx("nightVol", it.toString()) }
-        })
-        add(SItem(3, "Despertador con rampa", "Ambiente y noche") { m ->
-            SwitchRow("Despertador con rampa de brillo y volumen", cfg.ex("wakeOn") == "1", m) { cfg.setEx("wakeOn", if (it) "1" else "0") }
-        })
-        add(SItem(3, "Hora del despertador", "Ambiente y noche") { m ->
-            DialogRow("Hora del despertador: " + cfg.ex("wakeTime", "07:00"), m) { close ->
-                TextEditDialog("Hora del despertador", cfg.ex("wakeTime", "07:00"), "Formato 24 h, ej.: 07:00", 5, { t ->
-                    val mm = Regex("^(\\d{1,2}):(\\d{2})$").find(t.trim())
-                    if (mm != null && mm.groupValues[1].toInt() < 24 && mm.groupValues[2].toInt() < 60)
-                        cfg.setEx("wakeTime", "%02d:%s".format(mm.groupValues[1].toInt(), mm.groupValues[2]))
-                    else toast(ctx, "Hora no válida.")
-                    close()
-                }, close)
-            }
-        })
-        add(SItem(3, "Duración de la rampa", "Ambiente y noche") { m ->
-            SliderRow("Duración de la rampa", cfg.ex("wakeMin", "10").toIntOrNull() ?: 10, 1, 30, 1, " min", m) { cfg.setEx("wakeMin", it.toString()) }
-        })
-        add(SItem(3, "Filtro de luz cálida", "Ambiente y noche") { m ->
-            SwitchRow("Filtro de luz cálida (sobre todas las apps)", cfg.ex("warmOn") == "1", m) { cfg.setEx("warmOn", if (it) "1" else "0") }
-        })
-        add(SItem(3, "Intensidad del filtro", "Ambiente y noche") { m ->
-            SliderRow("Intensidad del filtro", cfg.ex("warmPct", "20").toIntOrNull() ?: 20, 5, 50, 5, "%", m) { cfg.setEx("warmPct", it.toString()) }
-        })
-        add(SItem(3, "Tarjeta en esquina", "Ambiente y noche") { m ->
-            SwitchRow("Tarjeta con hora y clima sobre otras apps", cfg.ex("cornerOn") == "1", m) { cfg.setEx("cornerOn", if (it) "1" else "0") }
-        })
-        add(SItem(3, "Esquina de la tarjeta", "Ambiente y noche") { m ->
-            ChoiceRow("Esquina de la tarjeta", listOf("Arriba derecha", "Arriba izquierda", "Abajo derecha", "Abajo izquierda"),
-                cfg.ex("cornerPos", "0").toIntOrNull() ?: 0, m) { cfg.setEx("cornerPos", it.toString()) }
-        })
-        add(SItem(3, "Modo noche automático", "Noche") { m ->
-            SwitchRow("Modo noche automático", cfg.night, m) { cfg.setNight(it) }
-        })
-        if (cfg.night) {
-            add(SItem(3, "Noche desde", "Noche") { m ->
-                SliderRow("Noche desde las", cfg.nightFrom, 0, 23, 1, ":00", m) { cfg.setNightFrom(it) }
-            })
-            add(SItem(3, "Noche hasta", "Noche") { m ->
-                SliderRow("Noche hasta las", cfg.nightTo, 0, 23, 1, ":00", m) { cfg.setNightTo(it) }
-            })
-        }
-        add(SItem(3, "Sonido al mover el foco", "Sonido") { m ->
-            ChoiceRow(
-                "Sonido al mover el foco",
-                listOf("Apagado", "Suave", "Medio"),
-                cfg.soundLevel, m
-            ) { cfg.setSoundLevel(it) }
-        })
-        add(SItem(3, "Sonido de paneles", "Sonido") { m ->
-            SwitchRow("Sonido al abrir y cerrar paneles", cfg.panelSounds, m) { cfg.setPanelSounds(it) }
-        })
-        // ---- Dock ----
-        add(SItem(1, "Tamaño general", "Fichas") { m ->
-            SliderRow("Tamaño general", style.scalePct, 50, 180, 10, "%", m) { onSet("scale", it) }
-        })
-        add(SItem(1, "Separación", "Fichas") { m ->
-            SliderRow("Separación", style.spacing, 0, 48, 2, " dp", m) { onSet("spacing", it) }
-        })
-        add(SItem(1, "Redondeo", "Fichas") { m ->
-            SliderRow("Redondeo", style.corner, 0, 40, 2, " dp", m) { onSet("corner", it) }
-        })
-        add(SItem(1, "Margen inferior", "Fichas") { m ->
-            SliderRow("Margen inferior", style.bottom, 0, 80, 2, " dp", m) { onSet("bottom", it) }
-        })
-        add(SItem(1, "Estilo de ficha", "Fichas") { m ->
-            ChoiceRow("Estilo de ficha", TILE_STYLES, cfg.tileStyle, m) { cfg.setTileStyle(it) }
-        })
-        if (cfg.tileStyle >= 2) {
-            add(SItem(1, "Iconos uniformes", "Fichas") { m ->
-                SwitchRow("Iconos uniformes", cfg.uniformIcons, m) { cfg.setUniformIcons(it) }
-            })
-        }
-        add(SItem(1, "Tarjeta de la app enfocada", "Información") { m ->
-            SwitchRow("Tarjeta bajo el dock", cfg.focusCard, m) { cfg.setFocusCard(it) }
-        })
-        add(SItem(1, "Fila extra 1", "Filas extra") { m ->
-            ChoiceRow("Fila extra 1", ROW_NAMES, cfg.row(0), m) { cfg.setRow(0, it) }
-        })
-        add(SItem(1, "Fila extra 2", "Filas extra") { m ->
-            ChoiceRow("Fila extra 2", ROW_NAMES, cfg.row(1), m) { cfg.setRow(1, it) }
-        })
-        add(SItem(1, "Fila extra 3", "Filas extra") { m ->
-            ChoiceRow("Fila extra 3", ROW_NAMES, cfg.row(2), m) { cfg.setRow(2, it) }
-        })
-        add(SItem(1, "Asignar apps", "Filas extra", false) {
-            InfoRow("Asignar apps", "mantén OK en la app")
-        })
-        add(SItem(1, "Exportar diseño", "Compartir diseño") { m ->
-            ActionRow("Guardar el diseño en un archivo", m) { onDesignSave() }
-        })
-        add(SItem(1, "Importar diseño", "Compartir diseño") { m ->
-            ActionRow("Cargar un diseño desde un archivo", m) { onDesignPick() }
-        })
-        // ---- Inicio ----
-        add(SItem(2, "Elementos de arriba", "Parte superior") { m ->
-            ChoiceRow(
-                "Elementos de arriba",
-                listOf("Completa", "Reducida", "Mínima"),
-                cfg.topMode, m
-            ) { cfg.setTopMode(it) }
-        })
-        add(SItem(2, "Aviso de elementos de arriba", "Parte superior", false) {
-            Text(
-                when (cfg.topMode) {
-                    0 -> "Se ve todo: reloj, fecha, clima, tarjetas, música, red y botón Más."
-                    1 -> "Reloj, fecha, clima, música y ajustes. Sin tarjetas, red ni botón Más."
-                    else -> "Solo el reloj y el botón de ajustes."
-                },
-                color = Color(0x99FFFFFF), fontSize = 14.sp,
-                modifier = Modifier.padding(start = 22.dp, end = 16.dp, bottom = 4.dp)
-            )
-        })
-        add(SItem(2, "Tamaño de arriba", "Parte superior") { m ->
-            SliderRow("Tamaño de la parte superior", cfg.topScale, 60, 150, 10, " %", m) { cfg.setTopScale(it) }
-        })
-        add(SItem(2, "Reloj grande", "Reloj y fecha") { m ->
-            SwitchRow("Reloj grande", cfg.bigClock, m) { cfg.setBigClock(it) }
-        })
-        add(SItem(2, "Formato de hora", "Reloj y fecha") { m ->
-            ChoiceRow("Formato de hora", listOf("12 horas", "24 horas"), if (cfg.clock24) 1 else 0, m) {
-                cfg.setClock24(it == 1)
-            }
-        })
-        add(SItem(2, "Mostrar fecha", "Reloj y fecha") { m ->
-            SwitchRow("Mostrar fecha", cfg.showDate, m) { cfg.setShowDate(it) }
-        })
-        add(SItem(2, "Formato de fecha", "Reloj y fecha") { m ->
-            ChoiceRow("Formato de fecha", dateLabels, cfg.dateFmt, m) { cfg.setDateFmt(it) }
-        })
-        add(SItem(2, "Próximo evento", "Tarjetas junto al reloj") { m ->
-            SwitchRow("Próximo evento del calendario", cfg.cardEvent, m) { on ->
-                if (on && !hasCalendarPermission(ctx)) {
-                    calWantsOn = true
-                    calPerm.launch(Manifest.permission.READ_CALENDAR)
-                } else {
-                    cfg.setCardEvent(on)
-                }
-            }
-        })
-        add(SItem(2, "Tarjeta de nota", "Tarjetas junto al reloj") { m ->
-            SwitchRow("Tarjeta con una nota", cfg.cardNote, m) { cfg.setCardNote(it) }
-        })
-        add(SItem(2, "Escribir la nota", "Tarjetas junto al reloj") { m ->
-            DialogRow(if (cfg.noteText.isBlank()) "Escribir la nota" else "Editar la nota", m) { close ->
-                TextEditDialog(
-                    title = "Nota del inicio",
-                    initial = cfg.noteText,
-                    hint = "Se muestra en una tarjeta junto al reloj.",
-                    maxLen = 80,
-                    onSave = {
-                        cfg.setNoteText(it)
-                        close()
-                    },
-                    onClose = close
-                )
-            }
-        })
-        add(SItem(2, "Tarjeta de cuenta regresiva", "Tarjetas junto al reloj") { m ->
-            SwitchRow("Tarjeta de cuenta regresiva", cfg.cardCountdown, m) { cfg.setCardCountdown(it) }
-        })
-        add(SItem(2, "Fecha de la cuenta regresiva", "Tarjetas junto al reloj") { m ->
-            DialogRow("Fecha: " + cfg.countdownDate.ifBlank { "sin elegir" }, m) { close ->
-                TextEditDialog(
-                    title = "Fecha de la cuenta regresiva",
-                    initial = cfg.countdownDate,
-                    hint = "Escribe año-mes-día, por ejemplo 2026-12-25.",
-                    maxLen = 10,
-                    onSave = { v ->
-                        if (v.isEmpty() || validDate(v)) {
-                            cfg.setCountdownDate(v)
-                            close()
-                        } else {
-                            toast(ctx, "Fecha no válida. Usa año-mes-día, por ejemplo 2026-12-25.")
-                        }
-                    },
-                    onClose = close
-                )
-            }
-        })
-        add(SItem(2, "Nombre de la cuenta regresiva", "Tarjetas junto al reloj") { m ->
-            DialogRow("Nombre: " + cfg.countdownLabel.ifBlank { "sin elegir" }, m) { close ->
-                TextEditDialog(
-                    title = "Nombre de la cuenta regresiva",
-                    initial = cfg.countdownLabel,
-                    hint = "Por ejemplo: Navidad o Mi cumpleaños.",
-                    maxLen = 30,
-                    onSave = {
-                        cfg.setCountdownLabel(it)
-                        close()
-                    },
-                    onClose = close
-                )
-            }
-        })
-        add(SItem(2, "Mostrar clima", "Clima") { m ->
-            SwitchRow("Mostrar clima", cfg.showWeather, m) { cfg.setShowWeather(it) }
-        })
-        add(SItem(2, "Ciudad del clima", "Clima") { m ->
-            ChoiceRow("Ciudad del clima", cityOpts, cityOpts.indexOf(cfg.city), m) {
-                cfg.setCity(cityOpts[it])
-            }
-        })
-        add(SItem(2, "Unidades", "Clima") { m ->
-            ChoiceRow("Unidades", listOf("°C", "°F"), if (cfg.fahrenheit) 1 else 0, m) {
-                cfg.setFahrenheit(it == 1)
-            }
-        })
-        add(SItem(2, "Pronóstico de 3 días", "Clima") { m ->
-            SwitchRow("Pronóstico de 3 días", cfg.forecast, m) {
-                cfg.setForecast(it)
-                WeatherOpts.forecast = if (it) 1 else 0
-            }
-        })
-        add(SItem(2, "Ubicación automática", "Clima") { m ->
-            SwitchRow("Ubicación automática (si la TV la entrega)", cfg.autoLoc, m) { on ->
-                if (on && !hasLocationPermission(ctx)) {
-                    locWantsOn = true
-                    locPerm.launch(Manifest.permission.ACCESS_COARSE_LOCATION)
-                } else {
-                    cfg.setAutoLoc(on)
-                    WeatherOpts.autoLoc = if (on) 1 else 0
-                }
-            }
-        })
-        add(SItem(2, "Fila Continuar", "Contenido") { m ->
-            SwitchRow("Fila «Continuar» (última app y las de hoy)", cfg.continueRow, m) { cfg.setContinueRow(it) }
-        })
-        add(SItem(2, "Mostrar recientes", "Contenido") { m ->
-            SwitchRow("Mostrar recientes", cfg.showRecents, m) { cfg.setShowRecents(it) }
-        })
-        add(SItem(2, "Botón de voz", "Contenido") { m ->
-            ChoiceRow(
-                "Botón de voz",
-                listOf("Asistente de voz", "Buscar apps"),
-                cfg.voiceMode, m
-            ) { cfg.setVoiceMode(it) }
-        })
-        add(SItem(2, "Ocultar barra superior", "Barra superior") { m ->
-            SwitchRow("Ocultar la barra superior sola", cfg.hideBar, m) { cfg.setHideBar(it) }
-        })
-        if (cfg.hideBar) {
-            add(SItem(2, "Ocultar tras", "Barra superior") { m ->
-                SliderRow("Ocultar tras", cfg.hideBarSecs, 3, 60, 3, " s", m) { cfg.setHideBarSecs(it) }
-            })
-        }
-                add(SItem(3, "Modo ambiente", "Reposo") { m ->
-            ChoiceRow(
-                "Modo ambiente",
-                listOf("Desactivado", "2 min", "5 min", "10 min", "20 min"),
-                cfg.ambient, m
-            ) { cfg.setAmbient(it) }
-        })
-        add(SItem(3, "Protección contra quemado", "Reposo") { m ->
-            SwitchRow("Mover el reloj en modo ambiente", cfg.burnIn, m) { cfg.setBurnIn(it) }
-        })
-        add(SItem(3, "Oscurecer en modo ambiente", "Diseño del modo ambiente") { m ->
-            SwitchRow("Oscurecer el fondo", cfg.ambDimOn, m) { cfg.setAmbDimOn(it) }
-        })
-        if (cfg.ambDimOn) {
-            add(SItem(3, "Nivel de oscurecimiento", "Diseño del modo ambiente") { m ->
-                SliderRow("Nivel de oscurecimiento", cfg.ambDimLvl, 10, 85, 5, "%", m) { cfg.setAmbDimLvl(it) }
-            })
-        }
-        add(SItem(3, "Fondo animado en reposo", "Diseño del modo ambiente") { m ->
-            SwitchRow("Mostrar el fondo animado", cfg.ambAnim, m) { cfg.setAmbAnim(it) }
-        })
-        add(SItem(3, "Posición de la hora", "Diseño del modo ambiente") { m ->
-            ChoiceRow("Hora", AMB_POS_OPTIONS, cfg.ambPosTime, m) { cfg.setAmbPosTime(it) }
-        })
-        add(SItem(3, "Posición de la fecha", "Diseño del modo ambiente") { m ->
-            ChoiceRow("Fecha y clima", AMB_POS_OPTIONS, cfg.ambPosDate, m) { cfg.setAmbPosDate(it) }
-        })
-        add(SItem(3, "Posición del reproductor", "Diseño del modo ambiente") { m ->
-            ChoiceRow("Reproductor", AMB_POS_OPTIONS, cfg.ambPosMusic, m) { cfg.setAmbPosMusic(it) }
-        })
-        add(SItem(3, "Posición de los iconos", "Diseño del modo ambiente") { m ->
-            ChoiceRow("Iconos", AMB_POS_OPTIONS, cfg.ambPosIcons, m) { cfg.setAmbPosIcons(it) }
-        })
-        add(SItem(3, "Temporizador de sueño", "Reposo") { m -> SleepRow(m) })
-        add(SItem(3, "Al terminar el temporizador", "Reposo") { m ->
-            ChoiceRow("Al terminar el temporizador", SLEEP_ACTIONS, cfg.sleepAction, m) { cfg.setSleepAction(it) }
-        })
-        // ---- Música ----
-        add(SItem(4, "Mostrar reproductor", "Reproductor") { m ->
-            SwitchRow("Mostrar reproductor", cfg.showMusic, m) { cfg.setShowMusic(it) }
-        })
-        add(SItem(4, "Tamaño del reproductor", "Reproductor") { m ->
-            SliderRow("Tamaño del reproductor", cfg.musicSize, 50, 120, 5, "%", m) { cfg.setMusicSize(it) }
-        })
-        add(SItem(4, "Posición del reproductor", "Reproductor") { m ->
-            ChoiceRow(
-                "Posición del reproductor",
-                listOf("Junto al reloj", "Arriba al centro"),
-                cfg.musicPos, m
-            ) { cfg.setMusicPos(it) }
-        })
-        // ---- Apps ----
-        add(SItem(5, "Editar apps", "Organizar") { m ->
-            ActionRow("Editar apps (favoritas, orden, tamaño, ocultas)", m) {
-                returnKey = "Editar apps"
-                onEdit()
-            }
-        })
-        add(SItem(5, "Carpetas del dock", "Carpetas") { m ->
-            DialogRow("Carpetas del dock (crear, renombrar, borrar)", m) { close ->
-                FoldersDialog(prefs, close)
-            }
-        })
-        add(SItem(5, "Aviso de app nueva", "Apps nuevas") { m ->
-            SwitchRow("Avisar al instalar una app nueva", cfg.newAppAlert, m) { cfg.setNewAppAlert(it) }
-        })
-        // ---- Sistema ----
-        add(SItem(6, "Wi-Fi", "Conexiones") { m ->
-            ActionRow("Wi-Fi", m) { onOpen("wifi") }
-        })
-        add(SItem(6, "Bluetooth", "Conexiones") { m ->
-            ActionRow("Bluetooth", m) { onOpen("bt") }
-        })
-        add(SItem(6, "Entradas (HDMI)", "Conexiones") { m ->
-            ActionRow("Entradas (HDMI)", m) {
-                returnKey = "Entradas (HDMI)"
-                onInputs()
-            }
-        })
-        add(SItem(7, "Permitir nombre de red y Bluetooth", "Permisos") { m ->
-            ActionRow("Permitir nombre de red y Bluetooth", m) { onNetPerm() }
-        })
-        add(SItem(6, "Todos los ajustes de Android", "Sistema") { m ->
-            ActionRow("Todos los ajustes de Android", m) { onOpen("all") }
-        })
-        add(SItem(6, "Menú de energía (accesibilidad)", "Sistema") { m ->
-            ActionRow("Menú de energía (accesibilidad)", m) { onOpen("access") }
-        })
-        add(SItem(6, "Protector de pantalla del sistema", "Sistema") { m ->
-            ActionRow("Protector de pantalla del sistema", m) { onOpen("dream") }
-        })
-        add(SItem(6, "Establecer como inicio predeterminado", "Sistema") { m ->
-            ActionRow("Establecer como inicio predeterminado", m) { onSetHome() }
-        })
-        add(SItem(6, "Inicio: prueba, restaurar y permisos", "Sistema") { m ->
-            DialogRow("Inicio: prueba, restaurar y permisos", m) { close -> HomeDialog(close) { onSetHome() } }
-        })
-        add(SItem(6, "Conexión con el celular", "Celular") { m ->
-            DialogRow("Conexión con el celular (fondos, texto, copia)", m) { close -> PhoneDialog(close, cfg) }
-        })
-        val colorNames = listOf("rojo", "verde", "amarillo", "azul")
-        for (ci in 0..3) {
-            add(SItem(6, "Botón " + colorNames[ci], "Botones de color") { m ->
-                ChoiceRow("Botón " + colorNames[ci], COLOR_ACTIONS, cfg.colorAction(ci), m) { v ->
-                    when (ci) {
-                        0 -> cfg.setKeyRed(v)
-                        1 -> cfg.setKeyGreen(v)
-                        2 -> cfg.setKeyYellow(v)
-                        else -> cfg.setKeyBlue(v)
-                    }
-                }
-            })
-            add(SItem(6, "Botón " + colorNames[ci] + ": web o Wake-on-LAN", "Botones de color") { m ->
-                val cur = cfg.colorExtra(ci)
-                val txt = if (cur.isEmpty()) "Botón " + colorNames[ci] + ": web o Wake-on-LAN…"
-                    else "Botón " + colorNames[ci] + ": " + cur.substring(2)
-                DialogRow(txt, m) { close ->
-                    TextEditDialog(
-                        "Botón " + colorNames[ci],
-                        cur.drop(2),
-                        "Dirección web (http://…) o MAC (AA:BB:CC:DD:EE:FF). Vacío = quitar. Tiene prioridad sobre la acción.",
-                        200,
-                        { t0 ->
-                            val t = t0.trim()
-                            if (t.isEmpty()) cfg.setColorExtra(ci, "")
-                            else {
-                                val b = Remap.parseMac(t)
-                                if (b != null) cfg.setColorExtra(ci, "l:" + b.joinToString(":") { "%02X".format(it) })
-                                else cfg.setColorExtra(ci, "w:" + (if (t.startsWith("http://") || t.startsWith("https://")) t else "http://$t"))
-                            }
-                            close()
-                        },
-                        close
-                    )
-                }
-            })
-        }
-        add(SItem(6, "Recordatorios en pantalla", "Casa y avisos") { m ->
-            SwitchRow("Recordatorios en pantalla", cfg.ex("remOn") == "1", m) { cfg.setEx("remOn", if (it) "1" else "0") }
-        })
-        add(SItem(6, "Nuevo recordatorio", "Casa y avisos") { m ->
-            DialogRow("Nuevo recordatorio (" + cfg.ex("remList").split("\n").count { it.isNotBlank() } + ")", m) { close ->
-                TextEditDialog("Nuevo recordatorio", "", "Formato: 21:45 Sacar la basura. Con * al inicio se repite cada día.", 80, { t ->
-                    val l = Remind.parse(t)
-                    if (l == null) toast(ctx, "Formato no válido. Ejemplo: 21:45 Sacar la basura")
-                    else { Remind.add(cfg, l); cfg.setEx("remOn", "1") }
-                    close()
-                }, close)
-            }
-        })
-        add(SItem(6, "Borrar recordatorios", "Casa y avisos") { m ->
-            ActionRow("Borrar todos los recordatorios", m) { cfg.setEx("remList", "") }
-        })
-        add(SItem(6, "Ambilight", "Casa y avisos") { m ->
-            SwitchRow("Ambilight casero (WLED)", cfg.ex("ambiOn") == "1", m) { cfg.setEx("ambiOn", if (it) "1" else "0") }
-        })
-        add(SItem(6, "Dirección del WLED", "Casa y avisos") { m ->
-            DialogRow("WLED: " + cfg.ex("ambiIp").ifEmpty { "sin dirección" }, m) { close ->
-                TextEditDialog("Dirección del WLED", cfg.ex("ambiIp"), "Ejemplo: 192.168.1.40. Envía el color del acento del tema.", 60, { t ->
-                    cfg.setEx("ambiIp", t.trim()); close()
-                }, close)
-            }
-        })
-        add(SItem(6, "Intensidad Ambilight", "Casa y avisos") { m ->
-            SliderRow("Intensidad del Ambilight", cfg.ex("ambiLvl", "70").toIntOrNull() ?: 70, 10, 100, 10, "%", m) { cfg.setEx("ambiLvl", it.toString()) }
-        })
-        add(SItem(6, "Probar Ambilight", "Casa y avisos") { m ->
-            ActionRow("Probar color ahora", m) {
-                Ambi.send(ctx, cfg.ex("ambiIp"), Themes.current.acc, cfg.ex("ambiLvl", "70").toIntOrNull() ?: 70, true)
-            }
-        })
-        add(SItem(6, "Dirección de la cámara", "Casa y avisos") { m ->
-            DialogRow("Cámara: " + cfg.ex("camUrl").ifEmpty { "sin dirección" }, m) { close ->
-                TextEditDialog("Dirección de la cámara", cfg.ex("camUrl"), "Video MJPEG, ej.: http://192.168.1.50:8080/video", 200, { t ->
-                    val u = t.trim()
-                    cfg.setEx("camUrl", if (u.isEmpty() || u.startsWith("http")) u else "http://$u"); close()
-                }, close)
-            }
-        })
-        add(SItem(6, "Esquina de la cámara", "Casa y avisos") { m ->
-            ChoiceRow("Esquina de la cámara", listOf("Abajo derecha", "Abajo izquierda", "Arriba derecha", "Arriba izquierda"),
-                cfg.ex("camCorner", "0").toIntOrNull() ?: 0, m) { cfg.setEx("camCorner", it.toString()) }
-        })
-        add(SItem(6, "Ver cámara", "Casa y avisos") { m ->
-            ActionRow("Ver la cámara ahora (Atrás la cierra)", m) { Cam.show = true }
-        })
-        for (qi in 0..3) {
-            add(SItem(6, "Atajo " + (qi + 1) + " del panel", "Casa y avisos") { m ->
-                val q = QS.parse(cfg.ex("qs$qi"))
-                DialogRow("Atajo " + (qi + 1) + " del Panel rápido: " + (q?.first ?: "vacío"), m) { close ->
-                    TextEditDialog("Atajo " + (qi + 1), cfg.ex("qs$qi"), "Nombre;destino. Destino: dirección web, MAC o la palabra camara. Vacío = quitar.", 200, { t ->
-                        if (t.isBlank() || QS.parse(t) != null) cfg.setEx("qs$qi", t.trim()) else toast(ctx, "Formato: Nombre;destino")
-                        close()
-                    }, close)
-                }
-            })
-        }
-        add(SItem(6, "Tiempo por app", "Familia y control") { m ->
-            SwitchRow("Tiempo por app (perfil Niños)", cfg.ex("famTime") == "1", m) { cfg.setEx("famTime", if (it) "1" else "0") }
-        })
-        add(SItem(6, "Apps con límite", "Familia y control") { m ->
-            DialogRow("Elegir apps con límite de tiempo…", m) { close -> FamLimitsDialog(cfg, close) }
-        })
-        add(SItem(6, "Bloqueo por horario", "Familia y control") { m ->
-            SwitchRow("Bloqueo por horario (perfil Niños)", cfg.ex("famSched") == "1", m) { cfg.setEx("famSched", if (it) "1" else "0") }
-        })
-        add(SItem(6, "Horario del bloqueo", "Familia y control") { m ->
-            DialogRow("Horario del bloqueo: " + cfg.ex("famRange", "21:00-07:00"), m) { close ->
-                TextEditDialog("Horario del bloqueo", cfg.ex("famRange", "21:00-07:00"), "Formato 24 h: 21:00-07:00", 11, { t ->
-                    val v = Fam.validRange(t)
-                    if (v == null) toast(ctx, "Horario no válido.") else cfg.setEx("famRange", v)
-                    close()
-                }, close)
-            }
-        })
-        add(SItem(6, "Apps con PIN", "Familia y control") { m ->
-            DialogRow("Apps que piden PIN al abrir…", m) { close -> FamLockDialog(cfg, close) }
-        })
-        add(SItem(6, "Aprobar instalaciones", "Familia y control") { m ->
-            SwitchRow("Aprobar instalaciones nuevas (quedan ocultas a Niños)", cfg.ex("famApprove") == "1", m) { cfg.setEx("famApprove", if (it) "1" else "0") }
-        })
-        add(SItem(6, "Apps pendientes", "Familia y control") { m ->
-            DialogRow("Apps pendientes de aprobar (" + Fam.pending(cfg).size + ")", m) { close -> FamPendingDialog(cfg, close) }
-        })
-        add(SItem(6, "Registro de actividad", "Familia y control") { m ->
-            SwitchRow("Registro de actividad del perfil Niños", cfg.ex("famLog") == "1", m) { cfg.setEx("famLog", if (it) "1" else "0") }
-        })
-        add(SItem(6, "Ver registro", "Familia y control") { m ->
-            DialogRow("Ver registro de actividad", m) { close -> FamLogDialog(cfg, close) }
-        })
-        add(SItem(6, "Remapear botones del mando", "Mando y uso diario") { m ->
-            DialogRow("Remapear cualquier botón del mando", m) { close -> RemapDialog(close) }
-        })
-        add(SItem(6, "Uso diario", "Mando y uso diario") { m ->
-            DialogRow("Uso diario: doble Inicio, hábitos, al encender y más", m) { close -> DailyDialog(close) }
-        })
-        add(SItem(6, "Abrir app al encender", "Arranque") { m ->
-            SwitchRow("Abrir una app al encender la TV", cfg.bootEnabled, m) { on ->
-                cfg.setBootEnabled(on)
-                if (on && cfg.bootApp.isEmpty()) toast(ctx, "Elige también la app de arranque.")
-            }
-        })
-        add(SItem(6, "App de arranque", "Arranque") { m ->
-            val bootLabel = AppCache.apps.firstOrNull { it.pkg == cfg.bootApp }?.label
-                ?: (if (cfg.bootApp.isEmpty()) "ninguna" else cfg.bootApp)
-            DialogRow("App de arranque: " + bootLabel, m) { close ->
-                AppPickerDialog(
-                    title = "App de arranque",
-                    current = cfg.bootApp,
-                    onPick = {
-                        cfg.setBootApp(it)
-                        close()
-                    },
-                    onClose = close
-                )
-            }
-        })
-        add(SItem(7, "Permiso del calendario", "Permisos") { m ->
-            val ok = remember(permTick) { hasCalendarPermission(ctx) }
-            ActionRow("Calendario: " + (if (ok) "permitido" else "falta (se pide al activar el evento)"), m) {
-                if (ok) {
-                    toast(ctx, "El calendario ya está permitido.")
-                } else {
-                    calPerm.launch(Manifest.permission.READ_CALENDAR)
-                }
-            }
-        })
-        add(SItem(7, "Permiso de ubicación", "Permisos") { m ->
-            val ok = remember(permTick) { hasLocationPermission(ctx) }
-            ActionRow("Ubicación: " + (if (ok) "permitida" else "falta (se pide al activarla)"), m) {
-                if (ok) {
-                    toast(ctx, "La ubicación ya está permitida.")
-                } else {
-                    locPerm.launch(Manifest.permission.ACCESS_COARSE_LOCATION)
-                }
-            }
-        })
-        add(SItem(7, "Permiso de notificaciones", "Permisos") { m ->
-            val ok = remember(permTick) {
-                NotificationManagerCompat.getEnabledListenerPackages(ctx).contains(ctx.packageName)
-            }
-            ActionRow("Acceso a notificaciones (música): " + (if (ok) "activo" else "falta permitir"), m) {
-                tryStart(ctx, "android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS")
-            }
-        })
-        add(SItem(6, "App de la escena", "Escena de cine") { m ->
-            val lbl = AppCache.apps.firstOrNull { it.pkg == cfg.sceneApp }?.label
-                ?: (if (cfg.sceneApp.isEmpty()) "ninguna" else cfg.sceneApp)
-            DialogRow("App de la escena: " + lbl, m) { close ->
-                AppPickerDialog(
-                    title = "App de la escena",
-                    current = cfg.sceneApp,
-                    onPick = {
-                        cfg.setSceneApp(it)
-                        close()
-                    },
-                    onClose = close
-                )
-            }
-        })
-        add(SItem(6, "Modo noche en la escena", "Escena de cine") { m ->
-            SwitchRow("Activar modo noche", cfg.sceneNight, m) { cfg.setSceneNight(it) }
-        })
-        add(SItem(6, "Oscurecimiento de la escena", "Escena de cine") { m ->
-            SliderRow("Oscurecer el fondo", cfg.sceneDim, 0, 80, 5, "%", m) { cfg.setSceneDim(it) }
-        })
-        add(SItem(6, "Temporizador de la escena", "Escena de cine") { m ->
-            ChoiceRow("Temporizador de sueño", SLEEP_OPTIONS, cfg.sceneSleep, m) { cfg.setSceneSleep(it) }
-        })
-        add(SItem(6, "Rutina diaria", "Rutina diaria") { m ->
-            SwitchRow("Rutina diaria", cfg.routineOn, m) { cfg.setRoutineOn(it) }
-        })
-        if (cfg.routineOn) {
-            add(SItem(6, "Hora de la rutina", "Rutina diaria") { m ->
-                SliderRow("Hora", cfg.routineHour, 0, 23, 1, " h", m) { cfg.setRoutineHour(it) }
-            })
-            add(SItem(6, "Minutos de la rutina", "Rutina diaria") { m ->
-                ChoiceRow(
-                    "Minutos", (0..11).map { (it * 5).toString().padStart(2, '0') },
-                    (cfg.routineMin / 5).coerceIn(0, 11), m
-                ) { cfg.setRoutineMin(it * 5) }
-            })
-            add(SItem(6, "Acción de la rutina", "Rutina diaria") { m ->
-                ChoiceRow(
-                    "Acción", listOf("Activar la escena de cine", "Abrir una app"),
-                    cfg.routineAction, m
-                ) { cfg.setRoutineAction(it) }
-            })
-            if (cfg.routineAction == 1) {
-                add(SItem(6, "App de la rutina", "Rutina diaria") { m ->
-                    val lbl = AppCache.apps.firstOrNull { it.pkg == cfg.routineApp }?.label
-                        ?: (if (cfg.routineApp.isEmpty()) "ninguna" else cfg.routineApp)
-                    DialogRow("App de la rutina: " + lbl, m) { close ->
-                        AppPickerDialog(
-                            title = "App de la rutina",
-                            current = cfg.routineApp,
-                            onPick = {
-                                cfg.setRoutineApp(it)
-                                close()
-                            },
-                            onClose = close
-                        )
-                    }
-                })
-            }
-        }
-        add(SItem(6, "Perfil activo", "Perfiles de familia") { m ->
-            ChoiceRow(
-                "Perfil activo", (1..FAM_COUNT).map { "Perfil " + it },
-                prefs.getInt("famCur", 0).coerceIn(0, FAM_COUNT - 1), m
-            ) { switchFamily(ctx, it, 6) }
-        })
-        add(SItem(6, "Asistente de configuración", "Asistente") { m ->
-            ActionRow("Abrir el asistente de configuración", m) { onWizard() }
-        })
-        // ---- Seguridad ----
-        if (!cfg.pinSet) {
-            add(SItem(6, "Estado del PIN", "Código PIN", false) { InfoRow("Estado", "Sin PIN") })
-            add(SItem(8, "Crear PIN de 4 dígitos", "Código PIN") { m ->
-                ActionRow("Crear PIN de 4 dígitos", m) { onPin("create") }
-            })
-        } else {
-            add(SItem(6, "Estado del PIN", "Código PIN", false) { InfoRow("Estado", "PIN activo") })
-            add(SItem(8, "Cambiar PIN", "Código PIN") { m ->
-                ActionRow("Cambiar PIN", m) { onPin("change") }
-            })
-            add(SItem(8, "Quitar PIN", "Código PIN") { m ->
-                ActionRow("Quitar PIN", m) {
-                    if (cfg.kids) {
-                        toast(ctx, "Desactiva antes el perfil para niños.")
-                    } else {
-                        onPin("remove")
-                    }
-                }
-            })
-            add(SItem(8, "Proteger ajustes", "Protección") { m ->
-                SwitchRow("Proteger ajustes", cfg.lockSettings, m) { cfg.setLockSettings(it) }
-            })
-            add(SItem(8, "Proteger apps ocultas", "Protección") { m ->
-                SwitchRow("Proteger apps ocultas", cfg.lockHidden, m) { cfg.setLockHidden(it) }
-            })
-        }
-        add(SItem(8, "Perfil para niños", "Perfil para niños") { m ->
-            SwitchRow("Perfil para niños", cfg.kids, m) { on ->
-                if (on && !cfg.pinSet) {
-                    toast(ctx, "Primero crea un PIN (arriba, en Código PIN) para activar el perfil para niños.")
-                } else {
-                    cfg.setKids(on)
-                }
-            }
-        })
-        add(SItem(8, "Apps permitidas para niños", "Perfil para niños") { m ->
-            DialogRow("Apps permitidas para niños", m) { close -> KidsAppsDialog(prefs, close) }
-        })
-        // ---- Accesibilidad ----
-        add(SItem(9, "Texto grande", "Lectura") { m ->
-            SwitchRow("Texto grande", cfg.bigText, m) { cfg.setBigText(it) }
-        })
-        add(SItem(9, "Alto contraste", "Lectura") { m ->
-            SwitchRow("Alto contraste", cfg.highContrast, m) { cfg.setHighContrast(it) }
-        })
-        add(SItem(9, "Foco grueso", "Navegación") { m ->
-            SwitchRow("Foco más grueso en las fichas", cfg.thickFocus, m) { cfg.setThickFocus(it) }
-        })
-        // ---- Hogar y utilidades ----
-        add(SItem(6, "Tarjeta de visitas", "Hogar y utilidades") { m ->
-            DialogRow("Tarjeta de visitas (QR del Wi-Fi)", m) { close -> VisitorCardDialog(prefs, close) }
-        })
-        add(SItem(6, "Lista de compras", "Hogar y utilidades") { m ->
-            DialogRow("Lista de compras (con el celular)", m) { close -> ShoppingDialog(prefs, close) }
-        })
-        add(SItem(6, "Ruido para dormir", "Hogar y utilidades") { m ->
-            DialogRow("Ruido para dormir", m) { close -> SleepNoiseDialog(prefs, close) }
-        })
-        add(SItem(6, "Modo fácil", "Hogar y utilidades") { m ->
-            DialogRow("Modo fácil (tres botones enormes)", m) { close -> EasyModeDialog(prefs, close) }
-        })
-        // ---- Herramientas del sistema ----
-        add(SItem(6, "Modo juego", "Herramientas del sistema") { m ->
-            DialogRow("Modo juego", m) { close -> GameModeDialog(cfg, close) }
-        })
-        add(SItem(6, "Instalar APK desde USB", "Herramientas del sistema") { m ->
-            DialogRow("Instalar APK desde USB", m) { close -> UsbInstallDialog(close) }
-        })
-        add(SItem(6, "Volumen adaptable", "Herramientas del sistema") { m ->
-            DialogRow("Volumen adaptable (tope y piso)", m) { close -> VolumeGuardDialog(prefs, close) }
-        })
-        add(SItem(6, "Centro de notificaciones", "Herramientas del sistema") { m ->
-            DialogRow("Centro de notificaciones", m) { close -> NotifCenterDialog(prefs, close) }
-        })
-        // ---- Acerca de ----
-        add(SItem(ABOUT, "Estadísticas de uso", "Uso y diagnóstico") { m ->
-            DialogRow("Estadísticas de uso (esta semana)", m) { close -> StatsDialog(prefs, close) }
-        })
-        add(SItem(ABOUT, "Novedades", "Uso y diagnóstico") { m ->
-            DialogRow("Novedades de la última versión", m) { close -> ReleaseNotesFlow(close) }
-        })
-        add(SItem(ABOUT, "Visor de errores", "Uso y diagnóstico") { m ->
-            DialogRow("Visor de errores", m) { close -> ErrorsDialog(close) }
-        })
-        add(SItem(ABOUT, "Ayuda y reporte (QR)", "Uso y diagnóstico") { m ->
-            DialogRow("Ayuda y reporte (código QR)", m) { close -> HelpQrDialog(close) }
-        })
-        add(SItem(ABOUT, "Test de pantalla", "Uso y diagnóstico") { m ->
-            DialogRow("Test de pantalla", m) { close -> ScreenTestDialog(close) }
-        })
-        add(SItem(ABOUT, "Test de sonido", "Uso y diagnóstico") { m ->
-            DialogRow("Test de sonido", m) { close -> SoundTestDialog(close) }
-        })
-        add(SItem(ABOUT, "Test del mando", "Uso y diagnóstico") { m ->
-            DialogRow("Test del mando", m) { close -> RemoteTestDialog(close) }
-        })
-        add(SItem(ABOUT, "Copia automática semanal", "Copias de seguridad") { m ->
-            val c2 = LocalContext.current
-            var on by remember { mutableStateOf(AutoBackup.enabled(c2)) }
-            SwitchRow("Copia automática semanal", on, m) {
-                on = it
-                AutoBackup.setEnabled(c2, it)
-                if (it) AutoBackup.runIfDue(c2)
-            }
-        })
-        add(SItem(ABOUT, "Restaurar copia automática", "Copias de seguridad") { m ->
-            DialogRow("Restaurar copia automática", m) { close -> AutoRestoreDialog(close) }
-        })
-        add(SItem(ABOUT, "Guardar copia de seguridad", "Copias de seguridad") { m ->
-            ActionRow("Guardar copia de seguridad", m) { onBackup() }
-        })
-        add(SItem(ABOUT, "Restaurar copia de seguridad", "Copias de seguridad") { m ->
-            ActionRow("Restaurar copia de seguridad", m) { onRestore() }
-        })
-        add(SItem(ABOUT, "Guardar copia en…", "Copias de seguridad") { m ->
-            ActionRow("Guardar copia en… (elegir dónde)", m) { onBackupSave() }
-        })
-        add(SItem(ABOUT, "Compartir copia de seguridad", "Copias de seguridad") { m ->
-            ActionRow("Compartir copia de seguridad", m) { onBackupShare() }
-        })
-        add(SItem(ABOUT, "Restaurar desde un archivo…", "Copias de seguridad") { m ->
-            ActionRow("Restaurar desde un archivo…", m) { onRestorePick() }
-        })
-        // Actualizaciones desde GitHub Releases.
-        add(SItem(ABOUT, "Buscar actualizaciones", "Actualizaciones") { m ->
-            val fr = remember { FocusRequester() }
-            LaunchedEffect(updBack) {
-                if (updBack > 0) {
-                    delay(200)
-                    runCatching { fr.requestFocus() }
-                }
-            }
-            ActionRow("Buscar actualizaciones", m.focusRequester(fr)) { onUpdate() }
-        })
-        add(SItem(ABOUT, "Avisar de actualizaciones", "Actualizaciones") { m ->
-            SwitchRow("Avisar si hay versión nueva (1 vez al día)", cfg.updateCheck, m) { cfg.setUpdateCheck(it) }
-        })
-    }
-
-    // Siempre hay una categoria seleccionada. Las categorias son pestañas arriba: se cambian con
-    // izquierda/derecha (sin pulsar OK) y Atras cierra Configuracion de una sola vez.
-    val curCat = if (cat in 0..CATS.lastIndex) cat else 0
-    val secOrder = SEC_ORDER[curCat] ?: emptyList()
-    val shown = items.filter { it.cat == curCat }
-        .sortedBy { i -> secOrder.indexOf(i.sec).let { if (it < 0) 99 else it } }
-    val title = CATS[curCat].name
-    val subtitle = if (settingsPreviewCat(curCat)) "Los cambios se ven en vivo debajo" else CATS[curCat].desc
-    val scroll = remember(curCat) { androidx.compose.foundation.ScrollState(0) }
-    val startCat = remember { curCat }
-    // Mientras no se toquen las pestañas, el foco cae solo en la primera opcion (o en la fila que abrio un sub-panel).
-    var tabTouched by remember { mutableStateOf(false) }
-    val tabFr = remember { List(CATS.size) { FocusRequester() } }
-    val firstFr = remember { FocusRequester() }
-    val updFr = remember { FocusRequester() }
-    val aLastFr = remember { FocusRequester() }
-    val bFirstFr = remember { FocusRequester() }
-    val lastFr = remember { FocusRequester() }
-    val hasReset = RESET_KEYS.containsKey(curCat) && curCat != ABOUT
-    val enterOptions: () -> Boolean = { runCatching { firstFr.requestFocus() }.isSuccess }
-    val retItem: String? = if (retKey != null && !tabTouched) retKey else null
-    val firstFocus = !tabTouched && retKey == null && curCat == startCat
-    val firstLabel = shown.firstOrNull { it.focusable }?.label
-    val lastLabel = shown.lastOrNull { it.focusable }?.label
-    // Abajo en la ultima opcion se queda donde esta: el foco nunca sale hacia el dock del inicio.
-    val stopDown = Modifier.focusRequester(lastFr).focusProperties { down = lastFr }
-    // Arriba desde la primera opcion siempre vuelve a la pestaña de la categoria abierta.
-    val upMod = Modifier.focusProperties { up = tabFr[curCat] }
-    DisposableEffect(Unit) { onDispose { onRightFocus(false) } }
-    LaunchedEffect(updBack) {
-        // Al cerrar el cuadro de actualización, el foco vuelve al botón de la barra lateral.
-        if (updBack > 0) {
-            delay(120)
-            runCatching { updFr.requestFocus() }
-        }
-    }
-    LaunchedEffect(railBack) {
-        if (railBack > 0) runCatching { tabFr[curCat].requestFocus() }
-    }
-    val focusMgr = androidx.compose.ui.platform.LocalFocusManager.current
-    LaunchedEffect(Unit) {
-        // Al abrir Configuración el foco podía quedarse en el dock: se suelta y se entra a la ventana.
-        runCatching { focusMgr.clearFocus(force = true) }
-        delay(450)
-        if (firstFocus) {
-            val ok = runCatching { firstFr.requestFocus() }.isSuccess
-            if (!ok) runCatching { tabFr[curCat].requestFocus() }
-        }
-    }
-
-    GlassPanelFrame(wide = true, compact = settingsPreviewCat(curCat)) {
-        Column(
-            Modifier
-                .fillMaxSize()
-                .focusProperties {
-                    // Solo se bloquean las flechas del mando. Con un cuadro encima (p. ej. actualizaciones)
-                    // el foco debe poder salir de la ventana.
-                    exit = { d ->
-                        val dir = androidx.compose.ui.focus.FocusDirection
-                        if (!blocked && (d == dir.Up || d == dir.Down || d == dir.Left || d == dir.Right)) {
-                            androidx.compose.ui.focus.FocusRequester.Cancel
-                        } else {
-                            androidx.compose.ui.focus.FocusRequester.Default
-                        }
-                    }
-                }
-                .focusGroup()
-                .focusProperties { canFocus = !blocked }
-        ) {
-            SettingsTopBar()
-            Row(Modifier.weight(1f).fillMaxWidth()) {
-            // Barra lateral de categorías: tarjeta oscura con contorno (arriba/abajo cambia de categoría).
-            val sideShape = RoundedCornerShape(22.dp)
-            Column(
-                Modifier
-                    .padding(start = 14.dp, top = 12.dp, bottom = 12.dp)
-                    .width(238.dp)
-                    .fillMaxHeight()
-                    .clip(sideShape)
-                    .background(Brush.verticalGradient(listOf(Color(0xFF0C0C12), Color(0xFF07070B))))
-                    .border(1.dp, ACC.copy(alpha = 0.40f), sideShape)
-                    .padding(horizontal = 10.dp, vertical = 12.dp)
-            ) {
-                Column(
-                    Modifier
-                        .weight(1f)
-                        .verticalScroll(androidx.compose.foundation.rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    CATS.forEachIndexed { i, c ->
-                        RailItem(
-                            c.icon, c.name, i == curCat,
-                            Modifier.focusRequester(tabFr[i]).focusProperties {
-                                if (i == 0) up = tabFr[i]
-                                right = firstFr
-                            },
-                            onFocus = {
-                                tabTouched = true
-                                if (i != curCat) onCat(i)
-                            },
-                            onClick = {
-                                onCat(i)
-                                enterOptions()
-                            }
-                        )
-                    }
-                }
-                Spacer(Modifier.height(8.dp))
-                UpdateButton(Modifier.focusRequester(updFr).focusProperties { down = updFr; right = firstFr }) { onUpdate() }
-            }
-            Column(
-                Modifier
-                    .weight(1f)
-                    .fillMaxHeight()
-                    .onFocusChanged { onRightFocus(it.hasFocus) }
-                    .onKeyEvent { e ->
-                        // Izquierda en una fila que no la usa (acciones, tarjetas) vuelve a las categorías.
-                        if (e.type == KeyEventType.KeyDown && e.key == Key.DirectionLeft) {
-                            runCatching { tabFr[curCat].requestFocus() }
-                            true
-                        } else {
-                            false
-                        }
-                    }
-                    .padding(start = 22.dp, end = 18.dp, top = 14.dp, bottom = 12.dp)
-            ) {
-            Row(Modifier.padding(start = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                LineIcon(CATS[curCat].icon, ACC, 26)
-                Spacer(Modifier.width(10.dp))
-                Text(title, color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Normal, maxLines = 1)
-            }
-            Text(
-                subtitle, color = Color(0x99FFFFFF), fontSize = 14.sp,
-                modifier = Modifier.padding(start = 6.dp, top = 2.dp)
-            )
-            Spacer(Modifier.height(8.dp))
-            Box(Modifier.fillMaxWidth().height(1.dp).background(Color(0x22FFFFFF)))
-            Spacer(Modifier.height(2.dp))
-            Column(
-                Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
-                    .focusProperties { left = tabFr[curCat] }
-                    .verticalScroll(scroll),
-                verticalArrangement = Arrangement.spacedBy(2.dp)
-            ) {
-                if (curCat == ABOUT) {
-                    AboutPage(
-                        cfg = cfg,
-                        updItems = shown.filter { it.sec == "Actualizaciones" },
-                        bakItems = shown.filter { it.sec == "Copias de seguridad" },
-                        toolItems = shown.filter { it.sec == "Uso y diagnóstico" },
-                        firstMod = (if (firstFocus) upMod.autoFocus() else upMod).focusRequester(firstFr)
-                    )
-                } else {
-                    val groups = shown.groupBy { it.sec }.toList()
-                    val colA = ArrayList<Pair<String, List<SItem>>>()
-                    val colB = ArrayList<Pair<String, List<SItem>>>()
-                    var wa = 0
-                    var wb = 0
-                    for (g in groups) {
-                        val w = g.second.size + 1
-                        if (wa <= wb) {
-                            colA.add(g)
-                            wa += w
-                        } else {
-                            colB.add(g)
-                            wb += w
-                        }
-                    }
-                    val aLabels = colA.flatMap { it.second }.filter { it.focusable }.map { it.label }
-                    val bLabels = colB.flatMap { it.second }.filter { it.focusable }.map { it.label }
-                    val aLast = aLabels.lastOrNull()
-                    val bFirst = bLabels.firstOrNull()
-                    val endLabel = bLabels.lastOrNull() ?: aLast
-                    val renderCol: @Composable (List<Pair<String, List<SItem>>>) -> Unit = { col ->
-                        for ((group, list) in col) {
-                            if (group.isNotEmpty()) SectionLabel(group)
-                            SectionCard {
-                                for (si in list) {
-                                    key(si.cat to si.label) {
-                                        val isFirst = si.label == firstLabel
-                                        var m: Modifier = if (isFirst) upMod.focusRequester(firstFr) else Modifier
-                                        if (si.focusable && si.label == bFirst) m = m.focusRequester(bFirstFr).focusProperties { up = aLastFr }
-                                        if (si.focusable && si.label == aLast && bFirst != null) m = m.focusRequester(aLastFr).focusProperties { down = bFirstFr }
-                                        if (si.focusable && si.label == retItem) {
-                                            m = m.autoFocus()
-                                        } else if (isFirst && firstFocus) {
-                                            m = m.autoFocus()
-                                        }
-                                        if (!hasReset && si.label == endLabel) m = m.then(stopDown)
-                                        si.content(m)
-                                        val d = DESCS[si.label]
-                                        if (d != null) {
-                                            Text(
-                                                d, color = Color(0x80FFFFFF), fontSize = 12.sp,
-                                                modifier = Modifier.padding(start = 22.dp, end = 16.dp, bottom = 8.dp)
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    if (colB.isEmpty()) {
-                        Column(Modifier.fillMaxWidth()) { renderCol(colA) }
-                    } else {
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(18.dp)) {
-                            Column(Modifier.weight(1f)) { renderCol(colA) }
-                            Column(Modifier.weight(1f)) { renderCol(colB) }
-                        }
-                    }
-                    if (RESET_KEYS.containsKey(curCat)) {
-                        SectionLabel(
-                            "Restablecer" + (RESET_KEYS[curCat]?.let { prefs.countKeys(it) }
-                                ?.takeIf { it > 0 }?.let { " · " + it + " ajustes cambiados" } ?: "")
-                        )
-                        SectionCard {
-                            ResetCategoryRow(title, stopDown) { resetCategory(ctx, curCat) }
-                        }
-                    }
-                }
-                Spacer(Modifier.height(12.dp))
-            }
-            }
-            }
-            SettingsBottomBar()
-        }
-    }
-}
-
-/** Barra inferior de estado: red, memoria usada y espacio libre (se lee una sola vez al abrir). */
-@Composable
-private fun SettingsBottomBar() {
-    val ctx = LocalContext.current
-    var info by remember { mutableStateOf(listOf<Triple<String, String, String>>()) }
-    LaunchedEffect(Unit) {
-        info = withContext(Dispatchers.IO) {
-            try {
-                val am = ctx.getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
-                val mi = android.app.ActivityManager.MemoryInfo()
-                am.getMemoryInfo(mi)
-                val used = 100 - (mi.availMem * 100 / mi.totalMem).toInt()
-                val sf = android.os.StatFs(android.os.Environment.getDataDirectory().path)
-                val cm = ctx.getSystemService(Context.CONNECTIVITY_SERVICE) as android.net.ConnectivityManager
-                val caps = cm.getNetworkCapabilities(cm.activeNetwork)
-                val net = when {
-                    caps == null -> "Sin red"
-                    caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI) -> "Wi-Fi"
-                    caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_ETHERNET) -> "Cable"
-                    else -> "Conectado"
-                }
-                listOf(
-                    Triple("globe", "Red", net),
-                    Triple("bolt", "RAM", "$used %"),
-                    Triple("device", "Libre", fmtBytes(sf.availableBytes))
-                )
-            } catch (e: Exception) {
-                emptyList()
-            }
-        }
-    }
-    Box(Modifier.fillMaxWidth().height(1.dp).background(Color(0x1FFFFFFF)))
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .background(Color(0xFF0B0B11))
-            .padding(horizontal = 20.dp, vertical = 9.dp),
-        horizontalArrangement = Arrangement.spacedBy(22.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        for ((icon, name, value) in info) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                LineIcon(icon, ACC, 16)
-                Spacer(Modifier.width(7.dp))
-                Text("$name  $value", color = Color(0xCCFFFFFF), fontSize = 13.sp, maxLines = 1)
-            }
-        }
-    }
-}
-
-/** Barra superior de la ventana: logo, nombre, versión y hora (como en las referencias). */
-@Composable
-private fun SettingsTopBar() {
-    val ctx = LocalContext.current
-    val version = remember {
-        runCatching { ctx.packageManager.getPackageInfo(ctx.packageName, 0).versionName }.getOrNull() ?: "?"
-    }
-    var clock by remember { mutableStateOf("") }
-    LaunchedEffect(Unit) {
-        val f = java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault())
-        while (true) {
-            clock = f.format(java.util.Date())
-            delay(20_000)
-        }
-    }
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .background(Color(0x14FFFFFF))
-            .padding(horizontal = 18.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Box(
-            Modifier.size(34.dp).clip(RoundedCornerShape(11.dp)).background(ACCENT),
-            contentAlignment = Alignment.Center
-        ) { GearIcon(Color(0xFF0B0B12), 20) }
-        Spacer(Modifier.width(12.dp))
-        Column {
-            Text("One Piece", color = Color.White, fontSize = 19.sp, fontWeight = FontWeight.Bold)
-            Text("Configuración", color = ACC, fontSize = 12.sp)
-        }
-        Spacer(Modifier.weight(1f))
-        TopChip("v$version")
-        Spacer(Modifier.width(8.dp))
-        TopChip(clock)
-        Spacer(Modifier.width(8.dp))
-        TopChip("Atrás: cerrar")
-    }
-    Box(Modifier.fillMaxWidth().height(1.dp).background(ACC.copy(alpha = 0.35f)))
-}
-
-@Composable
-private fun TopChip(text: String) {
-    val shape = RoundedCornerShape(50)
-    Text(
-        text, color = Color(0xE6FFFFFF), fontSize = 13.sp, maxLines = 1,
-        modifier = Modifier
-            .clip(shape)
-            .background(Color(0x14FFFFFF))
-            .border(1.dp, Color(0x26FFFFFF), shape)
-            .padding(horizontal = 14.dp, vertical = 6.dp)
-    )
-}
-
-/** Botón fijo de la barra lateral: abre la búsqueda de actualizaciones desde cualquier categoría. */
-@Composable
-private fun UpdateButton(modifier: Modifier = Modifier, onClick: () -> Unit) {
-    var focused by remember { mutableStateOf(false) }
-    val shape = RoundedCornerShape(18.dp)
-    Row(
-        modifier
-            .fillMaxWidth()
-            .clip(shape)
-            .background(
-                if (focused) ACCENT
-                else SolidColor(ACC.copy(alpha = 0.14f))
-            )
-            .border(1.5.dp, ACC.copy(alpha = if (focused) 1f else 0.6f), shape)
-            .onFocusChanged { focused = it.isFocused }
-            .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text("⟳", color = if (focused) Color(0xFF0B0B12) else ACC, fontSize = 20.sp)
-        Spacer(Modifier.width(10.dp))
-        Text(
-            "Buscar actualizaciones", color = if (focused) Color(0xFF0B0B12) else ACC,
-            fontSize = 15.sp, fontWeight = FontWeight.Bold, maxLines = 2
-        )
-    }
-}
-// ---------- Acerca de ----------
-
 /** Datos que cambian con el tiempo o que se leen del sistema (se refrescan cada pocos segundos). */
-private class AboutSnap(
+internal class AboutSnap(
     val res: String,
     val dpi: Int,
     val hz: Int,
@@ -2066,7 +478,7 @@ private fun fmtUptime(ms: Long): String {
 }
 
 /** true si One Piece es el inicio predeterminado de la TV. */
-private fun isDefaultHome(ctx: Context): Boolean = try {
+internal fun isDefaultHome(ctx: Context): Boolean = try {
     val i = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
     ctx.packageManager.resolveActivity(i, PackageManager.MATCH_DEFAULT_ONLY)?.activityInfo?.packageName == ctx.packageName
 } catch (e: Exception) {
@@ -2074,14 +486,6 @@ private fun isDefaultHome(ctx: Context): Boolean = try {
 }
 
 /** true si el texto es una fecha aaaa-mm-dd valida. */
-private fun validDate(s: String): Boolean = try {
-    java.time.LocalDate.parse(s.trim())
-    true
-} catch (e: Exception) {
-    false
-}
-
-/** Primera direccion IPv4 de la TV (sin permisos). */
 private fun localIp(): String? {
     try {
         val ifs = java.net.NetworkInterface.getNetworkInterfaces() ?: return null
@@ -2097,7 +501,7 @@ private fun localIp(): String? {
 }
 
 @Suppress("DEPRECATION")
-private fun readAboutSnap(ctx: Context): AboutSnap {
+internal fun readAboutSnap(ctx: Context): AboutSnap {
     var res = "?"
     var dpi = 0
     var hz = 0
@@ -2159,7 +563,7 @@ private fun readAboutSnap(ctx: Context): AboutSnap {
  * tarjeta y el panel se desplaza solo, asi se puede leer todo sin que el foco se pierda.
  */
 @Composable
-private fun InfoCard(lines: List<Pair<String, String>>, modifier: Modifier = Modifier) {
+internal fun InfoCard(lines: List<Pair<String, String>>, modifier: Modifier = Modifier) {
     var focused by remember { mutableStateOf(false) }
     val shape = RoundedCornerShape(18.dp)
     Column(
@@ -2196,116 +600,4 @@ private fun InfoCard(lines: List<Pair<String, String>>, modifier: Modifier = Mod
             }
         }
     }
-}
-
-/** Linea fina que separa la informacion de las opciones. */
-@Composable
-private fun OptionsDivider() {
-    Spacer(Modifier.height(6.dp))
-    Box(Modifier.fillMaxWidth().padding(horizontal = 10.dp).height(1.dp).background(Color(0x1FFFFFFF)))
-    Spacer(Modifier.height(4.dp))
-}
-
-/**
- * Categoria "Acerca de", por secciones. La informacion va en tarjetas de solo lectura y las
- * opciones (actualizaciones y copias de seguridad) en filas aparte debajo de su seccion.
- */
-@Suppress("DEPRECATION")
-@Composable
-private fun AboutPage(
-    cfg: Cfg,
-    updItems: List<SItem>,
-    bakItems: List<SItem>,
-    toolItems: List<SItem>,
-    firstMod: Modifier = Modifier
-) {
-    val ctx = LocalContext.current
-    val version = remember {
-        runCatching { ctx.packageManager.getPackageInfo(ctx.packageName, 0).versionName }.getOrNull() ?: "?"
-    }
-    val code = remember {
-        runCatching { ctx.packageManager.getPackageInfo(ctx.packageName, 0).versionCode.toString() }
-            .getOrNull() ?: "?"
-    }
-    val listenerOn = remember {
-        NotificationManagerCompat.getEnabledListenerPackages(ctx).contains(ctx.packageName)
-    }
-    val wallCount = remember { listWalls(ctx).size }
-    val defaultHome = remember { isDefaultHome(ctx) }
-
-    var fps by remember { mutableIntStateOf(0) }
-    LaunchedEffect(Unit) {
-        while (true) {
-            var frames = 0
-            val start = withFrameNanos { it }
-            var t = start
-            while (t - start < 1_000_000_000L) {
-                t = withFrameNanos { it }
-                frames++
-            }
-            fps = frames
-        }
-    }
-
-    var snap by remember { mutableStateOf(readAboutSnap(ctx)) }
-    LaunchedEffect(Unit) {
-        while (true) {
-            delay(4000)
-            snap = withContext(Dispatchers.IO) { readAboutSnap(ctx) }
-        }
-    }
-
-    SectionLabel("Versión y actualizaciones")
-    InfoCard(
-        listOf("Versión" to version, "Código de versión" to code),
-        firstMod
-    )
-    OptionsDivider()
-    for (si in updItems) key(si.label) { si.content(Modifier) }
-
-    SectionLabel("Equipo")
-    InfoCard(
-        listOf(
-            "Dispositivo" to android.os.Build.MODEL,
-            "Fabricante" to android.os.Build.MANUFACTURER.replaceFirstChar { it.uppercase() },
-            "Android" to android.os.Build.VERSION.RELEASE + " (API " + android.os.Build.VERSION.SDK_INT + ")",
-            "Procesador" to (android.os.Build.SUPPORTED_ABIS.firstOrNull() ?: "?") + " · " +
-                Runtime.getRuntime().availableProcessors() + " núcleos",
-            "Apps instaladas" to AppCache.apps.size.toString(),
-            "Fondos guardados" to wallCount.toString(),
-            "Permiso de música" to if (listenerOn) "Activo" else "Falta permitir",
-            "Fotogramas por segundo" to fps.toString(),
-            "Encendida desde hace" to snap.up,
-            "Parche de seguridad" to (android.os.Build.VERSION.SECURITY_PATCH.takeIf { it.isNotBlank() } ?: "—"),
-            "Launcher predeterminado" to if (defaultHome) "Sí" else "No"
-        )
-    )
-
-    SectionLabel("Pantalla")
-    InfoCard(
-        listOf(
-            "Resolución" to snap.res,
-            "Densidad" to snap.dpi.toString() + " dpi",
-            "Frecuencia" to snap.hz.toString() + " Hz",
-            "Tamaño de la interfaz" to cfg.uiScale.toString() + " %",
-            "Margen de seguridad" to cfg.overscan.toString() + " dp"
-        )
-    )
-
-    SectionLabel("Almacenamiento y memoria")
-    val mem = ArrayList<Pair<String, String>>()
-    mem.add("Almacenamiento" to snap.storage)
-    mem.add("Memoria (RAM)" to snap.ram)
-    val temp = snap.temp
-    if (temp != null) mem.add("Temperatura" to temp)
-    InfoCard(mem)
-
-    SectionLabel("Red")
-    InfoCard(snap.net)
-
-    SectionLabel("Uso y diagnóstico")
-    for (si in toolItems) key(si.label) { si.content(Modifier) }
-
-    SectionLabel("Copias de seguridad")
-    for (si in bakItems) key(si.label) { si.content(Modifier) }
 }

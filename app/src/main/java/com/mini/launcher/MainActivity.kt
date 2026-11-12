@@ -31,7 +31,6 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
@@ -97,9 +96,8 @@ object HomeBridge {
     var phoneCode by mutableStateOf("")
     /** Sube cuando un celular se empareja, para refrescar la lista en la TV. */
     var phonesTick by mutableIntStateOf(0)
-    /** Subir en 1 despues de guardar carpetas (prefs.saveGroups) o apps del perfil de ninos. */
+    /** Subir en 1 despues de guardar carpetas (prefs.saveGroups). */
     var groupsTick by mutableIntStateOf(0)
-    var kidsTick by mutableIntStateOf(0)
     /** Subir en 1 para volver a aplicar nombres, iconos y brillos propios sobre las apps. */
     var appsTick by mutableIntStateOf(0)
 }
@@ -174,7 +172,6 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        runBootApp(this)
         Home1.checkTrial(this)
         Safe.armReset(this)
         AutoBackup.runIfDue(this)
@@ -188,9 +185,8 @@ class MainActivity : ComponentActivity() {
         ContextCompat.registerReceiver(this, pkgReceiver, f, ContextCompat.RECEIVER_EXPORTED)
         Remap.load(this)
         addOnNewIntentListener { i ->
-            Daily.homeFromApp = appPaused
             homeTick++
-            if (i.getIntExtra("dAct", 0) == 0) Daily.doubleHome(this) else route(i)
+            if (i.getIntExtra("dAct", 0) != 0) route(i)
         }
         if (savedInstanceState == null) route(intent)
         setContent { HomeRoot(tick, homeTick, resumeTick, appPaused, addedPkg) { addedPkg = "" } }
@@ -265,7 +261,6 @@ fun HomeRoot(
     var seen by remember { mutableStateOf(prefs.seen()) }
     var unread by remember { mutableStateOf<Map<String, Int>>(emptyMap()) }
     var net by remember { mutableStateOf(NetState()) }
-    var rowApps by remember { mutableStateOf((0..2).map { prefs.rowApps(it) }) }
     var pinAsk by remember { mutableStateOf<PinAsk?>(null) }
     var pinErr by remember { mutableStateOf<String?>(null) }
     var showPower by remember { mutableStateOf(false) }
@@ -279,23 +274,17 @@ fun HomeRoot(
     var quickBack by remember { mutableIntStateOf(0) }
     var appsLoaded by remember { mutableStateOf(AppCache.apps.isNotEmpty()) }
     // Configuracion: categoria seleccionada en la columna izquierda (siempre hay una).
-    var settingsCat by remember { mutableIntStateOf(0) }
+    var settingsCat by remember { mutableIntStateOf(-1) }
     // true mientras el foco esta en las opciones (derecha); Atras primero lo devuelve a las categorias.
     var settingsRight by remember { mutableStateOf(false) }
     var railBack by remember { mutableIntStateOf(0) }
-    var focusedApp by remember { mutableStateOf<AppInfo?>(null) }
-    // Ultimo uso de cada app (tarjeta bajo el dock) y aviso de modo ahorro.
-    var lastUsed by remember { mutableStateOf(prefs.lastUsedMap()) }
-    var showSaverHint by remember { mutableStateOf(false) }
     var saverSkip by remember { mutableStateOf(false) }
     // Actualizador (GitHub Releases): cuadro, aviso diario y vuelta del foco a Configuracion.
     val upd = remember { UpdaterState(ctx.applicationContext, prefs) }
-    var updBack by remember { mutableIntStateOf(0) }
     // Barra superior que se oculta sola: oculta, foco dentro de ella y aviso para reiniciar el conteo.
     var barHidden by remember { mutableStateOf(false) }
     var barFocus by remember { mutableStateOf(false) }
     var barTick by remember { mutableIntStateOf(0) }
-    var backdropApp by remember { mutableStateOf<AppInfo?>(null) }
     var prevScreen by remember { mutableStateOf("home") }
     var accentTarget by remember { mutableStateOf(Color.White) }
     val dockState = rememberLazyListState()
@@ -308,24 +297,16 @@ fun HomeRoot(
     var extQuery by remember { mutableStateOf("") }
     var iconPkg by remember { mutableStateOf<String?>(null) }
     var newAppAsk by remember { mutableStateOf<AppInfo?>(null) }
-    var noteEdit by remember { mutableStateOf(false) }
     var whatsNew by remember { mutableStateOf<Pair<String, String>?>(null) }
-    var wxCode by remember { mutableIntStateOf(-1) }
-    var prevPanel by remember { mutableStateOf(false) }
     val sleep = HomeBridge.sleep
     val verCode = remember { appVersionCode(ctx) }
-    val kidsSet = remember(HomeBridge.kidsTick) { prefs.kidsApps() }
 
-    // Modo ahorro y modo noche: valores efectivos. Los ajustes guardados no se tocan, asi que
+    // Modo ahorro: valores efectivos. Los ajustes guardados no se tocan, asi que
     // al apagar el modo todo vuelve a como estaba.
-    val hourNow = remember(minute) { java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY) }
-    val night = cfg.night && cfg.nightActive(hourNow)
-    val eAnim = cfg.screenAnim && !cfg.saver
-    val eFade = cfg.fade && !cfg.saver
-    val eBlur = cfg.blur && !cfg.saver
-    val eDyn = if (cfg.saver) 0 else cfg.dynBg
-    val eGlow = if (cfg.saver) 0 else if (night) (glowLvl - 1).coerceAtLeast(0) else glowLvl
-    val eDim = if (night) (cfg.dim + 30).coerceAtMost(85) else cfg.dim
+    val eAnim = !cfg.saver
+    val eFade = !cfg.saver
+    val eGlow = if (cfg.saver) 0 else glowLvl
+    val eDim = cfg.dim
 
     // style: lo que se dibuja (con el brillo efectivo). realStyle: lo que muestra Configuracion.
     val style = remember(scalePct, spacing, corner, bottom, eGlow, sizes) {
@@ -334,37 +315,35 @@ fun HomeRoot(
     val realStyle = remember(scalePct, spacing, corner, bottom, glowLvl, sizes) {
         DockStyle(scalePct, spacing, corner, bottom, glowLvl, sizes)
     }
-    val profileSel = profileIndex(scalePct, spacing, corner, glowLvl, cfg)
 
     // Tema de color: se fija antes de dibujar nada y se actualiza al cambiarlo.
-    val themeIdx = Themes.pick(cfg, hourNow)
-    val tOvr = Amb2.themeOverride
-    remember { Themes.set(themeIdx, if (tOvr != 0) tOvr else cfg.accentCustom); 0 }
-    SideEffect { Themes.set(themeIdx, if (tOvr != 0) tOvr else cfg.accentCustom) }
+    val themeIdx = Themes.pick(cfg)
+    remember { Themes.set(themeIdx, cfg.accentCustom); 0 }
+    SideEffect { Themes.set(themeIdx, cfg.accentCustom) }
 
     // Tecla Home: si ya estas en el inicio, vuelve al principio de la fila, devuelve el
     // foco a la primera ficha y sale del modo ambiente / menus.
     // Barra superior oculta: solo con el inicio libre (sin paneles ni menus) y sin foco en la barra.
-    val showWizard = appsLoaded && !cfg.wizardDone && !cfg.kids && screen == "home"
     val homeFree = screen == "home" && menuApp == null && !showMore && !showQuick &&
-        !showPower && pinAsk == null && !showSaverHint && !upd.visible &&
-        openFolder == null && newAppAsk == null && !showWizard && whatsNew == null && !noteEdit
+        !showPower && pinAsk == null && !upd.visible &&
+        openFolder == null && newAppAsk == null && whatsNew == null
     val barFree = homeFree
     LaunchedEffect(cfg.hideBar, cfg.hideBarSecs, barFree, barFocus, barTick) {
         barHidden = false
         if (!cfg.hideBar || !barFree || barFocus) return@LaunchedEffect
         while (true) {
-            delay(1000)
-            if (SystemClock.elapsedRealtime() - lastInput.longValue >= cfg.hideBarSecs * 1000L) {
+            val left = cfg.hideBarSecs * 1000L - (SystemClock.elapsedRealtime() - lastInput.longValue)
+            if (left <= 0L) {
                 barHidden = true
                 break
             }
+            delay(left)
         }
     }
 
     // Limpia un APK viejo y, al volver del permiso de instalar, sigue con la instalacion.
     LaunchedEffect(Unit) { withContext(Dispatchers.IO) { upd.cleanOld() } }
-    LaunchedEffect(resumeTick) { upd.onResume(); Fam.returned(cfg) }
+    LaunchedEffect(resumeTick) { upd.onResume() }
 
     // Aviso diario: una consulta al dia, unos segundos despues de abrir el inicio. Si en ese
     // momento hay un panel o menu abierto no se muestra nada (queda para "Buscar actualizaciones").
@@ -374,7 +353,7 @@ fun HomeRoot(
             if (screen == "home" && !upd.visible) {
                 val found = upd.check(false)
                 if (found && screen == "home" && menuApp == null && !showMore && !showQuick &&
-                    !showPower && pinAsk == null && !showSaverHint
+                    !showPower && pinAsk == null
                 ) {
                     upd.visible = true
                 }
@@ -389,24 +368,11 @@ fun HomeRoot(
         showPower = false
         showMore = false
         showQuick = false
-        showSaverHint = false
         openFolder = null
-        if (homeTick > 0 && !(Daily.homeFromApp && Daily.on(ctx, "dKeepPos"))) {
+        if (homeTick > 0) {
             lastDockPkg = null
             dockState.animateScrollToItem(0)
             focusTick++
-        }
-    }
-    // Dock por franja horaria: al cambiar de franja se recarga el dock.
-    LaunchedEffect(Unit) {
-        var part = Daily.dayPart()
-        while (true) {
-            delay(60_000)
-            if (Daily.dayPart() != part) {
-                part = Daily.dayPart()
-                favs = prefs.favs()
-                habitTick++
-            }
         }
     }
     LaunchedEffect(screen) {
@@ -417,16 +383,11 @@ fun HomeRoot(
         }
     }
 
-    // Fondo segun la app enfocada: espera un instante para no parpadear al recorrer el dock.
-    LaunchedEffect(focusedApp?.pkg) {
-        delay(250)
-        backdropApp = focusedApp
-    }
         // Al cerrar Configuracion el inicio no se recompone: se devuelve el foco a la primera ficha.
     LaunchedEffect(screen) {
-        if (screen == "home" && (prevScreen == "settings" || prevScreen == "wizard")) focusTick++
+        if (screen == "home" && prevScreen == "settings") focusTick++
         if (screen == "home") {
-            settingsCat = 0
+            settingsCat = -1
             settingsRight = false
         }
         if (screen == "home" || (screen != "all" && prevScreen == "all")) extQuery = ""
@@ -495,7 +456,6 @@ fun HomeRoot(
         val srv = PhoneServer(
             ctx.applicationContext, prefs,
             onText = { t ->
-                Daily.pushClip(ctx, t)
                 ui.post {
                     extQuery = t
                     if (screen == "home" || screen == "all") {
@@ -541,32 +501,19 @@ fun HomeRoot(
         }
     }
 
-    // Codigo de clima real para la capa de clima del fondo (23). Apagado con el modo ahorro.
     LaunchedEffect(cfg.uniformIcons) { UiPrefs.uniform = cfg.uniformIcons }
-    LaunchedEffect(cfg.weatherFx, cfg.saver, cfg.city) {
-        if (!cfg.weatherFx || cfg.saver) {
-            wxCode = -1
-            return@LaunchedEffect
-        }
-        while (true) {
-            val r = withContext(Dispatchers.IO) { fetchWeatherRaw(cfg.city, false) }
-            if (r != null) wxCode = r.first
-            delay(if (r == null) 60_000L else 1_800_000L)
-        }
-    }
 
     // Aviso de app nueva (19): al instalar una app se ofrece anadirla al dock.
     LaunchedEffect(addedPkg, apps) {
         if (addedPkg.isEmpty()) return@LaunchedEffect
         val a = apps.firstOrNull { it.pkg == addedPkg } ?: return@LaunchedEffect
-        if (cfg.ex("famApprove") == "1" && a.pkg !in kidsSet) Fam.addPending(cfg, a.pkg)
-        if (cfg.newAppAlert && !cfg.kids && a.pkg !in favs) newAppAsk = a
+        if (cfg.newAppAlert && a.pkg !in favs) newAppAsk = a
         onAddedHandled()
     }
 
     // Novedades (35): tras actualizar, se muestran las notas del ultimo Release.
-    LaunchedEffect(appsLoaded, cfg.wizardDone) {
-        if (!appsLoaded || !cfg.wizardDone || verCode == 0) return@LaunchedEffect
+    LaunchedEffect(appsLoaded) {
+        if (!appsLoaded || verCode == 0) return@LaunchedEffect
         if (cfg.lastVersion == 0) {
             cfg.setLastVersion(verCode)
         } else if (cfg.lastVersion != verCode) {
@@ -579,56 +526,90 @@ fun HomeRoot(
         }
     }
 
-    // Sonido corto al abrir y cerrar paneles (26).
-    val anyPanel = (screen != "home" && screen != "ambient" && screen != "black") ||
-        menuApp != null || showPower || showMore || showQuick || openFolder != null
-    LaunchedEffect(anyPanel) {
-        if (anyPanel != prevPanel) {
-            prevPanel = anyPanel
-            if (cfg.panelSounds && appsLoaded) {
-                playPanelSound(view, if (cfg.soundLevel == 2) 0.7f else 0.3f, anyPanel)
+
+    // Musica: se relee solo cuando cambia una sesion de media (callbacks), mas un repaso por minuto.
+    var mediaTick by remember { mutableIntStateOf(0) }
+    androidx.compose.runtime.DisposableEffect(Notif.link) {
+        val msm = ctx.getSystemService(Context.MEDIA_SESSION_SERVICE) as android.media.session.MediaSessionManager
+        val comp = android.content.ComponentName(ctx, MediaListener::class.java)
+        val h = android.os.Handler(android.os.Looper.getMainLooper())
+        val cbs = HashMap<android.media.session.MediaController, android.media.session.MediaController.Callback>()
+        fun attach(list: List<android.media.session.MediaController>?) {
+            for ((c, k) in cbs) try { c.unregisterCallback(k) } catch (e: Exception) { }
+            cbs.clear()
+            for (c in list ?: emptyList()) {
+                val k = object : android.media.session.MediaController.Callback() {
+                    override fun onPlaybackStateChanged(state: android.media.session.PlaybackState?) { mediaTick++ }
+                    override fun onMetadataChanged(metadata: android.media.MediaMetadata?) { mediaTick++ }
+                    override fun onSessionDestroyed() { mediaTick++ }
+                }
+                try { c.registerCallback(k, h); cbs[c] = k } catch (e: Exception) { }
             }
+            mediaTick++
+        }
+        val sl = android.media.session.MediaSessionManager.OnActiveSessionsChangedListener { attach(it) }
+        try {
+            msm.addOnActiveSessionsChangedListener(sl, comp, h)
+            attach(msm.getActiveSessions(comp))
+        } catch (e: Exception) { }
+        onDispose {
+            try { msm.removeOnActiveSessionsChangedListener(sl) } catch (e: Exception) { }
+            for ((c, k) in cbs) try { c.unregisterCallback(k) } catch (e: Exception) { }
+            cbs.clear()
         }
     }
-
     LaunchedEffect(Unit) {
-        while (true) {
+        androidx.compose.runtime.snapshotFlow { Pair(mediaTick, minute) }.collect {
             val n = withContext(Dispatchers.IO) { readMedia(ctx) }
             if (!sameMedia(media, n)) media = n
-            delay(1000)
         }
     }
 
     // Estado real de Wi-Fi / Ethernet / Bluetooth.
+    var netTick by remember { mutableIntStateOf(0) }
+    androidx.compose.runtime.DisposableEffect(Unit) {
+        val cm = ctx.getSystemService(Context.CONNECTIVITY_SERVICE) as android.net.ConnectivityManager
+        val cb = object : android.net.ConnectivityManager.NetworkCallback() {
+            override fun onAvailable(network: android.net.Network) { netTick++ }
+            override fun onLost(network: android.net.Network) { netTick++ }
+            override fun onCapabilitiesChanged(network: android.net.Network, c: android.net.NetworkCapabilities) { netTick++ }
+        }
+        try { cm.registerDefaultNetworkCallback(cb) } catch (e: Exception) { }
+        val rx = object : android.content.BroadcastReceiver() {
+            override fun onReceive(c: Context?, i: Intent?) { netTick++ }
+        }
+        val f = android.content.IntentFilter().apply {
+            addAction(android.bluetooth.BluetoothAdapter.ACTION_STATE_CHANGED)
+            addAction(android.bluetooth.BluetoothDevice.ACTION_ACL_CONNECTED)
+            addAction(android.bluetooth.BluetoothDevice.ACTION_ACL_DISCONNECTED)
+            addAction(android.net.wifi.WifiManager.RSSI_CHANGED_ACTION)
+        }
+        try { ContextCompat.registerReceiver(ctx, rx, f, ContextCompat.RECEIVER_EXPORTED) } catch (e: Exception) { }
+        onDispose {
+            try { cm.unregisterNetworkCallback(cb) } catch (e: Exception) { }
+            try { ctx.unregisterReceiver(rx) } catch (e: Exception) { }
+        }
+    }
     LaunchedEffect(Unit) {
-        while (true) {
+        androidx.compose.runtime.snapshotFlow { Pair(netTick, minute) }.collect {
+            delay(400)
             val n = withContext(Dispatchers.IO) { readNet(ctx) }
             if (n != net) net = n
-            delay(4000)
         }
     }
 
     // Notificaciones sin leer por app.
     LaunchedEffect(Unit) {
-        while (true) {
+        androidx.compose.runtime.snapshotFlow { Pair(Notif.tick, minute) }.collect {
             val u = withContext(Dispatchers.IO) { unreadCounts(ctx.packageName) }
             if (u != unread) unread = u
-            delay(3000)
         }
     }
 
     val m = media
     val art = remember(m?.title, m?.artist, m?.bitmap != null) { m?.bitmap?.asImageBitmap() }
     val mm = minute
-    // Rotacion de fondos: por tiempo o segun la hora del dia.
-    val selected: File? = if (walls.isEmpty()) null else if (cfg.wallShow && walls.size > 1) {
-        walls[((mm / cfg.wallShowMins.coerceIn(1, 120)) % walls.size).toInt()]
-    } else when (cfg.rot) {
-        1 -> walls[((mm / 30L) % walls.size).toInt()]
-        2 -> walls[((mm / 60L) % walls.size).toInt()]
-        3 -> walls[java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY) * walls.size / 24]
-        else -> walls.firstOrNull { it.name == wallName } ?: walls.first()
-    }
+    val selected: File? = if (walls.isEmpty()) null else walls.firstOrNull { it.name == wallName } ?: walls.first()
 
     // Color de acento sacado del fondo actual.
     LaunchedEffect(selected?.name, cfg.glowSrc) {
@@ -667,11 +648,8 @@ fun HomeRoot(
         val r = prefs.getInt("reopenCat", -1)
         if (r >= 0) {
             prefs.putInt("reopenCat", -1)
-            settingsCat = r.coerceIn(0, 10)
+            settingsCat = r.coerceIn(0, 7)
             screen = "settings"
-        } else if (prefs.getInt("wizardDone", 0) == 0 && !cfg.lockSettings && !cfg.kids) {
-            delay(1500)
-            if (screen == "home") screen = "wizard"
         }
     }
 
@@ -679,17 +657,10 @@ fun HomeRoot(
     fun goBack() {
         when {
             pinAsk != null -> pinAsk = null
-            noteEdit -> noteEdit = false
             openFolder != null -> openFolder = null
             newAppAsk != null -> newAppAsk = null
             upd.visible -> {
                 upd.dismiss()
-                focusTick++
-                updBack++
-            }
-            showSaverHint -> {
-                showSaverHint = false
-                saverSkip = true
                 focusTick++
             }
             showQuick -> {
@@ -703,10 +674,6 @@ fun HomeRoot(
             showPower -> showPower = false
             screen == "walls" || screen == "edit" || screen == "dock" -> screen = "settings"
             screen == "settings" && settingsRight -> railBack++
-            screen == "wizard" -> {
-                prefs.putInt("wizardDone", 1)
-                screen = "home"
-            }
             screen == "hidden" -> screen = "all"
             else -> screen = "home"
         }
@@ -764,77 +731,28 @@ fun HomeRoot(
         }
     }
 
-    // Diseño (solo el aspecto): guardar en un archivo y cargarlo sin tocar apps ni PIN.
-    val designSaver = rememberLauncherForActivityResult(
-        ActivityResultContracts.CreateDocument("application/json")
-    ) { uri: Uri? ->
-        if (uri != null) {
-            scope.launch {
-                val ok = withContext(Dispatchers.IO) { writeDesignTo(ctx, prefs, uri) }
-                toast(ctx, if (ok) "Diseño guardado." else "No se pudo guardar el diseño.")
-            }
-        }
-    }
-    val designPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
-        if (uri != null) {
-            scope.launch {
-                val ok = withContext(Dispatchers.IO) { readDesignFrom(ctx, prefs, uri) }
-                if (ok) {
-                    toast(ctx, "Diseño aplicado.")
-                    prefs.putInt("reopenCat", 1)
-                    findActivity(ctx)?.recreate()
-                } else {
-                    toast(ctx, "Ese archivo no es un diseño válido.")
-                }
-            }
-        }
-    }
-
     // Permiso opcional para leer el nombre de la red Wi-Fi y los dispositivos Bluetooth.
     val netPerm = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
         scope.launch { net = withContext(Dispatchers.IO) { readNet(ctx) } }
     }
 
     // Perfil para ninos (34): solo las apps permitidas. Carpetas (17): sus apps no salen sueltas en el dock.
-    val visible = remember(apps, hidden, cfg.kids, kidsSet) {
-        if (cfg.kids) apps.filter { it.pkg in kidsSet } else apps.filter { it.pkg !in hidden }
-    }
-    val hiddenApps = remember(apps, hidden, cfg.kids) {
-        if (cfg.kids) emptyList<AppInfo>() else apps.filter { it.pkg in hidden }
-    }
+    val visible = remember(apps, hidden) { apps.filter { it.pkg !in hidden } }
+    val hiddenApps = remember(apps, hidden) { apps.filter { it.pkg in hidden } }
     val folderNames = remember(groupMap) { groupMap.keys.take(MAX_FOLDERS) }
     val inFolders = remember(groupMap, folderNames) {
         folderNames.flatMap { groupMap[it] ?: emptyList() }.toSet()
     }
-    val dock = remember(visible, favs, cfg.kids, inFolders, habitTick) {
-        if (cfg.kids) {
-            visible
-        } else {
-            val byPkg = visible.associateBy { it.pkg }
-            Daily.habitSort(ctx, favs.filter { it !in inFolders }).mapNotNull { byPkg[it] }
-        }
+    val dock = remember(visible, favs, inFolders, habitTick) {
+        val byPkg = visible.associateBy { it.pkg }
+        favs.filter { it !in inFolders }.mapNotNull { byPkg[it] }
     }
-    val groupList = remember(groupMap, folderNames, visible, cfg.kids) {
-        if (cfg.kids) {
-            emptyList<Pair<String, List<AppInfo>>>()
-        } else {
-            val byPkg = visible.associateBy { it.pkg }
-            folderNames.map { n -> n to (groupMap[n] ?: emptyList()).mapNotNull { byPkg[it] } }
-        }
+    val groupList = remember(groupMap, folderNames, visible) {
+        val byPkg = visible.associateBy { it.pkg }
+        folderNames.map { n -> n to (groupMap[n] ?: emptyList()).mapNotNull { byPkg[it] } }
     }
     val newPkgs = remember(visible, seen) { visible.map { it.pkg }.filter { it !in seen }.toSet() }
     val badges = remember(newPkgs, unread) { Badges(newPkgs, unread) }
-
-    // Filas extra (Streaming, Juegos...): solo las activas y con apps.
-    val byPkgVisible = remember(visible) { visible.associateBy { it.pkg } }
-    val rowList = ArrayList<Pair<String, List<AppInfo>>>()
-    for (i in 0..2) {
-        val ni = cfg.row(i)
-        if (ni > 0 && ni < ROW_NAMES.size) {
-            val l = rowApps[i].mapNotNull { byPkgVisible[it] }
-            if (l.isNotEmpty()) rowList.add(ROW_NAMES[ni] to l)
-        }
-    }
 
     fun startNow(a: AppInfo, b: Rect?) {
         val opts = try {
@@ -859,49 +777,18 @@ fun HomeRoot(
     remember { Perf.load(ctx); 0 }
     var home1Open by remember { mutableStateOf(Home1.firstRunPending(ctx)) }
     if (home1Open) HomeDialog({ home1Open = false }) { requestHome(ctx) { homeLauncher.launch(it) } }
-    val trigRef = remember { arrayOf<(Int) -> Unit>({}) }
-    var bootAsk by remember { mutableStateOf(Daily.bootPending(ctx)) }
-    var showStill by remember { mutableStateOf(false) }
-    var showInter by remember { mutableStateOf("") }
-    if (bootAsk && !home1Open) BootDialog { bootAsk = false }
-    if (showStill) StillThereDialog { timeout ->
-        showStill = false
-        if (timeout) systemPower(ctx, 2) else Daily.resumeMedia(ctx, prefs.recents().firstOrNull() ?: "")
-    }
-    if (showInter.isNotEmpty()) CountdownDialog("Intermedio", 600, "Pulsa cualquier botón para reanudar") {
-        Daily.resumeMedia(ctx, if (showInter == "-") "" else showInter)
-        showInter = ""
-    }
-
-    var famBlock by remember { mutableStateOf<Pair<FamBlock, AppInfo>?>(null) }
-    val askRef = remember { arrayOfNulls<(() -> Unit) -> Unit>(1) }
-
     fun openAppNow(a: AppInfo) {
-        Fam.opened(cfg, a.pkg)
         recents = prefs.pushRecent(a.pkg)
         usage = prefs.bumpUsage(a.pkg)
         Perf.noteLaunch(a.pkg)
         prefs.bumpDay(a.pkg)
-        Daily.noteOpen(ctx, a.pkg)
-        Daily.applyVolume(ctx, a.pkg)
-        trigRef[0](Daily.trigFor(ctx, a.pkg))
-        habitTick++
-        lastUsed = prefs.markUsed(a.pkg)
         seen = prefs.markSeen(a.pkg)
         val b = TileBounds.last
         TileBounds.last = null
-        startNow(Daily.deep(ctx, a), b)
+        startNow(a, b)
     }
 
-    fun openApp(a: AppInfo) {
-        val fb = Fam.blockFor(cfg, a.pkg, a.label)
-        if (fb != null) { famBlock = fb to a; return }
-        if (a.pkg in Fam.locked(cfg) && cfg.pinSet) {
-            askRef[0]?.invoke { openAppNow(a) }
-            return
-        }
-        openAppNow(a)
-    }
+    fun openApp(a: AppInfo) { openAppNow(a) }
 
         // Carpetas (17): una app esta en una sola carpeta a la vez.
     fun toggleFolder(p: String, i: Int) {
@@ -917,22 +804,6 @@ fun HomeRoot(
         }
         groupMap = nm
         prefs.saveGroups(nm)
-    }
-
-    // Perfil de diseno: aplica de una vez dock, brillo, fondo dinamico, filas y reloj.
-    fun applyProfile(i: Int) {
-        val pr = DESIGN_PROFILES.getOrNull(i) ?: return
-        scalePct = pr.scale
-        spacing = pr.spacing
-        corner = pr.corner
-        glowLvl = pr.glow
-        prefs.putInt("scale", pr.scale)
-        prefs.putInt("spacing", pr.spacing)
-        prefs.putInt("corner", pr.corner)
-        prefs.putInt("glow", pr.glow)
-        cfg.setDynBg(pr.dynBg)
-        cfg.setBigClock(pr.bigClock)
-        for (r in 0..2) cfg.setRow(r, pr.rows[r])
     }
 
     val onSet: (String, Int) -> Unit = { k, v ->
@@ -960,10 +831,6 @@ fun HomeRoot(
         }
     }
 
-    val recentApps = remember(recents, visible) {
-        val byPkg = visible.associateBy { it.pkg }
-        recents.mapNotNull { byPkg[it] }.take(8)
-    }
         // ---- PIN ----
     fun showPin(title: String, onCode: (String) -> Unit) {
         pinErr = null
@@ -983,7 +850,6 @@ fun HomeRoot(
             }
         }
     }
-    askRef[0] = { t -> askVerify(t) }
         fun guarded(on: Boolean, then: () -> Unit) {
         if (on && cfg.pinSet) askVerify(then) else then()
         }
@@ -1003,7 +869,7 @@ fun HomeRoot(
     }
         // ---- Voz / busqueda ----
     fun startVoice() {
-        if (cfg.voiceMode == 0 && launchAssistant(ctx)) return
+        if (launchAssistant(ctx)) return
         searchFocus = true
         screen = "all"
     }
@@ -1018,40 +884,6 @@ fun HomeRoot(
             else -> openSystem(ctx, "access")
         }
     }
-    // ---- Escena de cine ----
-    fun runScene() {
-        if (toggleScene(cfg, prefs, HomeBridge.sleep)) {
-            toast(ctx, "Escena de cine activada.")
-            AppCache.apps.firstOrNull { it.pkg == cfg.sceneApp }?.let { openApp(it) }
-        } else {
-            toast(ctx, "Escena de cine desactivada.")
-        }
-    }
-
-    // ---- Rutina diaria ----
-    fun runRoutine() {
-        if (cfg.routineAction == 0) {
-            if (prefs.getInt("sceneOn", 0) != 1) runScene()
-        } else {
-            AppCache.apps.firstOrNull { it.pkg == cfg.routineApp }?.let { openApp(it) }
-        }
-    }
-    LaunchedEffect(cfg.routineOn) {
-        while (cfg.routineOn) {
-            val cal = java.util.Calendar.getInstance()
-            val today = cal.get(java.util.Calendar.YEAR) * 1000 + cal.get(java.util.Calendar.DAY_OF_YEAR)
-            val nowM = cal.get(java.util.Calendar.HOUR_OF_DAY) * 60 + cal.get(java.util.Calendar.MINUTE)
-            val at = cfg.routineHour * 60 + cfg.routineMin
-            if (screen == "home" && !appPaused && nowM >= at && nowM <= at + 30 &&
-                prefs.getInt("routineLast", 0) != today
-            ) {
-                prefs.putInt("routineLast", today)
-                runRoutine()
-            }
-            delay(20_000)
-        }
-    }
-
     // ---- Rendimiento: ahorro automatico, limpieza nocturna y pre-calentado ----
     LaunchedEffect(Perf.autoSaver) {
         if (!Perf.autoSaver) {
@@ -1083,7 +915,7 @@ fun HomeRoot(
         }
     }
 
-    // ---- Botones de color (13) ----
+    // ---- Botones de color (10) ----
     fun runColorAction(a: Int) {
         when (a) {
             1 -> {
@@ -1103,41 +935,24 @@ fun HomeRoot(
             6 -> guarded(cfg.lockSettings) { screen = "edit" }
             7 -> screen = "ambient"
             8 -> screen = "black"
-            9 -> runScene()
-            10 -> {
-                val next = (prefs.getInt("famCur", 0) + 1) % FAM_COUNT
-                toast(ctx, "Perfil " + (next + 1))
-                switchFamily(ctx, next)
-            }
-            11 -> {
-                val pk = Daily.pauseMedia(ctx)
-                showInter = pk.ifEmpty { prefs.recents().firstOrNull() ?: "-" }
-            }
-            12 -> {
+            9 -> {
                 Perf.cleanAsync(ctx)
             }
         }
     }
-    trigRef[0] = { c ->
-        when (c) {
-            1 -> if (prefs.getInt("sceneOn", 0) != 1) runScene()
-            2 -> Perf.cleanAsync(ctx, true)
-            3 -> cfg.setSaver(true)
-        }
-    }
-    // Acciones pedidas desde fuera (remapeo, apagado inteligente).
+    // Acciones pedidas desde fuera (remapeo).
     LaunchedEffect(ActBus.n) {
         val a = ActBus.act
         if (a == 0) return@LaunchedEffect
         ActBus.act = 0
-        if (a == 99) showStill = true else runColorAction(a)
+        runColorAction(a)
     }
 
     val uiScale = cfg.uiScale / 100f
     // Vista previa en vivo: en Apariencia y Dock el fondo no se oscurece ni se desenfoca,
     // y la primera ficha del dock se ve "enfocada" para que se note cada cambio.
-    val preview = (screen == "settings" && settingsPreviewCat(settingsCat)) || screen == "wizard"
-    val sideOpen = screen == "settings" || screen == "edit" || screen == "wizard"
+    val preview = screen == "settings" && settingsPreviewCat(settingsCat)
+    val sideOpen = screen == "settings" || screen == "edit"
     // Ancho que ocupa el panel lateral: el inicio se hace mas angosto para no quedar debajo.
     val availW = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp / uiScale -
         2f * cfg.overscan / uiScale
@@ -1150,7 +965,6 @@ fun HomeRoot(
         "all", "hidden" -> 0x99000000
         "walls" -> 0xAA000000
         "settings" -> if (preview) 0x14000000L else 0x40000000L
-        "wizard" -> 0x14000000L
         "edit" -> 0x14000000
         "inputs" -> 0x55000000
         else -> 0L
@@ -1158,33 +972,18 @@ fun HomeRoot(
 
     val dimColor by animateColorAsState(Color(dimLayer), tween(300), label = "dim")
 
-    // Desenfoque del fondo mientras hay un panel abierto (solo Android 12 o superior).
-    val panelOpen = screen == "settings" || screen == "edit" || screen == "inputs" ||
-        menuApp != null || showPower
-    val blurDp by animateDpAsState(
-        if (panelOpen && !preview && screen != "edit" && ((screen == "settings" && Fx.blur && !cfg.saver) || (eBlur && screen != "settings"))) 24.dp else 0.dp, tween(350), label = "blur"
-    )
     // Fondo animado (video / GIF): se pausa con paneles, menus o cuando hay otra app abierta.
     val wallPaused = (screen == "ambient" && (!cfg.ambAnim || cfg.saver)) ||
         (cfg.pauseWall &&
             (appPaused || (screen != "home" && screen != "ambient" && !preview) || menuApp != null || showPower || showMore))
-    val bdApp: AppInfo? = when {
-        screen == "home" -> backdropApp
-        preview -> dock.firstOrNull()
-        else -> null
-    }
     // Si el control va muy lento varias veces seguidas, se sugiere el modo ahorro.
         SlowWatch(
-        active = homeFree && !cfg.saver && (cfg.saverHint || Perf.autoFluid) && !saverSkip,
+        active = homeFree && !cfg.saver && Perf.autoFluid && !saverSkip,
         lastInputMs = { lastInput.longValue },
         onSlow = {
-            if (Perf.autoFluid) {
-                cfg.setFluid(true)
-                saverSkip = true
-                toast(ctx, "Fluidez máxima activada automáticamente.")
-            } else {
-                showSaverHint = true
-            }
+            cfg.setFluid(true)
+            saverSkip = true
+            toast(ctx, "Fluidez máxima activada automáticamente.")
         }
     )
         Box(
@@ -1194,7 +993,6 @@ fun HomeRoot(
             .onPreviewKeyEvent {
                 lastInput.longValue = SystemClock.elapsedRealtime()
                 val k = it.key
-                if (HomeFx.handleKey(cfg, it)) return@onPreviewKeyEvent true
                 // Atras en Configuracion se atiende aqui, antes que cualquier otra cosa: una
                 // pulsacion = un nivel. Se ignoran las repeticiones al mantener la tecla.
                 if (k == Key.Back && screen == "settings") {
@@ -1205,7 +1003,7 @@ fun HomeRoot(
                 }
                 // Botones de color (13): solo con el inicio libre y fuera del perfil para ninos.
                 if (it.type == KeyEventType.KeyDown && it.nativeKeyEvent.repeatCount == 0 &&
-                    homeFree && !cfg.kids
+                    homeFree
                 ) {
                     val act = colorKeyAction(cfg, k)
                     val cx = colorKeyIndex(k)?.let { ci -> cfg.colorExtra(ci) } ?: ""
@@ -1228,7 +1026,7 @@ fun HomeRoot(
                             return@onPreviewKeyEvent true
                         }
                         val rn = rv.removePrefix("a:").toIntOrNull() ?: 0
-                        if (rn in 1..12) {
+                        if (rn in 1..9) {
                             runColorAction(rn)
                             return@onPreviewKeyEvent true
                         }
@@ -1253,31 +1051,12 @@ fun HomeRoot(
         Box(
             Modifier
                 .fillMaxSize()
-                .then(
-                    if (blurDp.value > 0.5f) {
-                        Modifier
-                            .graphicsLayer {
-                                val z = 1f + 0.08f * (blurDp.value / 24f)
-                                scaleX = z
-                                scaleY = z
-                            }
-                            .blur(blurDp)
-                    } else {
-                        Modifier
-                    }
-                )
         ) {
             Crossfade(
                 targetState = selected,
                 animationSpec = tween(if (eFade) 700 else 1),
                 label = "wall"
             ) { f -> WallpaperLayer(f, wallPaused) }
-            FocusBackdrop(bdApp, eDyn)
-            // Capa de clima (23): apagada con el ajuste, el modo ahorro o si el launcher esta en pausa.
-            WeatherFx(
-                wxCode, hourNow < 7 || hourNow >= 19,
-                cfg.weatherFx && !cfg.saver && !appPaused && screen != "ambient" && screen != "black"
-            )
             Box(
                 Modifier.fillMaxSize().background(
                     Brush.verticalGradient(listOf(Color(0x22000000), Color.Transparent, Color(0x99000000)))
@@ -1331,19 +1110,19 @@ fun HomeRoot(
                         AnimatedContent(
                             targetState = screen,
                             modifier = Modifier.fillMaxSize(),
-                            transitionSpec = { screenTransition(initialState, targetState, eAnim) },
+                            transitionSpec = { androidx.compose.animation.ContentTransform(EnterTransition.None, ExitTransition.None) },
                             label = "screen",
-                            contentKey = { if (it == "home" || it == "settings" || it == "edit" || it == "wizard") "homeLayer" else it }
+                            contentKey = { if (it == "home" || it == "settings" || it == "edit") "homeLayer" else it }
                         ) { s ->
                             when (s) {
-                                "home", "settings", "edit", "wizard" -> Box(Modifier.fillMaxSize()) {
+                                "home", "settings", "edit" -> Box(Modifier.fillMaxSize()) {
                                     // El inicio queda debajo de Configuracion: asi no se duplica al abrir o cerrar el panel.
                                     val live = s == "home" && screen == "home"
                                     Box(
                                         Modifier
                                             .fillMaxSize()
                                             .padding(end = sideInset)
-                                            .focusProperties { canFocus = live && !showMore && !showQuick && !showSaverHint && !upd.visible }
+                                            .focusProperties { canFocus = live && !showMore && !showQuick && !upd.visible }
                                     ) {
                                         HomeScreen(
                                             tileStyle = cfg.tileStyle,
@@ -1360,23 +1139,16 @@ fun HomeRoot(
                                                 }
                                             },
                                             onSettings = {
-                                                if (live) guarded(cfg.lockSettings || cfg.kids) { screen = "settings" }
+                                                if (live) guarded(cfg.lockSettings) { screen = "settings" }
                                             },
                                             onWifi = { if (live) openSystem(ctx, "wifi") },
                                             cfg = cfg,
-                                            recents = recentApps,
-                                            onMenu = { if (live && !cfg.kids) menuApp = it },
-                                            rows = rowList,
+                                            onMenu = { if (live) menuApp = it },
                                             net = net,
                                             onMore = { if (live) showMore = true },
                                             moreBack = moreBack,
                                             onFocusApp = { a, f ->
-                                                if (f) {
-                                                    focusedApp = a
-                                                    lastDockPkg = a.pkg
-                                                } else if (focusedApp?.pkg == a.pkg) {
-                                                    focusedApp = null
-                                                }
+                                                if (f) lastDockPkg = a.pkg
                                             },
                                             dockState = dockState,
                                             focusTick = focusTick,
@@ -1385,12 +1157,9 @@ fun HomeRoot(
                                             previewDock = preview,
                                             onQuick = { if (live) showQuick = true },
                                             quickBack = quickBack,
-                                            focusedApp = if (preview) dock.firstOrNull() else focusedApp,
-                                            lastUsed = lastUsed,
                                             sidePanel = s == "settings" || s == "edit",
                                             groups = groupList,
-                                            onFolder = { if (live) openFolder = it },
-                                            onEditNote = { if (live) noteEdit = true }
+                                            onFolder = { if (live) openFolder = it }
                                         )
                                     }
                                     AnimatedVisibility(
@@ -1425,33 +1194,6 @@ fun HomeRoot(
                                             }
                                         )
                                     }
-                                    if (s == "wizard") {
-                                        SetupWizard(
-                                            style = realStyle,
-                                            cfg = cfg,
-                                            onProfile = { applyProfile(it) },
-                                            onWalls = {
-                                                prefs.putInt("wizardDone", 1)
-                                                screen = "walls"
-                                            },
-                                            onNetPerm = {
-                                                val perms = ArrayList<String>()
-                                                perms.add(Manifest.permission.ACCESS_FINE_LOCATION)
-                                                if (Build.VERSION.SDK_INT >= 31) {
-                                                    perms.add(Manifest.permission.BLUETOOTH_CONNECT)
-                                                }
-                                                try {
-                                                    netPerm.launch(perms.toTypedArray())
-                                                } catch (e: Exception) {
-                                                    toast(ctx, "Esta TV no permite pedir ese permiso.")
-                                                }
-                                            },
-                                            onClose = {
-                                                prefs.putInt("wizardDone", 1)
-                                                screen = "home"
-                                            }
-                                        )
-                                    }
                                     AnimatedVisibility(
                                         visible = s == "settings",
                                         enter = if (eAnim) {
@@ -1461,45 +1203,15 @@ fun HomeRoot(
                                         },
                                         exit = if (eAnim) fadeOut(tween(160)) else ExitTransition.None
                                     ) {
-                                        SettingsScreen(
+                                        SettingsHost(
                                             style = realStyle,
                                             cfg = cfg,
                                             onSet = onSet,
-                                            onResetDock = {
-                                                scalePct = 100
-                                                spacing = 16
-                                                corner = 18
-                                                bottom = 0
-                                                glowLvl = 2
-                                                prefs.putInt("scale", 100)
-                                                prefs.putInt("spacing", 16)
-                                                prefs.putInt("corner", 18)
-                                                prefs.putInt("bottom", 0)
-                                                prefs.putInt("glow", 2)
-                                            },
                                             cat = settingsCat,
                                             onCat = { settingsCat = it },
                                             onRightFocus = { settingsRight = it },
                                             railBack = railBack,
-                                            onProfile = { applyProfile(it) },
                                             onUpdate = { upd.open(scope) },
-                                            onDesignSave = {
-                                                try {
-                                                    designSaver.launch("diseno_launcher.json")
-                                                } catch (e: Exception) {
-                                                    toast(ctx, "Esta TV no tiene selector de archivos.")
-                                                }
-                                            },
-                                            onDesignPick = {
-                                                try {
-                                                    designPicker.launch(arrayOf("*/*"))
-                                                } catch (e: Exception) {
-                                                    toast(ctx, "Esta TV no tiene selector de archivos.")
-                                                }
-                                            },
-                                            onWizard = { screen = "wizard" },
-                                            updBack = updBack,
-                                            blocked = upd.visible,
                                             onBackupSave = {
                                                 try {
                                                     backupSaver.launch(backupName())
@@ -1580,7 +1292,6 @@ fun HomeRoot(
                                     items = inputs,
                                     onPick = {
                                         openInput(ctx, it)
-                                        trigRef[0](prefs.getInt("dTrigHdmi", 0))
                                         screen = "home"
                                     },
                                     onClose = { screen = "home" },
@@ -1589,7 +1300,7 @@ fun HomeRoot(
                                 "all" -> AllApps(
                                     visible, usage, recents, cfg.sort,
                                     { cfg.setSort(it) },
-                                    { if (!cfg.kids) menuApp = it },
+                                    { menuApp = it },
                                     focusSearch = searchFocus,
                                     loading = !appsLoaded,
                                     onHidden = if (hiddenApps.isNotEmpty()) {
@@ -1599,10 +1310,7 @@ fun HomeRoot(
                                     },
                                     recentSearches = recentSearches,
                                     onSearched = { q -> recentSearches = pushSearch(prefs, q) },
-                                    externalQuery = extQuery,
-                                    onVoice = {
-                                        if (!launchAssistant(ctx)) toast(ctx, "Esta TV no tiene asistente de voz.")
-                                    }
+                                    externalQuery = extQuery
                                 ) { openApp(it) }
                                 "hidden" -> AllApps(
                                     hiddenApps, usage, recents, cfg.sort,
@@ -1659,17 +1367,6 @@ fun HomeRoot(
                                 menuApp = null
                                 uninstallApp(ctx, p)
                             },
-                            rowNames = (0..2).map { i ->
-                                val ni = cfg.row(i)
-                                if (ni > 0 && ni < ROW_NAMES.size) ROW_NAMES[ni] else null
-                            },
-                            inRow = (0..2).map { i -> p in rowApps[i] },
-                            onRow = { i ->
-                                val l = rowApps[i]
-                                val nl = if (p in l) l - p else l + p
-                                rowApps = rowApps.mapIndexed { j, x -> if (j == i) nl else x }
-                                prefs.saveRowApps(i, nl)
-                            },
                             customName = prefs.names()[p] ?: "",
                             onRename = { v ->
                                 prefs.setName(p, v)
@@ -1700,11 +1397,6 @@ fun HomeRoot(
                     }
                     if (showMore) {
                         MoreMenu(
-                            onVoice = {
-                                showMore = false
-                                moreBack++
-                                startVoice()
-                            },
                             onInputs = {
                                 showMore = false
                                 inputs = listInputs(ctx)
@@ -1720,18 +1412,9 @@ fun HomeRoot(
                             }
                         )
                     }
-                    famBlock?.let { fbp ->
-                        FamBlockDialog(fbp.first, cfg.pinSet, {
-                            famBlock = null
-                            askVerify { Fam.grant(cfg, fbp.first); openAppNow(fbp.second) }
-                        }, { famBlock = null })
-                    }
-                    HomeOverlays(cfg, m, screen == "home", { if (screen == "ambient" || screen == "black") screen = "home" })
                     if (showQuick) {
                         QuickPanel(
                             cfg = cfg,
-                            profile = profileSel,
-                            onProfile = { applyProfile(it) },
                             net = net,
                             media = m,
                             onWifi = {
@@ -1761,16 +1444,10 @@ fun HomeRoot(
                                 searchFocus = true
                                 screen = "all"
                             },
-                            sceneOn = prefs.getInt("sceneOn", 0) == 1,
-                            onScene = {
-                                showQuick = false
-                                quickBack++
-                                runScene()
-                            },
                             onSettings = {
                                 showQuick = false
                                 quickBack++
-                                guarded(cfg.lockSettings || cfg.kids) { screen = "settings" }
+                                guarded(cfg.lockSettings) { screen = "settings" }
                             },
                             onClose = {
                                 showQuick = false
@@ -1785,28 +1462,6 @@ fun HomeRoot(
                             onClose = { showPower = false }
                         )
                     }
-                    if (showSaverHint) {
-                        SaverHint(
-                            onEnable = {
-                                cfg.setSaver(true)
-                                showSaverHint = false
-                                saverSkip = true
-                                focusTick++
-                                toast(ctx, "Modo ahorro activado.")
-                            },
-                            onNever = {
-                                cfg.setSaverHint(false)
-                                showSaverHint = false
-                                saverSkip = true
-                                focusTick++
-                            },
-                            onClose = {
-                                showSaverHint = false
-                                saverSkip = true
-                                focusTick++
-                            }
-                        )
-                    }
                     if (upd.visible) {
                         UpdateDialog(
                             st = upd,
@@ -1814,7 +1469,6 @@ fun HomeRoot(
                             onClose = {
                                 upd.dismiss()
                                 focusTick++
-                                updBack++
                             }
                         )
                     }
@@ -1832,7 +1486,7 @@ fun HomeRoot(
                                 TileBounds.last = null
                                 openApp(it)
                             },
-                            onMenu = { if (!cfg.kids) menuApp = it },
+                            onMenu = { menuApp = it },
                             onClose = { openFolder = null }
                         )
                     }
@@ -1849,35 +1503,6 @@ fun HomeRoot(
                                 toast(ctx, "Añadida al dock.")
                             },
                             onClose = { newAppAsk = null }
-                        )
-                    }
-                    if (noteEdit) {
-                        TextEditDialog(
-                            title = "Nota rápida",
-                            initial = cfg.noteText,
-                            hint = "Se muestra junto al reloj (hasta 80 letras).",
-                            maxLen = 80,
-                            onSave = {
-                                cfg.setNoteText(it)
-                                noteEdit = false
-                            },
-                            onClose = { noteEdit = false }
-                        )
-                    }
-                    if (showWizard) {
-                        SetupWizard(
-                            onSetHome = { requestHome(ctx) { homeLauncher.launch(it) } },
-                            onNotifications = {
-                                if (!tryStart(ctx, "android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS")) {
-                                    openSystem(ctx, "access")
-                                }
-                            },
-                            onProfile = { applyProfile(it) },
-                            onDone = {
-                                cfg.setWizardDone(true)
-                                cfg.setLastVersion(verCode)
-                                focusTick++
-                            }
                         )
                     }
                     val wn = whatsNew

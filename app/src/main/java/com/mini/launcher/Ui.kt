@@ -93,16 +93,6 @@ val LocalFocusStyle = compositionLocalOf { 0 }
 val LocalThickFocus = compositionLocalOf { false }
 val LocalHighContrast = compositionLocalOf { false }
 
-/** Sonido corto al abrir (true) o cerrar (false) un panel (26). Usa los sonidos del sistema. */
-fun playPanelSound(view: View, vol: Float, open: Boolean) {
-    val am = view.context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
-    if (am != null) {
-        am.playSoundEffect(
-            if (open) AudioManager.FX_KEYPRESS_STANDARD else AudioManager.FX_KEYPRESS_RETURN, vol
-        )
-    }
-}
-
 /** Reproduce el sonido de foco a volumen bajo (si el sistema tiene los sonidos activados). */
 fun playSoftFocus(view: View, vol: Float) {
     val am = view.context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
@@ -165,7 +155,11 @@ fun Modifier.autoFocusOn(key: Any?, requester: FocusRequester? = null): Modifier
     val fr = requester ?: own
     LaunchedEffect(key) {
         delay(150)
-        runCatching { fr.requestFocus() }
+        var tries = 0
+        while (tries < 4 && runCatching { fr.requestFocus() }.isFailure) {
+            tries++
+            delay(150)
+        }
     }
     return this.focusRequester(fr)
 }

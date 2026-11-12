@@ -36,6 +36,10 @@ import java.util.Calendar
 /** Hora de la ultima notificacion (la anota MediaListener); el modo ambiente atenua la hora. */
 object Notif {
     var at by mutableLongStateOf(0L)
+    /** Sube con cada notificacion nueva o quitada: avisa a la pantalla de inicio sin sondear. */
+    var tick by androidx.compose.runtime.mutableIntStateOf(0)
+    /** Sube cuando el servicio de notificaciones se conecta (hay que volver a enganchar las sesiones de media). */
+    var link by androidx.compose.runtime.mutableIntStateOf(0)
     fun recent(): Boolean = at != 0L && SystemClock.elapsedRealtime() - at < 60_000L
 }
 
@@ -105,36 +109,3 @@ fun liveBgBrush(): Brush {
     return Brush.verticalGradient(listOf(lerp(a.top, b.top, f), lerp(a.bottom, b.bottom, f)))
 }
 
-/** Margen de seguridad guiado: marco verde = zona segura; las esquinas rojas deben verse completas. */
-@Composable
-fun OverscanGuide(cfg: Cfg, onClose: () -> Unit) {
-    val ov = cfg.overscan
-    Box(
-        Modifier
-            .fillMaxSize()
-            .background(Color.Black)
-            .onKeyEvent { e ->
-                if (e.type == KeyEventType.KeyDown) {
-                    when (e.key) {
-                        Key.DirectionRight, Key.DirectionUp -> cfg.setOverscan((cfg.overscan + 2).coerceAtMost(60))
-                        Key.DirectionLeft, Key.DirectionDown -> cfg.setOverscan((cfg.overscan - 2).coerceAtLeast(0))
-                        else -> onClose()
-                    }
-                }
-                true
-            }
-            .autoFocus()
-    ) {
-        val red = Color(0xFFFF5555)
-        Box(Modifier.align(Alignment.TopStart).size(48.dp).border(3.dp, red))
-        Box(Modifier.align(Alignment.TopEnd).size(48.dp).border(3.dp, red))
-        Box(Modifier.align(Alignment.BottomStart).size(48.dp).border(3.dp, red))
-        Box(Modifier.align(Alignment.BottomEnd).size(48.dp).border(3.dp, red))
-        Box(Modifier.fillMaxSize().padding(ov.dp).border(2.dp, Color(0xFF3DDC84)), contentAlignment = Alignment.Center) {
-            Text(
-                "Margen: $ov dp\nLas 4 esquinas rojas deben verse completas.\nDerecha/Arriba = más margen · Izquierda/Abajo = menos · OK = listo",
-                color = Color(0xFFCCD6E6), fontSize = 18.sp
-            )
-        }
-    }
-}

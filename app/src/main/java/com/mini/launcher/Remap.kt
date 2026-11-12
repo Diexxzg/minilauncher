@@ -7,7 +7,7 @@ import android.media.AudioManager
 import android.view.KeyEvent
 import org.json.JSONObject
 
-/** Acciones del remapeo: 0..12 igual que COLOR_ACTIONS, mas las globales. */
+/** Acciones del remapeo: 0..9 igual que COLOR_ACTIONS, mas las globales. */
 val REMAP_ACTIONS = COLOR_ACTIONS + listOf("Atrás", "Inicio", "Apps recientes del sistema", "Pausar / reanudar")
 
 /** Remapeo de botones del mando: codigo de tecla -> "a:N" (accion) o "p:paquete" (abrir app). */
@@ -26,6 +26,7 @@ object Remap {
     }
 
     fun load(c: Context): Map<Int, String> {
+        migrateActions(Prefs(c))
         val out = LinkedHashMap<Int, String>()
         try {
             val o = JSONObject(Prefs(c).getStr("remap", "{}"))
@@ -65,10 +66,10 @@ object Remap {
                 return
             }
             when (val a = v.removePrefix("a:").toIntOrNull() ?: 0) {
-                13 -> svc.performGlobalAction(AccessibilityService.GLOBAL_ACTION_BACK)
-                14 -> svc.performGlobalAction(AccessibilityService.GLOBAL_ACTION_HOME)
-                15 -> svc.performGlobalAction(AccessibilityService.GLOBAL_ACTION_RECENTS)
-                16 -> {
+                10 -> svc.performGlobalAction(AccessibilityService.GLOBAL_ACTION_BACK)
+                11 -> svc.performGlobalAction(AccessibilityService.GLOBAL_ACTION_HOME)
+                12 -> svc.performGlobalAction(AccessibilityService.GLOBAL_ACTION_RECENTS)
+                13 -> {
                     val am = c.getSystemService(Context.AUDIO_SERVICE) as AudioManager
                     am.dispatchMediaKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE))
                     am.dispatchMediaKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE))
