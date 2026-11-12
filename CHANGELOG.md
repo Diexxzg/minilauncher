@@ -1,5 +1,10 @@
 # Novedades
 
+## 4.48
+- Limpieza grande: quitados Perfil de niños y Familia, escena de cine, rutina diaria, asistente de configuración, modo noche automático, sonido de paneles, transiciones, ambiente por carátula, recordatorios, Ambilight/WLED y cámara.
+- Configuración de 8 categorías y el celular muestra solo lo que sigue vivo; menos sondeos (música, red y notificaciones se actualizan por avisos del sistema).
+- El foco vuelve al dock con más reintentos al salir de Configuración.
+
 ## 4.47
 - «One Piece Control» suma Apps (favoritas y todas, con búsqueda; tocar una la abre en la TV).
 - Ajustes del celular con las 11 secciones de la TV, de Fondo y color hasta Acerca de: interruptores, opciones y deslizadores se cambian desde el celular, con búsqueda en todos los ajustes. Lo que abre diálogos o permisos se ve como «Solo en la TV».
